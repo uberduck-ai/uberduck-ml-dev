@@ -24,9 +24,7 @@ def synthesize_speakerids(data_dict):
     speaker_offset = {}
     for source_file in source_files:
         data = data_dict[source_file]
-        #data = pd.read_csv(source_file, sep = "|",header=None, error_bad_lines=False)
         nspeakers = len(np.unique(data[3]))
-        #speakers_cumulative = data[3] + nspeakers_cumulative
         data[3] = data[3] + nspeakers_cumulative
         data_dict[source_file] = data
         speaker_offset[source_file] = nspeakers_cumulative
@@ -34,16 +32,49 @@ def synthesize_speakerids(data_dict):
 
     return(data_dict)  
 
-def get_dataset(source_files, data_id, data_folder):
-
+def get_dataset(source_files, wav_folders,data_id, data_folder):
+    '''
+    source_files: the identities of the multispeaker metadatasets
+    '''
     os.mkdir(data_folder + '/' + data_id)
     data_dict = {}
-    for source_file in source_files:
+
+    for s in range(len(source_files)):
+        source_file = source_files[s]
+        wav_folder = wav_folders[s]
         data_dict[source_file] = add_speakerid(source_file)
+        npoints = data_dict[source_file].shape[0]
+        for i in range(npoints):
+            data_dict[source_file][:,0] = wav_folder + data_dict[source_file][i,0]
     data_dict = synthesize_speakerids(data_dict)
     combined_data = pd.concat(list(data_dict.values()))
     combined_data.to_csv(data_folder + '/' + data_id + source_file, sep = "|",header=None, error_bad_lines=False)
     
+
+def parse_libritts():
+    #wavs /LibriTTS/dev-clean/1272/135031
+
+#folder = '/mnt/disks/uberduck-experiments-v0/data/vctk/'
+def parse_vctk(folder):
+
+    wav_dir = folder + 'wav48_silence_trimmed'
+    txt_dir = folder + 'txt'
+    speakers = os.listdir(wav_dir):
+    data_dict = {}
+    for f in wav_dir:
+        wav_files_speaker = os.listdir(wav_dir + f):
+        data_dict[wav_dir] = pd.DataFrame()
+        text = np.asarray([])
+        wav_file = np.asarray([])
+        for g in range(len(files)):
+            text = np.append(text, pd.read_csv(f + files[g]))
+            wav_file = np.append(text, pd.read_csv(txt_dir + files[g]))
+            data_dict[wav_dir][:,0] = pd.DataFrame()
+    txt_folders = os.listdir(folder + 'txt'):
+    
+    #flacs (wav like) vctk/wav48_silence_trimmed/p230/
+    #folder is speaker_id
+
     # source_file in source_files:
     #     data_dict[source_file].to_csv(data_folder + '/' + data_id + source_file, sep = "|",header=None, error_bad_lines=False)
 #def compute_statistics(data_dict):
