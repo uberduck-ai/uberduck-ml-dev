@@ -1,7 +1,7 @@
 #launch gpu... not fininalized
 export IMAGE_FAMILY="pytorch-latest-gpu"
-export ZONE="us-west4-b"
-export INSTANCE_NAME="uberduck-1"
+export ZONE="us-west2-b"
+export INSTANCE_NAME="uberduck-sam"
 
 gcloud compute instances create $INSTANCE_NAME \
   --zone=$ZONE \
@@ -50,3 +50,26 @@ python train.py --output_directory=outdir --log_directory=logdir
 #get existing mellotron
 pip install gdown
 gdown --id 1UwDARlUl8JvB2xSuyMFHFsIWELVpgQD4
+
+# #launch gpu... not fininalized
+# export IMAGE_FAMILY="pytorch-latest-gpu"
+# export ZONE="us-west1-b"
+# export INSTANCE_NAME="uberduck-1"
+
+# gcloud compute instances create $INSTANCE_NAME \
+#   --zone=$ZONE \
+#   --custom-memory=16384MB \
+#   --custom-cpu=8 \
+#   --image-family=$IMAGE_FAMILY \
+#   --image-project=deeplearning-platform-release \
+#   --maintenance-policy=TERMINATE \
+#   --accelerator="type=nvidia-tesla-a100,count=1" \
+#   --metadata="install-nvidia-driver=True"
+
+# export INSTANCE_NAME="uberduck-100"
+# gcloud compute instances create $INSTANCE_NAME \
+#   --zone=$ZONE \
+#   --machine-type=a2-highgpu-1g \
+#   --image-family=$IMAGE_FAMILY \
+#   --image-project=deeplearning-platform-release \
+#   --maintenance-policy=TERMINATE

@@ -1,19 +1,22 @@
 import torch
+import pandas as pd
 
 class TTSModel(torch.nn.Module):
-    
     def infer(self):
-        raise NotImplemented  
+        raise NotImplemented
 
     def forward(self):
-        raise NotImplemented  
+        raise NotImplemented
 
     def from_pretrained(self):
-        raise NotImplemented  
+        raise NotImplemented
 
-    @classmethod 
-    def create(cls, name, opts):
+    @classmethod
+    def create(cls, name, opts, folders, all_speakers = True):
 
         model_cls = cls.get_class(name)
-        
-        return(model_cls(opts))
+        folders = pd.read_csv(folders)
+        for folder in folders:
+            
+
+        return model_cls(opts)
