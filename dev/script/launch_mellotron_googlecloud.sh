@@ -1,6 +1,6 @@
 #launch gpu... not fininalized
 export IMAGE_FAMILY="pytorch-latest-gpu"
-export ZONE="us-west2-b"
+export ZONE="us-west-2-b"
 export INSTANCE_NAME="uberduck-sam"
 
 gcloud compute instances create $INSTANCE_NAME \
@@ -34,6 +34,9 @@ sudo apt-get install libsndfile1-dev
 pip install tensorboardX
 pip install inflect
 pip install tensorflow==1.15.5
+pip install gdown
+pip install soundfile
+conda install libsndfile #deactivate log out and log in
 
 cd mellotron
 mkdir outdir
@@ -56,6 +59,12 @@ gdown --id 1UwDARlUl8JvB2xSuyMFHFsIWELVpgQD4
 # export ZONE="us-west1-b"
 # export INSTANCE_NAME="uberduck-1"
 
+
+
+dvc remote modify --local uberduck user pub_qwmyyewvnpxhjwwufv
+dvc remote modify --local uberduck password pk_731b4c9c-0d17-4537-a6a5-4900bacd540c
+
+echo "set enable-bracketed-paste off" >> ~/.inputrc
 # gcloud compute instances create $INSTANCE_NAME \
 #   --zone=$ZONE \
 #   --custom-memory=16384MB \
