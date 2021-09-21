@@ -1,103 +1,192 @@
+import sys
+import os
+import soundfile as sf 
 import pandas as pd
-import numpy as np
-import os 
-def add_speakerid(source_file, speaker_key = 0):
 
-    # if speaker_ids == None:
-    #     speaker_ids = np.asarray(np.ones(data.shape[0], dtype = int) * speaker_key, dtype = int)
-    data = pd.read_csv(source_file, sep = "|",header=None, error_bad_lines=False)
+workingdirectory = os.popen('git rev-parse --show-toplevel').read()[:-1]
+sys.path.append(workingdirectory)
+os.chdir(workingdirectory)
+
+from src.utils import add_speakerid, parse_vctk, parse_libritts_mellotron, parse_lj7
+import numpy as np
+
+import soundfile as sf
+import librosa
+
+def load_filepaths_and_text(filename, split="|"):
+    with open(filename, encoding='utf-8') as f:
+        filepaths_and_text = [line.strip().split(split) for line in f]
+    return filepaths_and_text
+
+def synthesize_speakerids2(filelists, fix_indices_index = None):
+
+    data_dict = {}
+    data_dict_out = {}
+    for f in range(len(filelists)):
+            data = load_filepaths_and_text(filelists[f])
+            data_dict[filelists[f]] = pd.DataFrame(data)    
+        
+    source_files = list(data_dict.keys())
+    
+    speaker_offset = {}
+    nfilelist = len(filelists)
+    reserved_speakers = np.unique(data_dict[filelists[fix_indices_index]].iloc[:,2])
+    
+    for s in range(nfilelist):
+        source_file = filelists[s]
+        data = data_dict[source_file]
+        if s != fix_indices_index:
+            speakers = np.unique(data.iloc[:,2])
+            overlap = np.where(np.isin(speakers, reserved_speakers))[0]
+            reserved_speakers_temp = np.union1d(speakers, reserved_speakers)
+            newindices = np.setdiff1d(list(range(len(reserved_speakers) + len(speakers))), reserved_speakers_temp)[:len(overlap)]
+            for o in range(len(overlap)):
+                data.iloc[np.where(data.iloc[:,2] == overlap[o])[0] ,2] = newindices[o]
+
+            data_dict_out[source_file] = data
+            speakers = np.unique(data.iloc[:,2])
+            reserved_speakers = np.union1d(speakers, reserved_speakers)
+        else:
+            data_dict_out[source_file] = data
+    return(data_dict_out)  
+
+def parse_vctk(folder):
+
+    wav_dir = folder + 'wav48_silence_trimmed'
+    txt_dir = folder + 'txt'
+    speaker_wavs = os.listdir(wav_dir)
+    speaker_txts = os.listdir(txt_dir)
+    speakers = np.intersect1d(speaker_wavs, speaker_txts)
+    
+    output_dict = {}
+    #wav_dict = {}
+    #txt_dict = {}
+    #speaker_dict = {}
+    counter = 0
+    for speaker in speakers:
+        
+        speaker_wav_dir = wav_dir + '/' + speaker
+        speaker_txt_dir = txt_dir + '/' + speaker
+        wav_files_speaker = np.asarray(os.listdir(speaker_wav_dir))
+        txt_files_speaker = np.asarray(os.listdir(speaker_txt_dir))
+        #data_dict[wav_dir] = pd.DataFrame()
+
+        wav_files = np.asarray([])
+        nwavfiles= len(wav_files_speaker)
+        list1 = np.asarray([txt_files_speaker[i][:8] for i in range(len(txt_files_speaker))])
+        list2 = np.asarray([wav_files_speaker[i][:8] for i in range(nwavfiles)])
+        mic = np.asarray([wav_files_speaker[i][12]  for i in range(nwavfiles)])
+        mic1_ind = mic == '1'
+        wav_files_speaker = wav_files_speaker[mic1_ind]
+        list2 = list2[mic1_ind]
+        combined_files = np.intersect1d(list1, list2)
+        matching_inds1 = np.where(np.isin(list1 , combined_files))[0]
+        matching_inds2 = np.where(np.isin(list2 , combined_files))[0]
+        inds1 = matching_inds1[list1[matching_inds1].argsort()]
+        inds2 = matching_inds2[list2[matching_inds2].argsort()]
+        txt_files_speaker = txt_files_speaker[inds1]
+        wav_files_speaker = wav_files_speaker[inds2]
+        texts = list()
+        for g in range(len(txt_files_speaker)):
+            text_file = speaker_txt_dir + '/' + txt_files_speaker[g]
+            with open(text_file) as f:
+                contents = f.read().splitlines() 
+            #print(contents)
+            texts = np.append(texts, contents)
+
+            wav_file = speaker_wav_dir + '/' + wav_files_speaker[g]
+            wav_files = np.append(wav_files, wav_file)
+
+        if wav_files.shape[0]>0:
+            output_dict[speaker] = pd.DataFrame([wav_files, texts,np.repeat(counter, wav_files.shape[0])]).transpose()
+            counter = counter +1
+            
+    output = pd.concat(list(output_dict.values()))   
+    return(output)
+
+def parse_libritts_mellotron(source_folder, mellotron_filelist):
+
+    data = pd.read_csv(mellotron_filelist, sep = "|",header=None, error_bad_lines=False)
+    
+    data[0] = data[0].str[17:]
+    
+    data[0] = source_folder + data[0].astype(str)
+    return(data)
+
+def load_filepaths_and_text(filename, split="|"):
+    with open(filename, encoding='utf-8') as f:
+        filepaths_and_text = [line.strip().split(split) for line in f]
+    return filepaths_and_text
+
+# export
+def flac_to_wav(input_file):
+    
+    nsamp = input_file.shape[0]
+    output_file = input_file.copy()
+    for i in range(nsamp):
+        filename = input_file.iloc[i,0]
+        print(i,filename)
+        filestart = filename[:-5]
+        print(i,filestart)
+        audio, sr = librosa.load(filename)#sf.read(filename)
+        newfile = filestart + '.wav'
+        print(i,newfile)
+        sf.write(newfile,audio,sr)
+        output_file.iloc[i,0] = newfile
+        
+    return(output_file)
+
+def add_speakerid(data, speaker_key = 0):
+
     if data.shape[1] == 3:
         if type(data[2]) == int:
             pass
-
+        else:
+            speaker_ids = np.asarray(np.ones(data.shape[0], dtype = int) * speaker_key, dtype = int)
+            data[2] = speaker_ids            
     if data.shape[1] == 2:
         speaker_ids = np.asarray(np.ones(data.shape[0], dtype = int) * speaker_key, dtype = int)
         data[2] = speaker_ids
 
     return(data)
-    #data.to_csv(source_file + '_multispeaker.txt', sep = "|",header=None,index= False)
 
-#def synthesize_speakerids(source_files):
-def synthesize_speakerids(data_dict):
+# export 
+def parse_libritts_mellotron(source_folder, mellotron_filelist):
 
-    source_files = list(data_dict.keys())
-    nspeakers_cumulative = 0
-    speaker_offset = {}
-    for source_file in source_files:
-        data = data_dict[source_file]
-        nspeakers = len(np.unique(data[3]))
-        data[3] = data[3] + nspeakers_cumulative
-        data_dict[source_file] = data
-        speaker_offset[source_file] = nspeakers_cumulative
-        nspeakers_cumulative = nspeakers_cumulative + nspeakers
-
-    return(data_dict)  
-
-def get_dataset(source_files, wav_folders,data_id, data_folder):
-    '''
-    source_files: the identities of the multispeaker metadatasets
-    '''
-    os.mkdir(data_folder + '/' + data_id)
-    data_dict = {}
-
-    for s in range(len(source_files)):
-        source_file = source_files[s]
-        wav_folder = wav_folders[s]
-        data_dict[source_file] = add_speakerid(source_file)
-        npoints = data_dict[source_file].shape[0]
-        for i in range(npoints):
-            data_dict[source_file][:,0] = wav_folder + data_dict[source_file][i,0]
-    data_dict = synthesize_speakerids(data_dict)
-    combined_data = pd.concat(list(data_dict.values()))
-    combined_data.to_csv(data_folder + '/' + data_id + source_file, sep = "|",header=None, error_bad_lines=False)
-
-
-
-def parse_libritts():
-    #wavs /LibriTTS/dev-clean/1272/135031
-    pass
-
-def parse_lj7():
-
-    2+2
-    pass
-
-def parse_libritts_mellotron(source_file):
-
-    data = pd.read_csv(source_file, sep = "|",header=None, error_bad_lines=False)
-
-#folder = '/mnt/disks/uberduck-experiments-v0/data/vctk/'
-def parse_vctk(folder):
-
-    wav_dir = folder + 'wav48_silence_trimmed'
-    txt_dir = folder + 'txt'
-    speakers = os.listdir(wav_dir)
-    data_dict = {}
-    for speaker in speakers:
-        speaker_dir = wav_dir + '/' + speaker
-        wav_files_speaker = os.listdir(speaker_dir)
-        data_dict[wav_dir] = pd.DataFrame()
-        text = np.asarray([])
-        wav_file = np.asarray([])
-        for g in range(len(wav_files_speaker)):
-            text = np.append(text, pd.read_csv(speaker_dir + '/' + wav_files_speaker[g]))
-            wav_file = np.append(text, pd.read_csv(txt_dir + wav_files_speaker[g]))
-            data_dict[wav_dir][:,0] = pd.DataFrame()
-    txt_folders = os.listdir(folder + 'txt')
+    data = load_filepaths_and_text(mellotron_filelist)
+    data = pd.DataFrame(data)    
+    data[0] = data[0].str[17:]
     
-    #flacs (wav like) vctk/wav48_silence_trimmed/p230/
-    #folder is speaker_id
+    data[0] = source_folder + data[0].astype(str)
+    return(data)
 
-    # source_file in source_files:
-    #     data_dict[source_file].to_csv(data_folder + '/' + data_id + source_file, sep = "|",header=None, error_bad_lines=False)
-#def compute_statistics(data_dict):
+    
+def parse_uberduck(source_folder):
+    
+    source_file = source_folder + '/all.txt'
+    data = load_filepaths_and_text(source_file)
+    data = pd.DataFrame(data)  
+    
+    nsamp = data.shape[0]
+    data[0] =  source_folder + '/'+data[0].astype(str)
+    output = add_speakerid(data, speaker_key = 0)
+    
+    for i in range(output.shape[0]):
+        loaded = librosa.load(output.iloc[i,0])
+        sf.write(output.iloc[i,0],loaded[0],loaded[1])
+        
+    return(output)
 
-
-# def add_speakerid(source_file, speaker_ids = None, speaker_key = None):
-#     data = pd.read_csv(source_file, sep = "|",header=None, error_bad_lines=False)
-#     if speaker_ids == None:
-#         speaker_ids = np.asarray(np.ones(data.shape[0], dtype = int) * speaker_key, dtype = int)
-#     for i in range(data.shape[0]):
-#         data[0][i] = '/Users/samsonkoelle/Downloads/eminem_14/' + data[0][i] 
-#     data[2] = speaker_ids
-#     data.to_csv(source_file + '_multispeaker.txt', sep = "|",header=None,index= False)
+def parse_lj7(source_folder):
+    
+    source_file = source_folder + '/metadata.csv'
+    data = load_filepaths_and_text(source_file)
+    data = pd.DataFrame(data)  
+    nsamp = data.shape[0]
+    
+    data[0] = source_folder + '/wavs/' + data[0].astype(str)
+    output = add_speakerid(data, speaker_key = 0)
+    for i in range(output.shape[0]):
+        output.iloc[i,0] = output.iloc[i,0] + '.wav'
+        
+    return(output)
