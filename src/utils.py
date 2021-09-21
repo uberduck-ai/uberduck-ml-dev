@@ -1,12 +1,13 @@
 import pandas as pd
-
+import numpy as np
+import os 
 def add_speakerid(source_file, speaker_key = 0):
 
     # if speaker_ids == None:
     #     speaker_ids = np.asarray(np.ones(data.shape[0], dtype = int) * speaker_key, dtype = int)
     data = pd.read_csv(source_file, sep = "|",header=None, error_bad_lines=False)
     if data.shape[1] == 3:
-        if type(data[2]]) == int:
+        if type(data[2]) == int:
             pass
 
     if data.shape[1] == 2:
@@ -49,28 +50,40 @@ def get_dataset(source_files, wav_folders,data_id, data_folder):
     data_dict = synthesize_speakerids(data_dict)
     combined_data = pd.concat(list(data_dict.values()))
     combined_data.to_csv(data_folder + '/' + data_id + source_file, sep = "|",header=None, error_bad_lines=False)
-    
+
+
 
 def parse_libritts():
     #wavs /LibriTTS/dev-clean/1272/135031
+    pass
+
+def parse_lj7():
+
+    2+2
+    pass
+
+def parse_libritts_mellotron(source_file):
+
+    data = pd.read_csv(source_file, sep = "|",header=None, error_bad_lines=False)
 
 #folder = '/mnt/disks/uberduck-experiments-v0/data/vctk/'
 def parse_vctk(folder):
 
     wav_dir = folder + 'wav48_silence_trimmed'
     txt_dir = folder + 'txt'
-    speakers = os.listdir(wav_dir):
+    speakers = os.listdir(wav_dir)
     data_dict = {}
-    for f in wav_dir:
-        wav_files_speaker = os.listdir(wav_dir + f):
+    for speaker in speakers:
+        speaker_dir = wav_dir + '/' + speaker
+        wav_files_speaker = os.listdir(speaker_dir)
         data_dict[wav_dir] = pd.DataFrame()
         text = np.asarray([])
         wav_file = np.asarray([])
-        for g in range(len(files)):
-            text = np.append(text, pd.read_csv(f + files[g]))
-            wav_file = np.append(text, pd.read_csv(txt_dir + files[g]))
+        for g in range(len(wav_files_speaker)):
+            text = np.append(text, pd.read_csv(speaker_dir + '/' + wav_files_speaker[g]))
+            wav_file = np.append(text, pd.read_csv(txt_dir + wav_files_speaker[g]))
             data_dict[wav_dir][:,0] = pd.DataFrame()
-    txt_folders = os.listdir(folder + 'txt'):
+    txt_folders = os.listdir(folder + 'txt')
     
     #flacs (wav like) vctk/wav48_silence_trimmed/p230/
     #folder is speaker_id
