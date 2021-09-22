@@ -3,7 +3,10 @@
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
 index = {"TTSModel": "models.base.ipynb",
+         "Conv1d": "models.common.ipynb",
          "Tacotron2": "models.mellotron.ipynb",
+         "VITSEncoder": "models.vits.ipynb",
+         "VITSModel": "models.vits.ipynb",
          "TTSTrainer": "trainer.base.ipynb",
          "load_filepaths_and_text": "utils.ipynb",
          "synthesize_speakerids2": "utils.ipynb",
@@ -14,8 +17,11 @@ index = {"TTSModel": "models.base.ipynb",
          "parse_uberduck": "utils.ipynb",
          "parse_lj7": "utils.ipynb"}
 
-modules = ["models/base.py",
+modules = ["exec/train_tacotron2.py",
+           "models/base.py",
+           "models/common.py",
            "models/mellotron.py",
+           "models/vits.py",
            "trainer/base.py",
            "utils.py"]
 
