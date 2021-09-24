@@ -75,27 +75,36 @@ class MellotronTrainer(TTSTrainer):
                 y_pred = model(y)
                 loss = criterion(y_pred, y)
 
-        pass
-
-    def train(self):
-        # load dataset
-        train_set = TextMelDataset(
+    @property
+    def training_dataset_args(self):
+        return [
             self.dataset_path,
             self.training_audiopaths_and_text,
             self.text_cleaners,
+            # audio params
             self.n_mel_channels,
+            self.sample_rate,
             self.mel_fmin,
             self.mel_fmax,
-        )
-        val_set = TextMelDataset(
-            self.dataset_path,
-            self.val_audiopaths_and_text,
-            self.text_cleaners,
-            self.n_mel_channels,
-            self.mel_fmin,
-            self.mel_fmax,
-        )
-        collate_fn = TextMelCollate()
+            self.filter_length,
+            self.hop_length,
+            self.win_length,
+            self.max_wav_value,
+            self.include_f0,
+        ]
+
+    @property
+    def val_dataset_args(self):
+        val_args = [a for a in self.training_dataset_args]
+        val_args[1] = self.val_audiopaths_and_text
+        return val_args
+
+
+    def train(self):
+        # load dataset
+        train_set = TextMelDataset(*self.training_dataset_args)
+        val_set = TextMelDataset(*val_dataset_args)
+        collate_fn = TextMelCollate(n_frames_per_step=1, include_f0=self.include_f0)
         train_loader = DataLoader(
             dataset, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn
         )
