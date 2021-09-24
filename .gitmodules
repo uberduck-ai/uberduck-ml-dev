@@ -1,3 +1,6 @@
 [submodule "path_to_submodule"] 
   path = src/vendor/mellotron 
   url = git:https://github.com/NVIDIA/mellotron
+[submodule "src/vendor_tools/waveglow"]
+	path = src/vendor_tools/waveglow
+	url = https://github.com/NVIDIA/waveglow

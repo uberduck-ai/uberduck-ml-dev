@@ -153,3 +153,29 @@ pip install -r requirements.txt
 #pip install inflect
 #pip install tensorboardX==1.1
 #pip install tensorflow==1.15.2
+
+
+#modifying .bash shared between sessions... 5 gb base storage...  maybe need venv?
+
+conda install -c conda-forge mamba # installs much faster than conda
+mamba install -c conda-forge dvc
+
+#export UBERDUCK_ACCESS_TOKEN=your-github-access-token
+export UBERDUCK_ACCESS_TOKEN="5dc7e850038038abdceecab854cd2bc0a375d2ad"
+
+git clone https://sjkoelle:$UBERDUCK_ACCESS_TOKEN@git.uberduck.ai/uberduck-internal/eminem.git
+
+export API_KEY="pub_qwmyyewvnpxhjwwufv"
+export API_SECRET="pk_731b4c9c-0d17-4537-a6a5-4900bacd540c"
+
+dvc remote modify --local uberduck user $API_KEY
+dvc remote modify --local uberduck password $API_SECRET
+
+mkdir data
+cd data
+git clone https://git.uberduck.ai/uberduck-internal/eminem.git
+git clone https://git.uberduck.ai/uberduck-internal/kanye-rap.git
+git clone https://git.uberduck.ai/uberduck-internal/alex-trebek.git
+git clone https://git.uberduck.ai/uberduck-internal/ben-shapiro.git
+git clone https://git.uberduck.ai/uberduck-internal/michael-rosen.git
+git clone https://git.uberduck.ai/uberduck-internal/steve-harvey.git

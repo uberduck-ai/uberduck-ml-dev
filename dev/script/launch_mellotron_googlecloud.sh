@@ -82,3 +82,24 @@ echo "set enable-bracketed-paste off" >> ~/.inputrc
 #   --image-family=$IMAGE_FAMILY \
 #   --image-project=deeplearning-platform-release \
 #   --maintenance-policy=TERMINATE
+
+nohup python train.py -c /mnt/disks/uberduck-experiments-v0/models/mellotron_libritts.pt --warm_start --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs > uberljlog
+
+
+
+
+python train.py --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs
+
+nohup python -m multiproc train.py --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs --hparams=distributed_run=True,fp16_run=True &
+
+nohup python train.py -c /mnt/disks/uberduck-experiments-v0/models/mellotron/vendor/mellotron_ljs.pt --warm_start --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs > uberljlog3 &
+
+
+nohup python train.py -c /mnt/disks/uberduck-experiments-v0/models/mellotron/vendor/mellotron_ljs.pt --warm_start --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs_processed --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs > uberljlog_processed &
+
+nohup python /mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/src/vendor_run/mellotron/train.py -c /mnt/disks/uberduck-experiments-v0/models/mellotron/vendor/mellotron_ljs.pt --warm_start --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs/ljmel --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs/ljmel > /mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs/ljmel/ljlog_processed &
+
+ps -ef
+
+cd /mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/src/vendor_run/mellotron/
+nohup python /mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/src/vendor_run/mellotron/train.py -c /mnt/disks/uberduck-experiments-v0/models/mellotron/vendor/mellotron_ljs.pt --warm_start --output_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/outputs/em --log_directory=/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs/em > /mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/experiments/logs/em/emlog &

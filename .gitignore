@@ -1,3 +1,8 @@
+#outputcheckpoints - to remove when better configured
+experiments/outputs/*
+experiments/outputs_processed/*
+experiments/logs/*
+
 *.bak
 .gitattributes
 .last_checked
