@@ -27,11 +27,13 @@ if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
     config = MELLOTRON_DEFAULTS.values()
     if args.config:
-        config.update(json.load(args.config))
+        with open(args.config) as f:
+            config.update(json.load(f))
     hparams = HParams(**config)
     trainer = MellotronTrainer(hparams)
     try:
         trainer.train()
     except Exception as e:
         print(f"Exception raised while training: {e}")
-        # TODO: catch interrupt, save state.
+        # TODO: save state.
+        raise e
