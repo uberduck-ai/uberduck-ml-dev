@@ -71,6 +71,7 @@ class MellotronTrainer(TTSTrainer):
         if self.distributed_run:
             raise NotImplemented
         total_loss = 0
+        total_steps = 0
         with torch.no_grad():
             val_loader = DataLoader(
                 val_set,
@@ -79,11 +80,12 @@ class MellotronTrainer(TTSTrainer):
                 collate_fn=collate_fn,
             )
             for batch in val_loader:
+                total_steps += 1
                 X, y = model.parse_batch(batch)
                 y_pred = model(X)
                 loss = criterion(y_pred, y)
                 total_loss += loss.item()
-            mean_loss = total_loss / len(val_set)
+            mean_loss = total_loss / total_steps
             print(f"Average loss: {mean_loss}")
 
     @property
@@ -152,6 +154,9 @@ class MellotronTrainer(TTSTrainer):
                     )
                 optimizer.step()
                 print(f"Loss: {reduced_loss}")
+            # There's no need to validate in debug mode since we're not really training.
+            if self.debug:
+                continue
             self.validate(
                 model=model,
                 val_set=val_set,
