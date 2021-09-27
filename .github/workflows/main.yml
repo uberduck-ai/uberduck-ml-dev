@@ -9,6 +9,10 @@ jobs:
       with:
         python-version: '3.7'
         architecture: 'x64'
+    - name: Install OS dependencies
+      run: |
+        apt-get update
+        apt-get install libsndfile-dev
     - name: Install the library
       run: |
         pip install nbdev jupyter
