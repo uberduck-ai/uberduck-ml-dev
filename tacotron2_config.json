@@ -14,16 +14,18 @@
     "max_wav_value": 32768.0,
     "include_f0": false,
 
-    "batch_size": 4,
+    "batch_size": 2,
     "mask_padding": true,
     "fp16_run": false,
     "n_speakers": 2,
-    "learning_rate": 1e-4,
+    "learning_rate": 1e-3,
     "weight_decay": 1e-6,
+    "epochs_per_checkpoint": 20,
     "epochs": 101,
     "distributed_run": false,
     "grad_clip_thresh": 1.0,
 
+    "checkpoint_path": "checkpoints",
     "debug": true
 
 }

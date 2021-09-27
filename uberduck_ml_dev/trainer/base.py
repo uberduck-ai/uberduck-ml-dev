@@ -3,7 +3,10 @@
 __all__ = ['TTSTrainer', 'Tacotron2Loss', 'MellotronTrainer']
 
 # Cell
+import os
 from pprint import pprint
+
+import torch
 
 class TTSTrainer():
 
@@ -16,7 +19,17 @@ class TTSTrainer():
             self.debug = False
         if self.debug:
             print("Running in debug mode with hparams:")
-            pprint(hparams)
+            pprint(hparams.values())
+
+    def save_checkpoint(self, checkpoint_name, **kwargs):
+        checkpoint = {}
+        for k, v in kwargs.items():
+            if hasattr(v, "state_dict"):
+                checkpoint[k] = v.state_dict()
+            else:
+                checkpoint[k] = v
+        torch.save(checkpoint, os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt"))
+
 
 
     def train():
@@ -55,6 +68,7 @@ class Tacotron2Loss(nn.Module):
 class MellotronTrainer(TTSTrainer):
     REQUIRED_HPARAMS = [
         "audiopaths_and_text",
+        "checkpoint_path",
         "dataset_path",
         "epochs",
         "mel_fmax",
@@ -154,6 +168,15 @@ class MellotronTrainer(TTSTrainer):
                     )
                 optimizer.step()
                 print(f"Loss: {reduced_loss}")
+            if epoch % self.epochs_per_checkpoint == 0:
+                self.save_checkpoint(
+                    f"mellotron_{epoch}",
+                    model=model,
+                    optimizer=optimizer,
+                    iteration=epoch,
+                    learning_rate=self.learning_rate,
+                )
+
             # There's no need to validate in debug mode since we're not really training.
             if self.debug:
                 continue
