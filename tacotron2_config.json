@@ -26,6 +26,7 @@
     "grad_clip_thresh": 1.0,
 
     "checkpoint_path": "checkpoints",
+    "checkpoint_name": "mellotron_80.pt",
     "debug": true
 
 }
