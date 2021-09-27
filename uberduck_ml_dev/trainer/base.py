@@ -8,8 +8,8 @@ from pprint import pprint
 
 import torch
 
-class TTSTrainer():
 
+class TTSTrainer:
     def __init__(self, hparams):
         self.hparams = hparams
         for k, v in hparams.values().items():
@@ -28,15 +28,17 @@ class TTSTrainer():
                 checkpoint[k] = v.state_dict()
             else:
                 checkpoint[k] = v
-        torch.save(checkpoint, os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt"))
+        torch.save(
+            checkpoint, os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt")
+        )
 
-
+    def load_checkpoint(self, checkpoint_name):
+        return torch.load(os.path.join(self.checkpoint_path, checkpoint_name))
 
     def train():
         raise NotImplemented
-        #for batch in enumerate(data):
+        # for batch in enumerate(data):
         #    #fill in
-
 
 # Cell
 from typing import List
@@ -140,14 +142,20 @@ class MellotronTrainer(TTSTrainer):
             train_set, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn
         )
         criterion = Tacotron2Loss()
+
         model = Tacotron2(self.hparams)
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
         )
-        # main training loop
         start_epoch = 0
+        if self.checkpoint_name:
+            checkpoint = self.load_checkpoint(self.checkpoint_name)
+            model.load_state_dict(checkpoint["model"])
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            start_epoch = checkpoint["iteration"]
+        # main training loop
         for epoch in range(start_epoch, self.epochs):
             for batch in train_loader:
                 model.zero_grad()
