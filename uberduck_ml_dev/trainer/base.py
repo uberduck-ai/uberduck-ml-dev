@@ -3,6 +3,7 @@
 __all__ = ['TTSTrainer', 'Tacotron2Loss', 'MellotronTrainer']
 
 # Cell
+from pprint import pprint
 
 class TTSTrainer():
 
@@ -10,6 +11,12 @@ class TTSTrainer():
         self.hparams = hparams
         for k, v in hparams.values().items():
             setattr(self, k, v)
+
+        if not hasattr(self, "debug"):
+            self.debug = False
+        if self.debug:
+            print("Running in debug mode with hparams:")
+            pprint(hparams)
 
 
     def train():
@@ -35,8 +42,8 @@ class Tacotron2Loss(nn.Module):
         mel_target, gate_target = target[0], target[1]
         mel_target.requires_grad = False
         gate_target.requires_grad = False
-        gate_target.view(-1, 1)
-        mel_out, mel_out_postnet, gate_out, _ = model_ouput
+        gate_target = gate_target.view(-1, 1)
+        mel_out, mel_out_postnet, gate_out, _ = model_output
         gate_out = gate_out.view(-1, 1)
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
@@ -63,17 +70,21 @@ class MellotronTrainer(TTSTrainer):
         criterion = kwargs["criterion"]
         if self.distributed_run:
             raise NotImplemented
+        total_loss = 0
         with torch.no_grad():
             val_loader = DataLoader(
-                valset,
+                val_set,
                 shuffle=False,
                 batch_size=self.batch_size,
                 collate_fn=collate_fn,
             )
             for batch in val_loader:
                 X, y = model.parse_batch(batch)
-                y_pred = model(y)
+                y_pred = model(X)
                 loss = criterion(y_pred, y)
+                total_loss += loss.item()
+            mean_loss = total_loss / len(val_set)
+            print(f"Average loss: {mean_loss}")
 
     @property
     def training_dataset_args(self):
@@ -99,20 +110,21 @@ class MellotronTrainer(TTSTrainer):
         val_args[1] = self.val_audiopaths_and_text
         return val_args
 
-
     def train(self):
-        # load dataset
-        train_set = TextMelDataset(*self.training_dataset_args)
-        val_set = TextMelDataset(*val_dataset_args)
+        train_set = TextMelDataset(
+            *self.training_dataset_args,
+            debug=self.debug,
+            debug_dataset_size=self.batch_size,
+        )
+        val_set = TextMelDataset(
+            *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
+        )
         collate_fn = TextMelCollate(n_frames_per_step=1, include_f0=self.include_f0)
         train_loader = DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn
+            train_set, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn
         )
-        # create loss criterion
         criterion = Tacotron2Loss()
-        # create model
         model = Tacotron2(self.hparams)
-        # load optimizer
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=self.learning_rate,
@@ -136,11 +148,13 @@ class MellotronTrainer(TTSTrainer):
                     raise NotImplemented
                 else:
                     grad_norm = torch.nn.utils.clip_grad_norm(
-                        model.parameters(), self.grad_clip_threshold
+                        model.parameters(), self.grad_clip_thresh
                     )
                 optimizer.step()
                 print(f"Loss: {reduced_loss}")
             self.validate(
                 model=model,
                 val_set=val_set,
+                collate_fn=collate_fn,
+                criterion=criterion,
             )

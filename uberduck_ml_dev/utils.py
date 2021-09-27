@@ -2,7 +2,8 @@
 
 __all__ = ['load_filepaths_and_text', 'synthesize_speakerids2', 'parse_vctk', 'parse_libritts_mellotron',
            'load_filepaths_and_text', 'flac_to_wav', 'add_speakerid', 'parse_libritts_mellotron', 'parse_uberduck',
-           'parse_lj7', 'window_sumsquare', 'griffin_lim', 'dynamic_range_compression', 'dynamic_range_decompression']
+           'parse_lj7', 'window_sumsquare', 'griffin_lim', 'dynamic_range_compression', 'dynamic_range_decompression',
+           'to_gpu', 'get_mask_from_lengths']
 
 # Cell
 
@@ -291,3 +292,24 @@ def dynamic_range_decompression(x, C=1):
     C: compression factor used to compress
     """
     return torch.exp(x) / C
+
+
+# Cell
+def to_gpu(x):
+    x = x.contiguous()
+
+    if torch.cuda.is_available():
+        x = x.cuda(non_blocking=True)
+    return torch.autograd.Variable(x)
+
+# Cell
+
+def get_mask_from_lengths(lengths):
+    """Return a mask matrix. Unmasked entires are true."""
+    max_len = torch.max(lengths).item()
+    tensor_cls = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
+    ids = torch.arange(0, max_len, out=tensor_cls(max_len))
+    print(ids)
+    print(lengths)
+    mask = (ids < lengths.unsqueeze(1)).bool()
+    return mask
