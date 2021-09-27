@@ -524,7 +524,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    def inference(self, memory, f0s):
+    def inference(self, memory, f0s=None):
         """Decoder inference
         PARAMS
         ------
@@ -539,19 +539,27 @@ class Decoder(nn.Module):
         decoder_input = self.get_go_frame(memory)
 
         self.initialize_decoder_states(memory, mask=None)
-        f0_dummy = self.get_end_f0(f0s)
-        f0s = torch.cat((f0s, f0_dummy), dim=2)
-        f0s = F.relu(self.prenet_f0(f0s))
-        f0s = f0s.permute(2, 0, 1)
+        if f0s:
+            f0_dummy = self.get_end_f0(f0s)
+            f0s = torch.cat((f0s, f0_dummy), dim=2)
+            f0s = F.relu(self.prenet_f0(f0s))
+            f0s = f0s.permute(2, 0, 1)
 
         mel_outputs, gate_outputs, alignments = [], [], []
         while True:
-            if len(mel_outputs) < len(f0s):
-                f0 = f0s[len(mel_outputs)]
-            else:
-                f0 = f0s[-1] * 0
+            if f0s:
+                if len(mel_outputs) < len(f0s):
+                    f0 = f0s[len(mel_outputs)]
+                else:
+                    f0 = f0s[-1] * 0
 
-            decoder_input = torch.cat((self.prenet(decoder_input), f0), dim=1)
+            if f0:
+                to_cat = (self.prenet(decoder_input), f0)
+            else:
+                to_cat = (self.prenet(decoder_input),)
+
+
+            decoder_input = torch.cat(to_cat, dim=1)
             mel_output, gate_output, alignment = self.decode(decoder_input)
 
             mel_outputs += [mel_output.squeeze(1)]
@@ -719,7 +727,11 @@ class Tacotron2(TTSModel):
         )
 
     def inference(self, inputs):
-        text, style_input, speaker_ids, f0s = inputs
+        text, style_input, speaker_ids, *_ = inputs
+        if self.include_f0:
+            f0s = inputs[3]
+        else:
+            f0s = None
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
@@ -753,6 +765,12 @@ class Tacotron2(TTSModel):
         )
 
     def inference_noattention(self, inputs):
+        """Run inference conditioned on an attention map.
+
+        NOTE(zach): I don't think it is necessary to do a version
+        of this without f0s passed as well, since it seems like we
+        would always want to condition on pitch when conditioning on rhythm.
+        """
         text, style_input, speaker_ids, f0s, attention_map = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs)
