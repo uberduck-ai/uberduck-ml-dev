@@ -327,6 +327,14 @@ class MelSTFT(torch.nn.Module):
         mel_output = self.spectral_normalize(mel_output)
         return mel_output
 
+    def griffin_lim(self, mel_spectrogram, n_iters=30):
+        mel_dec = self.spectral_de_normalize(mel_spectrogram)
+        mel_dec = mel_dec.transpose(0, 1).cpu().data
+        spec_from_mel = torch.mm(mel_dec, self.mel_basis).transpose(0, 1)
+        spec_from_mel *= 1000
+        out = griffin_lim(spec_from_mel.unsqueeze(0), self.stft_fn, n_iters=n_iters)
+        return out
+
 # Cell
 from torch.nn import init
 
