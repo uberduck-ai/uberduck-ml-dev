@@ -91,7 +91,7 @@ class TextMelDataset(Dataset):
 
     def __len__(self):
         if self.debug and self.debug_dataset_size:
-            return self.debug_dataset_size
+            return min(self.debug_dataset_size, len(self.audiopaths_and_text))
         return len(self.audiopaths_and_text)
 
 # Cell
