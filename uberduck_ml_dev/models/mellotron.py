@@ -15,7 +15,7 @@ from .base import TTSModel
 from .common import Attention, Conv1d, LinearNorm, GST
 from ..text.symbols import symbols
 from ..vendor.tfcompat.hparam import HParams
-from ..utils import to_gpu, get_mask_from_lengths
+from ..utils.utils import to_gpu, get_mask_from_lengths
 
 
 DEFAULTS = HParams(
@@ -139,7 +139,7 @@ class Postnet(nn.Module):
 
 class Prenet(nn.Module):
     def __init__(self, in_dim, sizes):
-        super(Prenet, self).__init__()
+        super().__init__()
         in_sizes = [in_dim] + sizes[:-1]
         self.layers = nn.ModuleList(
             [
@@ -539,7 +539,7 @@ class Decoder(nn.Module):
         decoder_input = self.get_go_frame(memory)
 
         self.initialize_decoder_states(memory, mask=None)
-        if f0s:
+        if f0s is not None:
             f0_dummy = self.get_end_f0(f0s)
             f0s = torch.cat((f0s, f0_dummy), dim=2)
             f0s = F.relu(self.prenet_f0(f0s))
@@ -547,13 +547,14 @@ class Decoder(nn.Module):
 
         mel_outputs, gate_outputs, alignments = [], [], []
         while True:
-            if f0s:
+            f0 = None
+            if f0s is not None:
                 if len(mel_outputs) < len(f0s):
                     f0 = f0s[len(mel_outputs)]
                 else:
                     f0 = f0s[-1] * 0
 
-            if f0:
+            if f0 is not None:
                 to_cat = (self.prenet(decoder_input), f0)
             else:
                 to_cat = (self.prenet(decoder_input),)
@@ -737,7 +738,9 @@ class Tacotron2(TTSModel):
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
         if hasattr(self, "gst"):
             if isinstance(style_input, int):
-                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size).cuda()
+                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size)
+                if torch.cuda.is_available():
+                    query = query.cuda()
                 GST = torch.tanh(self.gst.stl.embed)
                 key = GST[style_input].unsqueeze(0).expand(1, -1, -1)
                 embedded_gst = self.gst.stl.attention(query, key)
@@ -777,7 +780,9 @@ class Tacotron2(TTSModel):
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
         if hasattr(self, "gst"):
             if isinstance(style_input, int):
-                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size).cuda()
+                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size)
+                if torch.cuda.is_available():
+                    query = query.cuda()
                 GST = torch.tanh(self.gst.stl.embed)
                 key = GST[style_input].unsqueeze(0).expand(1, -1, -1)
                 embedded_gst = self.gst.stl.attention(query, key)

@@ -13,7 +13,7 @@ from torch.autograd import Variable
 from torch import nn
 from torch.nn import functional as F
 
-from ..utils import *
+from ..utils.utils import *
 from ..vendor.tfcompat.hparam import HParams
 
 # Cell
