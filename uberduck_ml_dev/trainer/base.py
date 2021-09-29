@@ -7,6 +7,9 @@ import os
 from pprint import pprint
 
 import torch
+from torch.utils.tensorboard import SummaryWriter
+
+from ..models.common import MelSTFT
 
 
 class TTSTrainer:
@@ -15,6 +18,8 @@ class TTSTrainer:
         for k, v in hparams.values().items():
             setattr(self, k, v)
 
+        self.global_step = 0
+        self.writer = SummaryWriter()
         if not hasattr(self, "debug"):
             self.debug = False
         if self.debug:
@@ -34,6 +39,23 @@ class TTSTrainer:
 
     def load_checkpoint(self, checkpoint_name):
         return torch.load(os.path.join(self.checkpoint_path, checkpoint_name))
+
+    def log(self, tag, step, scalar=None, audio=None):
+        if audio is not None:
+            self.writer.add_audio(tag, audio, step)
+        if scalar:
+            self.writer.add_scalar(tag, scalar, step)
+
+
+    def sample(self, mel, algorithm="griffin-lim", **kwargs):
+        if algorithm == "griffin-lim":
+            mel_stft = MelSTFT()
+            audio = mel_stft.griffin_lim(mel)
+        else:
+            raise NotImplemented
+        return audio
+
+
 
     def train():
         raise NotImplemented
@@ -103,6 +125,7 @@ class MellotronTrainer(TTSTrainer):
                 total_loss += loss.item()
             mean_loss = total_loss / total_steps
             print(f"Average loss: {mean_loss}")
+            self.log("Val/loss", self.global_step, scalar=mean_loss)
 
     @property
     def training_dataset_args(self):
@@ -155,9 +178,11 @@ class MellotronTrainer(TTSTrainer):
             model.load_state_dict(checkpoint["model"])
             optimizer.load_state_dict(checkpoint["optimizer"])
             start_epoch = checkpoint["iteration"]
+            # self.global_step = checkpoint["global_step"]
         # main training loop
         for epoch in range(start_epoch, self.epochs):
             for batch in train_loader:
+                self.global_step += 1
                 model.zero_grad()
                 X, y = model.parse_batch(batch)
                 y_pred = model(X)
@@ -176,6 +201,11 @@ class MellotronTrainer(TTSTrainer):
                     )
                 optimizer.step()
                 print(f"Loss: {reduced_loss}")
+                self.log("Loss/train", self.global_step, scalar=reduced_loss)
+                if epoch % self.steps_per_sample == 0:
+                    _, mel_out_postnet, *_ = y_pred
+                    audio = self.sample(mel=mel_out_postnet[0])
+                    self.log("AudioSample/train", self.global_step, audio=audio)
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"mellotron_{epoch}",
@@ -183,7 +213,11 @@ class MellotronTrainer(TTSTrainer):
                     optimizer=optimizer,
                     iteration=epoch,
                     learning_rate=self.learning_rate,
+                    global_step=self.global_step,
                 )
+
+            # Generate an audio sample
+            # TODO(zach)
 
             # There's no need to validate in debug mode since we're not really training.
             if self.debug:
