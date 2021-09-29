@@ -133,6 +133,7 @@ class MellotronTrainer(TTSTrainer):
             self.dataset_path,
             self.training_audiopaths_and_text,
             self.text_cleaners,
+            self.p_arpabet,
             # audio params
             self.n_mel_channels,
             self.sample_rate,

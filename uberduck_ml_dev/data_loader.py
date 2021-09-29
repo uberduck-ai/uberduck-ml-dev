@@ -34,6 +34,7 @@ class TextMelDataset(Dataset):
         dataset_path: str,
         audiopaths_and_text: str,
         text_cleaners: List[str],
+        p_arpabet: float,
         n_mel_channels: int,
         sample_rate: int,
         mel_fmin: float,
@@ -45,7 +46,7 @@ class TextMelDataset(Dataset):
         include_f0: bool = False,
         f0_min: int = 80,
         f0_max: int = 880,
-        harmonic_thresh = 0.25,
+        harmonic_thresh=0.25,
         debug: bool = False,
         debug_dataset_size: int = None,
     ):
@@ -54,6 +55,7 @@ class TextMelDataset(Dataset):
         self.dataset_path = dataset_path
         self.audiopaths_and_text = load_filepaths_and_text(path)
         self.text_cleaners = text_cleaners
+        self.p_arpabet = p_arpabet
         self.stft = MelSTFT(
             filter_length=filter_length,
             hop_length=hop_length,
@@ -100,7 +102,9 @@ class TextMelDataset(Dataset):
         path = Path(self.dataset_path) / path
         sample_rate, wav_data = read(path)
         text_sequence = torch.LongTensor(
-            text_to_sequence(transcription, self.text_cleaners)
+            text_to_sequence(
+                transcription, self.text_cleaners, p_arpabet=self.p_arpabet
+            )
         )
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / self.max_wav_value
@@ -111,7 +115,7 @@ class TextMelDataset(Dataset):
             return (text_sequence, melspec, speaker_id)
         f0 = self._get_f0(audio.data.cpu().numpy())
         f0 = torch.from_numpy(f0)[None]
-        f0 = f0[:, :melspec.size(1)]
+        f0 = f0[:, : melspec.size(1)]
 
         return (text_sequence, melspec, speaker_id, f0)
 

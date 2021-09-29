@@ -3,6 +3,8 @@
     "training_audiopaths_and_text": "train.txt",
     "val_audiopaths_and_text": "val.txt",
     "text_cleaners": ["english_cleaners"],
+    "p_arpabet": 1.0,
+
     "n_mel_channels": 80,
     "sample_rate": 22050,
     "mel_fmin": 0,
