@@ -7,6 +7,7 @@ import os
 from pprint import pprint
 
 import torch
+from torch.cuda.amp import autocast, GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
 from ..models.common import MelSTFT
@@ -180,27 +181,42 @@ class MellotronTrainer(TTSTrainer):
             optimizer.load_state_dict(checkpoint["optimizer"])
             start_epoch = checkpoint["iteration"]
             # self.global_step = checkpoint["global_step"]
+        if self.fp16_run:
+            scaler = GradScaler()
         # main training loop
         for epoch in range(start_epoch, self.epochs):
             for batch in train_loader:
                 self.global_step += 1
                 model.zero_grad()
                 X, y = model.parse_batch(batch)
-                y_pred = model(X)
-                loss = criterion(y_pred, y)
+                if self.fp16_run:
+                    with autocast():
+                        y_pred = model(X)
+                        loss = criterion(y_pred, y)
+                else:
+                    y_pred = model(X)
+                    loss = criterion(y_pred, y)
+
                 # TODO: fix for distributed run
                 if self.distributed_run:
                     raise NotImplemented
                 else:
                     reduced_loss = loss.item()
-                loss.backward()
+
                 if self.fp16_run:
-                    raise NotImplemented
-                else:
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
                     grad_norm = torch.nn.utils.clip_grad_norm(
                         model.parameters(), self.grad_clip_thresh
                     )
-                optimizer.step()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    grad_norm = torch.nn.utils.clip_grad_norm(
+                        model.parameters(), self.grad_clip_thresh
+                    )
+                    optimizer.step()
                 print(f"Loss: {reduced_loss}")
                 self.log("Loss/train", self.global_step, scalar=reduced_loss)
                 if epoch % self.steps_per_sample == 0:
