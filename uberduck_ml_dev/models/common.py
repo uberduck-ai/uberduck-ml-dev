@@ -66,6 +66,7 @@ class LinearNorm(torch.nn.Module):
         return self.linear_layer(x)
 
 # Cell
+from numpy import finfo
 
 
 class LocationLayer(nn.Module):
@@ -100,6 +101,7 @@ class Attention(nn.Module):
         attention_dim,
         attention_location_n_filters,
         attention_location_kernel_size,
+        fp16_run,
     ):
         super(Attention, self).__init__()
         self.query_layer = LinearNorm(
@@ -112,7 +114,10 @@ class Attention(nn.Module):
         self.location_layer = LocationLayer(
             attention_location_n_filters, attention_location_kernel_size, attention_dim
         )
-        self.score_mask_value = -float("inf")
+        if fp16_run:
+            self.score_mask_value = finfo("float16").min
+        else:
+            self.score_mask_value = -float("inf")
 
     def get_alignment_energies(self, query, processed_memory, attention_weights_cat):
         """

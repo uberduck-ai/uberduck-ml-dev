@@ -278,6 +278,7 @@ class Decoder(nn.Module):
             hparams.attention_dim,
             hparams.attention_location_n_filters,
             hparams.attention_location_kernel_size,
+            fp16_run=hparams.fp16_run,
         )
 
         self.decoder_rnn = nn.LSTMCell(
