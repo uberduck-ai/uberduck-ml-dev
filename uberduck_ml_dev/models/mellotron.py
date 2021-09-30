@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
+from torch.cuda.amp import autocast
 from torch.nn import functional as F
 
 from .base import TTSModel
@@ -514,7 +515,11 @@ class Decoder(nn.Module):
                 else:
                     to_concat = (self.prenet(mel_outputs[-1]),)
                 decoder_input = torch.cat(to_concat, dim=1)
-            mel_output, gate_output, attention_weights = self.decode(decoder_input)
+            # NOTE(zach): When training with fp16_run == True, decoder_rnn seems to run into
+            # issues with NaNs in gradient, probably due to vanishing gradients (? maybe).
+            # Disable half-precision for this call to work around this issue.
+            with autocast(enabled=False):
+                mel_output, gate_output, attention_weights = self.decode(decoder_input)
             mel_outputs += [mel_output.squeeze(1)]
             gate_outputs += [gate_output.squeeze()]
             alignments += [attention_weights]
