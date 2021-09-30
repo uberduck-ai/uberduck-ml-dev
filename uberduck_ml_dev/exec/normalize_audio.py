@@ -6,6 +6,7 @@ __all__ = ['run', 'parse_args']
 
 import argparse
 import os
+import sys
 
 from ..utils.audio import normalize_audio
 

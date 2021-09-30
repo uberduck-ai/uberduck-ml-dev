@@ -5,6 +5,7 @@ __all__ = ['parse_args']
 # Cell
 import argparse
 import json
+import librosa  # NOTE(zach): importing torch before librosa causes LLVM issues for some unknown reason.
 import sys
 
 from ..trainer.base import TTSTrainer, MellotronTrainer
