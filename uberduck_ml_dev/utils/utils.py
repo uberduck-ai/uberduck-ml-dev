@@ -3,7 +3,7 @@
 __all__ = ['load_filepaths_and_text', 'synthesize_speakerids2', 'parse_vctk', 'parse_libritts_mellotron',
            'load_filepaths_and_text', 'add_speakerid', 'parse_libritts_mellotron', 'parse_uberduck', 'parse_ljspeech',
            'window_sumsquare', 'griffin_lim', 'dynamic_range_compression', 'dynamic_range_decompression', 'to_gpu',
-           'get_mask_from_lengths']
+           'get_mask_from_lengths', 'reduce_tensor']
 
 # Cell
 
@@ -293,3 +293,12 @@ def get_mask_from_lengths(lengths):
     ids = torch.arange(0, max_len, out=tensor_cls(max_len))
     mask = (ids < lengths.unsqueeze(1)).bool()
     return mask
+
+# Cell
+import torch.distributed as dist
+
+def reduce_tensor(tensor, n_gpus):
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+    rt /= n_gpus
+    return rt

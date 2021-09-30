@@ -9,19 +9,23 @@ from pprint import pprint
 
 import torch
 from torch.cuda.amp import autocast, GradScaler
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
 from ..models.common import MelSTFT
 
 
 class TTSTrainer:
-    def __init__(self, hparams):
+    def __init__(self, hparams, rank=None, world_size=None):
         self.hparams = hparams
         for k, v in hparams.values().items():
             setattr(self, k, v)
 
         torch.backends.cudnn_enabled = hparams.cudnn_enabled
         self.global_step = 0
+        self.rank = rank
+        self.world_size = world_size
         self.writer = SummaryWriter()
         if not hasattr(self, "debug"):
             self.debug = False
@@ -32,7 +36,19 @@ class TTSTrainer:
             print("Initializing trainer with hparams:")
             pprint(hparams.values())
 
+    def init_distributed(self):
+        if not self.distributed_run:
+            return
+        if self.rank is None or self.world_size is None:
+            raise Exception(
+                "Rank and world size must be provided when distributed training"
+            )
+        dist.init_process_group("nccl", rank=self.rank, world_size=self.world_size)
+        torch.cuda.set_device(self.rank)
+
     def save_checkpoint(self, checkpoint_name, **kwargs):
+        if self.rank is not None and self.rank != 0:
+            return
         checkpoint = {}
         for k, v in kwargs.items():
             if hasattr(v, "state_dict"):
@@ -49,13 +65,16 @@ class TTSTrainer:
         return torch.load(os.path.join(self.checkpoint_path, checkpoint_name))
 
     def log(self, tag, step, scalar=None, audio=None):
+        if self.rank is not None and self.rank != 0:
+            return
         if audio is not None:
             self.writer.add_audio(tag, audio, step)
         if scalar:
             self.writer.add_scalar(tag, scalar, step)
 
-
     def sample(self, mel, algorithm="griffin-lim", **kwargs):
+        if self.rank is not None and self.rank != 0:
+            return
         if algorithm == "griffin-lim":
             mel_stft = MelSTFT()
             audio = mel_stft.griffin_lim(mel)
@@ -63,20 +82,19 @@ class TTSTrainer:
             raise NotImplemented
         return audio
 
-
-
     def train():
         raise NotImplemented
-        # for batch in enumerate(data):
-        #    #fill in
 
 # Cell
 from typing import List
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.mellotron import Tacotron2
+from ..utils.utils import reduce_tensor
 
 
 class Tacotron2Loss(nn.Module):
@@ -114,13 +132,14 @@ class MellotronTrainer(TTSTrainer):
         val_set = kwargs["val_set"]
         collate_fn = kwargs["collate_fn"]
         criterion = kwargs["criterion"]
-        if self.distributed_run:
-            raise NotImplemented
+        sampler = DistributedSampler(valset) if self.distributed_run else None
         total_loss = 0
         total_steps = 0
+        model.eval()
         with torch.no_grad():
             val_loader = DataLoader(
                 val_set,
+                sampler=sampler,
                 shuffle=False,
                 batch_size=self.batch_size,
                 collate_fn=collate_fn,
@@ -130,10 +149,15 @@ class MellotronTrainer(TTSTrainer):
                 X, y = model.parse_batch(batch)
                 y_pred = model(X)
                 loss = criterion(y_pred, y)
-                total_loss += loss.item()
+                if self.distributed_run:
+                    reduced_val_loss = reduce_tensor(loss, self.world_size).item()
+                else:
+                    reduced_val_loss = loss.item()
+                total_loss += reduced_val_loss
             mean_loss = total_loss / total_steps
             print(f"Average loss: {mean_loss}")
             self.log("Val/loss", self.global_step, scalar=mean_loss)
+        model.train()
 
     @property
     def training_dataset_args(self):
@@ -170,14 +194,23 @@ class MellotronTrainer(TTSTrainer):
             *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
         )
         collate_fn = TextMelCollate(n_frames_per_step=1, include_f0=self.include_f0)
+        sampler = None
+        if self.distributed_run:
+            sampler = DistributedSampler(train_set, rank=self.rank)
         train_loader = DataLoader(
-            train_set, batch_size=self.batch_size, shuffle=True, collate_fn=collate_fn
+            train_set,
+            batch_size=self.batch_size,
+            shuffle=(sampler is None),
+            sampler=sampler,
+            collate_fn=collate_fn,
         )
         criterion = Tacotron2Loss()
 
         model = Tacotron2(self.hparams)
         if torch.cuda.is_available():
             model = model.cuda()
+        if self.distributed_run:
+            model = DDP(model, device_ids=[self.rank])
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=self.learning_rate,
@@ -194,6 +227,8 @@ class MellotronTrainer(TTSTrainer):
             scaler = GradScaler()
         # main training loop
         for epoch in range(start_epoch, self.epochs):
+            if self.distributed_run:
+                sampler.set_epoch(epoch)
             for batch in train_loader:
                 self.global_step += 1
                 model.zero_grad()
@@ -208,7 +243,7 @@ class MellotronTrainer(TTSTrainer):
 
                 # TODO: fix for distributed run
                 if self.distributed_run:
-                    raise NotImplemented
+                    reduced_loss = reduce_tensor(loss, self.world_size).item()
                 else:
                     reduced_loss = loss.item()
 
