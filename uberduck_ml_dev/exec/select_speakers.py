@@ -14,6 +14,9 @@ from shutil import copyfile, copytree
 import sys
 from typing import List
 
+from ..utils.audio import convert_to_wav
+from ..utils.utils import parse_vctk
+
 STANDARD_MULTISPEAKER = "standard-multispeaker"
 STANDARD_SINGLESPEAKER = "standard-singlespeaker"
 VCTK = "vctk"
@@ -31,16 +34,36 @@ class Dataset:
     speakers: str = None
 
 
-def _convert_to_multispeaker(f, out_path: str, ds: Dataset, start_speaker_id: int):
-    assert (
-        ds.format == STANDARD_MULTISPEAKER
-    ), f"Only {STANDARD_MULTISPEAKER} is supported"
-    root = ds.path
-
+def _convert_vctk(f, out_path: str, ds: Dataset, start_speaker_id: int):
+    assert ds.format == VCTK, "VCTK is the only format supported by this function!"
+    vctk_data = parse_vctk(ds.path)
+    if ds.speakers:
+        speakers = ds.speakers.split(",")
+    else:
+        speakers = list(vctk_data.keys())
     speaker_id = start_speaker_id
-    print(ds.format)
-    print(ds.path)
-    print(ds.speakers)
+    for speaker_name, speaker_data in vctk_data.items():
+        if speaker_name not in speakers:
+            continue
+        speaker_out_path = Path(out_path) / speaker_name
+        if not speaker_out_path.exists():
+            os.makedirs(speaker_out_path)
+        for transcription, flac_path in speaker_data:
+            assert flac_path.endswith(".flac")
+            # convert flac to wav in proper location
+            basename = os.path.basename(flac_path).replace(".flac", ".wav")
+            rel_path = Path(speaker_name) / basename
+            convert_to_wav(flac_path, str(speaker_out_path / basename))
+            line = f"{rel_path}|{transcription}|{speaker_id}\n"
+            f.write(line)
+        speaker_id += 1
+    return speaker_id - start_speaker_id
+
+
+def _convert_standard_multispeaker(
+    f, out_path: str, ds: Dataset, start_speaker_id: int
+):
+    speaker_id = start_speaker_id
     if ds.speakers:
         speakers = ds.speakers.split(",")
     else:
@@ -74,6 +97,22 @@ def _convert_to_multispeaker(f, out_path: str, ds: Dataset, start_speaker_id: in
     return speaker_id - start_speaker_id
 
 
+def _convert_to_multispeaker(f, out_path: str, ds: Dataset, start_speaker_id: int):
+    assert ds.format in [
+        STANDARD_MULTISPEAKER,
+        VCTK,
+    ], f"Supported formats: {STANDARD_MULTISPEAKER}, {VCTK}"
+    root = ds.path
+
+    print(ds.format)
+    print(ds.path)
+    print(ds.speakers)
+    if ds.format == STANDARD_MULTISPEAKER:
+        return _convert_standard_multispeaker(f, out_path, ds, start_speaker_id)
+    elif ds.format == VCTK:
+        return _convert_vctk(f, out_path, ds, start_speaker_id)
+
+
 def select_speakers(datasets: List[Dataset], out_dir):
     speaker_id = 0
     out_path = Path(out_dir)
@@ -87,7 +126,9 @@ def select_speakers(datasets: List[Dataset], out_dir):
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--out", help="Path to dataset out directory", default="./dataset")
+    parser.add_argument(
+        "-o", "--out", help="Path to dataset out directory", default="./dataset"
+    )
     parser.add_argument("--config", help="path to JSON config")
     parser.add_argument("-d", "--dataset", action="append", nargs="*")
     return parser.parse_args(args)

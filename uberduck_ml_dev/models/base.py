@@ -15,6 +15,9 @@ class TTSModel(nn.Module):
     def from_pretrained(self):
         raise NotImplemented
 
+    def to_checkpoint(self):
+        return dict(model=self.state_dict())
+
     @classmethod
     def create(cls, name, opts, folders, all_speakers = True):
         pass
