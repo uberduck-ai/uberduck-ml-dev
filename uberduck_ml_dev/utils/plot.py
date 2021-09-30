@@ -12,3 +12,18 @@ def mel_spectrogram(mel):
     plt.ylabel("Channel")
     plt.imshow(mel, aspect="auto", origin="lower", interpolation="none", cmap="inferno")
     return figure
+
+# Cell
+
+def plot_attention(attention):
+    figure = plt.figure()
+    plt.xlabel("Decoder timestep")
+    plt.ylabel("Encoder timestep")
+    plt.imshow(
+        attention.data.cpu().numpy(),
+        aspect="auto",
+        origin="lower",
+        interpolation="none",
+        cmap="inferno",
+    )
+    return figure
