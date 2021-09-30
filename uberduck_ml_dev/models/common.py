@@ -334,7 +334,8 @@ class MelSTFT(torch.nn.Module):
 
     def griffin_lim(self, mel_spectrogram, n_iters=30):
         mel_dec = self.spectral_de_normalize(mel_spectrogram)
-        mel_dec = mel_dec.transpose(0, 1).cpu().data
+        # Float cast required for fp16 training.
+        mel_dec = mel_dec.transpose(0, 1).cpu().data.float()
         spec_from_mel = torch.mm(mel_dec, self.mel_basis).transpose(0, 1)
         spec_from_mel *= 1000
         out = griffin_lim(spec_from_mel.unsqueeze(0), self.stft_fn, n_iters=n_iters)
