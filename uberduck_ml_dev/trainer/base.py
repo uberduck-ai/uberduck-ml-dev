@@ -26,6 +26,9 @@ class TTSTrainer:
         if self.debug:
             print("Running in debug mode with hparams:")
             pprint(hparams.values())
+        else:
+            print("Initializing trainer with hparams:")
+            pprint(hparams.values())
 
     def save_checkpoint(self, checkpoint_name, **kwargs):
         checkpoint = {}
@@ -169,6 +172,8 @@ class MellotronTrainer(TTSTrainer):
         criterion = Tacotron2Loss()
 
         model = Tacotron2(self.hparams)
+        if torch.cuda.is_available():
+            model = model.cuda()
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=self.learning_rate,
