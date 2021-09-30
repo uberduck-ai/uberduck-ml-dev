@@ -4,6 +4,7 @@ __all__ = ['TTSTrainer', 'Tacotron2Loss', 'MellotronTrainer']
 
 # Cell
 import os
+from pathlib import Path
 from pprint import pprint
 
 import torch
@@ -19,6 +20,7 @@ class TTSTrainer:
         for k, v in hparams.values().items():
             setattr(self, k, v)
 
+        torch.backends.cudnn_enabled = hparams.cudnn_enabled
         self.global_step = 0
         self.writer = SummaryWriter()
         if not hasattr(self, "debug"):
@@ -37,6 +39,8 @@ class TTSTrainer:
                 checkpoint[k] = v.state_dict()
             else:
                 checkpoint[k] = v
+        if not Path(self.checkpoint_path).exists():
+            os.makedirs(Path(self.checkpoint_path))
         torch.save(
             checkpoint, os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt")
         )
@@ -224,7 +228,7 @@ class MellotronTrainer(TTSTrainer):
                     optimizer.step()
                 print(f"Loss: {reduced_loss}")
                 self.log("Loss/train", self.global_step, scalar=reduced_loss)
-                if epoch % self.steps_per_sample == 0:
+                if self.global_step % self.steps_per_sample == 0:
                     _, mel_out_postnet, *_ = y_pred
                     audio = self.sample(mel=mel_out_postnet[0])
                     self.log("AudioSample/train", self.global_step, audio=audio)
