@@ -160,7 +160,9 @@ def compute_yin(sig, sr, w_len=512, w_step=256, f0_min=100, f0_max=500,
 
 # Cell
 import os
+import shlex
 import subprocess
+
 
 def convert_to_wav(filename, output, sr=22050):
     """Convert a file to 16-bit 22050hz wav."""
@@ -183,9 +185,7 @@ def convert_to_wav(filename, output, sr=22050):
         if not output.endswith(".wav"):
             o, ext = os.path.splitext(output)
             output = f"{o}.wav"
-        ffmpeg_cmd = (
-            f"ffmpeg -y -i {shlex.quote(filename)} -ar {sr} -ac 1 {shlex.quote(output)}"
-        )
+        ffmpeg_cmd = f"ffmpeg -hide_banner -loglevel error -y -i {shlex.quote(filename)} -ar {sr} -ac 1 {shlex.quote(output)}"
         subprocess.check_call(shlex.split(ffmpeg_cmd))
     else:
         raise Exception("only ogg, flac, mp3 and wav are supported")
