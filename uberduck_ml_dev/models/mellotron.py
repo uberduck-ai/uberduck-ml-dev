@@ -9,13 +9,14 @@ import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
+from torch.cuda.amp import autocast
 from torch.nn import functional as F
 
 from .base import TTSModel
 from .common import Attention, Conv1d, LinearNorm, GST
 from ..text.symbols import symbols
 from ..vendor.tfcompat.hparam import HParams
-from ..utils import to_gpu, get_mask_from_lengths
+from ..utils.utils import to_gpu, get_mask_from_lengths
 
 
 DEFAULTS = HParams(
@@ -139,7 +140,7 @@ class Postnet(nn.Module):
 
 class Prenet(nn.Module):
     def __init__(self, in_dim, sizes):
-        super(Prenet, self).__init__()
+        super().__init__()
         in_sizes = [in_dim] + sizes[:-1]
         self.layers = nn.ModuleList(
             [
@@ -278,6 +279,7 @@ class Decoder(nn.Module):
             hparams.attention_dim,
             hparams.attention_location_n_filters,
             hparams.attention_location_kernel_size,
+            fp16_run=hparams.fp16_run,
         )
 
         self.decoder_rnn = nn.LSTMCell(
@@ -513,7 +515,11 @@ class Decoder(nn.Module):
                 else:
                     to_concat = (self.prenet(mel_outputs[-1]),)
                 decoder_input = torch.cat(to_concat, dim=1)
-            mel_output, gate_output, attention_weights = self.decode(decoder_input)
+            # NOTE(zach): When training with fp16_run == True, decoder_rnn seems to run into
+            # issues with NaNs in gradient, probably due to vanishing gradients (? maybe).
+            # Disable half-precision for this call to work around this issue.
+            with autocast(enabled=False):
+                mel_output, gate_output, attention_weights = self.decode(decoder_input)
             mel_outputs += [mel_output.squeeze(1)]
             gate_outputs += [gate_output.squeeze()]
             alignments += [attention_weights]
@@ -524,7 +530,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    def inference(self, memory, f0s):
+    def inference(self, memory, f0s=None):
         """Decoder inference
         PARAMS
         ------
@@ -539,19 +545,28 @@ class Decoder(nn.Module):
         decoder_input = self.get_go_frame(memory)
 
         self.initialize_decoder_states(memory, mask=None)
-        f0_dummy = self.get_end_f0(f0s)
-        f0s = torch.cat((f0s, f0_dummy), dim=2)
-        f0s = F.relu(self.prenet_f0(f0s))
-        f0s = f0s.permute(2, 0, 1)
+        if f0s is not None:
+            f0_dummy = self.get_end_f0(f0s)
+            f0s = torch.cat((f0s, f0_dummy), dim=2)
+            f0s = F.relu(self.prenet_f0(f0s))
+            f0s = f0s.permute(2, 0, 1)
 
         mel_outputs, gate_outputs, alignments = [], [], []
         while True:
-            if len(mel_outputs) < len(f0s):
-                f0 = f0s[len(mel_outputs)]
-            else:
-                f0 = f0s[-1] * 0
+            f0 = None
+            if f0s is not None:
+                if len(mel_outputs) < len(f0s):
+                    f0 = f0s[len(mel_outputs)]
+                else:
+                    f0 = f0s[-1] * 0
 
-            decoder_input = torch.cat((self.prenet(decoder_input), f0), dim=1)
+            if f0 is not None:
+                to_cat = (self.prenet(decoder_input), f0)
+            else:
+                to_cat = (self.prenet(decoder_input),)
+
+
+            decoder_input = torch.cat(to_cat, dim=1)
             mel_output, gate_output, alignment = self.decode(decoder_input)
 
             mel_outputs += [mel_output.squeeze(1)]
@@ -719,13 +734,19 @@ class Tacotron2(TTSModel):
         )
 
     def inference(self, inputs):
-        text, style_input, speaker_ids, f0s = inputs
+        text, style_input, speaker_ids, *_ = inputs
+        if self.include_f0:
+            f0s = inputs[3]
+        else:
+            f0s = None
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
         if hasattr(self, "gst"):
             if isinstance(style_input, int):
-                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size).cuda()
+                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size)
+                if torch.cuda.is_available():
+                    query = query.cuda()
                 GST = torch.tanh(self.gst.stl.embed)
                 key = GST[style_input].unsqueeze(0).expand(1, -1, -1)
                 embedded_gst = self.gst.stl.attention(query, key)
@@ -753,13 +774,21 @@ class Tacotron2(TTSModel):
         )
 
     def inference_noattention(self, inputs):
+        """Run inference conditioned on an attention map.
+
+        NOTE(zach): I don't think it is necessary to do a version
+        of this without f0s passed as well, since it seems like we
+        would always want to condition on pitch when conditioning on rhythm.
+        """
         text, style_input, speaker_ids, f0s, attention_map = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
         if hasattr(self, "gst"):
             if isinstance(style_input, int):
-                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size).cuda()
+                query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size)
+                if torch.cuda.is_available():
+                    query = query.cuda()
                 GST = torch.tanh(self.gst.stl.embed)
                 key = GST[style_input].unsqueeze(0).expand(1, -1, -1)
                 embedded_gst = self.gst.stl.attention(query, key)
