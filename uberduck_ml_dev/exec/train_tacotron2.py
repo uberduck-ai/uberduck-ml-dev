@@ -48,4 +48,4 @@ if __name__ == "__main__" and not IN_NOTEBOOK:
         device_count = torch.cuda.device_count()
         mp.spawn(run, (device_count, hparams), device_count)
     else:
-        run(None, params)
+        run(None, None, hparams)
