@@ -43,7 +43,12 @@ class TTSTrainer:
             raise Exception(
                 "Rank and world size must be provided when distributed training"
             )
-        dist.init_process_group("nccl", rank=self.rank, world_size=self.world_size)
+        dist.init_process_group(
+            "nccl",
+            init_method="tcp://localhost:54321",
+            rank=self.rank,
+            world_size=self.world_size,
+        )
         torch.cuda.set_device(self.rank)
 
     def save_checkpoint(self, checkpoint_name, **kwargs):
