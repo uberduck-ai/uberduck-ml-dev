@@ -196,6 +196,7 @@ class MellotronTrainer(TTSTrainer):
         collate_fn = TextMelCollate(n_frames_per_step=1, include_f0=self.include_f0)
         sampler = None
         if self.distributed_run:
+            self.init_distributed()
             sampler = DistributedSampler(train_set, rank=self.rank)
         train_loader = DataLoader(
             train_set,
