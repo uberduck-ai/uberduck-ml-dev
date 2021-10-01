@@ -73,7 +73,7 @@ class TTSTrainer:
         if self.rank is not None and self.rank != 0:
             return
         if audio is not None:
-            self.writer.add_audio(tag, audio, step)
+            self.writer.add_audio(tag, audio, step, sample_rate=self.sample_rate)
         if scalar:
             self.writer.add_scalar(tag, scalar, step)
 
