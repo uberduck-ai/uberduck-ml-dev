@@ -132,7 +132,7 @@ class MellotronTrainer(TTSTrainer):
         val_set = kwargs["val_set"]
         collate_fn = kwargs["collate_fn"]
         criterion = kwargs["criterion"]
-        sampler = DistributedSampler(valset) if self.distributed_run else None
+        sampler = DistributedSampler(val_set) if self.distributed_run else None
         total_loss = 0
         total_steps = 0
         model.eval()
@@ -146,7 +146,10 @@ class MellotronTrainer(TTSTrainer):
             )
             for batch in val_loader:
                 total_steps += 1
-                X, y = model.parse_batch(batch)
+                if self.distributed_run:
+                    X, y = model.module.parse_batch(batch)
+                else:
+                    X, y = model.parse_batch(batch)
                 y_pred = model(X)
                 loss = criterion(y_pred, y)
                 if self.distributed_run:
@@ -233,7 +236,10 @@ class MellotronTrainer(TTSTrainer):
             for batch in train_loader:
                 self.global_step += 1
                 model.zero_grad()
-                X, y = model.parse_batch(batch)
+                if self.distributed_run:
+                    X, y = model.module.parse_batch(batch)
+                else:
+                    X, y = model.parse_batch(batch)
                 if self.fp16_run:
                     with autocast():
                         y_pred = model(X)
@@ -242,7 +248,6 @@ class MellotronTrainer(TTSTrainer):
                     y_pred = model(X)
                     loss = criterion(y_pred, y)
 
-                # TODO: fix for distributed run
                 if self.distributed_run:
                     reduced_loss = reduce_tensor(loss, self.world_size).item()
                 else:
