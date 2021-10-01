@@ -14,6 +14,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
 from ..models.common import MelSTFT
+from ..utils.plot import (
+    plot_attention,
+    plot_gate_outputs,
+    plot_spectrogram,
+)
 
 
 class TTSTrainer:
@@ -69,13 +74,17 @@ class TTSTrainer:
     def load_checkpoint(self, checkpoint_name):
         return torch.load(os.path.join(self.checkpoint_path, checkpoint_name))
 
-    def log(self, tag, step, scalar=None, audio=None):
+    def log(self, tag, step, scalar=None, audio=None, image=None, figure=None):
         if self.rank is not None and self.rank != 0:
             return
         if audio is not None:
             self.writer.add_audio(tag, audio, step, sample_rate=self.sample_rate)
         if scalar:
             self.writer.add_scalar(tag, scalar, step)
+        if image:
+            self.writer.add_image(tag, image, step, dataformats="HWC")
+        if figure:
+            self.writer.add_figure(tag, figure, step)
 
     def sample(self, mel, algorithm="griffin-lim", **kwargs):
         if self.rank is not None and self.rank != 0:
@@ -91,7 +100,10 @@ class TTSTrainer:
         raise NotImplemented
 
 # Cell
+from random import randint
+import time
 from typing import List
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -164,7 +176,36 @@ class MellotronTrainer(TTSTrainer):
                 total_loss += reduced_val_loss
             mean_loss = total_loss / total_steps
             print(f"Average loss: {mean_loss}")
-            self.log("Val/loss", self.global_step, scalar=mean_loss)
+            self.log("Loss/val", self.global_step, scalar=mean_loss)
+            # Generate the sample from a random item from the last y_pred batch.
+            sample_idx = randint(0, mel_out_postnet.size(0) - 1)
+            _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+            mel_target, gate_target = y
+            audio = self.sample(mel=mel_out_postnet[sample_idx])
+            self.log("AudioSample/val", self.global_step, audio=audio)
+            self.log(
+                "MelPredicted/val",
+                self.global_step,
+                figure=plot_spectrogram(mel_out_postnet[sample_idx].data.cpu()),
+            )
+            self.log(
+                "MelTarget/val",
+                self.global_step,
+                figure=plot_spectrogram(mel_target[sample_idx].data.cpu()),
+            )
+            self.log(
+                "Gate/val",
+                self.global_step,
+                figure=plot_gate_outputs(
+                    gate_outputs[sample_idx].data.cpu(),
+                    gate_target[sample_idx].data.cpu(),
+                ),
+            )
+            self.log(
+                "Attention/val",
+                self.global_step,
+                figure=plot_attention(alignments[sample_idx].data.cpu()),
+            )
         model.train()
 
     @property
@@ -234,11 +275,13 @@ class MellotronTrainer(TTSTrainer):
             # self.global_step = checkpoint["global_step"]
         if self.fp16_run:
             scaler = GradScaler()
+
         # main training loop
         for epoch in range(start_epoch, self.epochs):
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
+                start_time = time.perf_counter()
                 self.global_step += 1
                 model.zero_grad()
                 if self.distributed_run:
@@ -272,12 +315,45 @@ class MellotronTrainer(TTSTrainer):
                         model.parameters(), self.grad_clip_thresh
                     )
                     optimizer.step()
+                step_duration_seconds = time.perf_counter() - start_time
                 print(f"Loss: {reduced_loss}")
                 self.log("Loss/train", self.global_step, scalar=reduced_loss)
+                self.log("GradNorm", self.global_step, scalar=grad_norm.item())
+                self.log("LearningRate", self.global_step, scalar=self.learning_rate)
+                self.log(
+                    "StepDurationSeconds",
+                    self.global_step,
+                    scalar=step_duration_seconds,
+                )
                 if self.global_step % self.steps_per_sample == 0:
-                    _, mel_out_postnet, *_ = y_pred
-                    audio = self.sample(mel=mel_out_postnet[0])
+                    _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+                    mel_target, gate_target = y
+                    sample_idx = randint(0, mel_out_postnet.size(0) - 1)
+                    audio = self.sample(mel=mel_out_postnet[sample_idx])
                     self.log("AudioSample/train", self.global_step, audio=audio)
+                    self.log(
+                        "MelPredicted/train",
+                        self.global_step,
+                        figure=plot_spectrogram(mel_out_postnet[sample_idx].data.cpu()),
+                    )
+                    self.log(
+                        "MelTarget/train",
+                        self.global_step,
+                        figure=plot_spectrogram(mel_target[sample_idx].data.cpu()),
+                    )
+                    self.log(
+                        "Gate/train",
+                        self.global_step,
+                        figure=plot_gate_outputs(
+                            gate_outputs[sample_idx].data.cpu(),
+                            gate_target[sample_idx].data.cpu(),
+                        ),
+                    )
+                    self.log(
+                        "Attention/train",
+                        self.global_step,
+                        figure=plot_attention(alignments[sample_idx].data.cpu()),
+                    )
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"mellotron_{epoch}",
