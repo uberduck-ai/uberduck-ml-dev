@@ -633,7 +633,7 @@ class Tacotron2(TTSModel):
         self.mask_padding = hparams.mask_padding
         self.fp16_run = hparams.fp16_run
         self.include_f0 = hparams.include_f0
-        self.pos_weight = hparam.pos_weight
+        self.pos_weight = hparams.pos_weight
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step = hparams.n_frames_per_step
         self.embedding = nn.Embedding(hparams.n_symbols, hparams.symbols_embedding_dim)
