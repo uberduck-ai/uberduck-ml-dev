@@ -115,7 +115,8 @@ from ..utils.utils import reduce_tensor
 
 
 class Tacotron2Loss(nn.Module):
-    def __init__(self):
+    def __init__(self,pos_weight):
+        self.pos_weight = pos_weight
         super().__init__()
 
     def forward(self, model_output: List, target: List):
@@ -128,8 +129,8 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        pos_weight = self.pos_weight
-        gate_loss = nn.BCEWithLogitsLoss(pos_weight = pos_weight)(gate_out, gate_target)
+        pos_weight = torch.tensor(self.pos_weight)
+        gate_loss = nn.BCEWithLogitsLoss(pos_weight)(gate_out, gate_target)
         return mel_loss + gate_loss
 
 
@@ -142,6 +143,7 @@ class MellotronTrainer(TTSTrainer):
         "mel_fmin",
         "n_mel_channels",
         "text_cleaners",
+        "pos_weight",
     ]
 
     def validate(self, **kwargs):
@@ -267,6 +269,35 @@ class MellotronTrainer(TTSTrainer):
             weight_decay=self.weight_decay,
         )
         start_epoch = 0
+
+        #for comparison
+        # def warm_start_model(checkpoint_path, model, ignore_layers):
+        #     assert os.path.isfile(checkpoint_path)
+        #     print("Warm starting model from checkpoint '{}'".format(checkpoint_path))
+        #     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+        #     model_dict = checkpoint_dict['state_dict']
+        #     if len(ignore_layers) > 0:
+        #         model_dict = {k: v for k, v in model_dict.items()
+        #                       if k not in ignore_layers}
+        #         dummy_dict = model.state_dict()
+        #         dummy_dict.update(model_dict)
+        #         model_dict = dummy_dict
+        #     model.load_state_dict(model_dict)
+        #     return model
+
+
+        # def load_checkpoint(checkpoint_path, model, optimizer):
+        #     assert os.path.isfile(checkpoint_path)
+        #     print("Loading checkpoint '{}'".format(checkpoint_path))
+        #     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+        #     model.load_state_dict(checkpoint_dict['state_dict'])
+        #     optimizer.load_state_dict(checkpoint_dict['optimizer'])
+        #     learning_rate = checkpoint_dict['learning_rate']
+        #     iteration = checkpoint_dict['iteration']
+        #     print("Loaded checkpoint '{}' from iteration {}" .format(
+        #         checkpoint_path, iteration))
+        #     return model, optimizer, learning_rate, iteration
+
         if self.warm_start_name:
             checkpoint = self.load_checkpoint()
             model.load_state_dict(checkpoint["model"])

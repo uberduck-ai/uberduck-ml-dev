@@ -43,7 +43,7 @@ class TextMelDataset(Dataset):
         win_length: int,
         max_wav_value: float = 32768.0,
         include_f0: bool = False,
-        pos_weight: int = 10,
+        pos_weight: float = 10,
         f0_min: int = 80,
         f0_max: int = 880,
         harmonic_thresh=0.25,
