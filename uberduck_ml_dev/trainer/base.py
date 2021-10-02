@@ -119,6 +119,7 @@ class Tacotron2Loss(nn.Module):
         self.pos_weight = pos_weight
         super().__init__()
 
+
     def forward(self, model_output: List, target: List):
         mel_target, gate_target = target[0], target[1]
         mel_target.requires_grad = False
@@ -130,7 +131,7 @@ class Tacotron2Loss(nn.Module):
             mel_out_postnet, mel_target
         )
         gate_loss = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(self.pos_weight))(gate_out, gate_target)
-        return mel_loss + gate_loss
+        return mel_loss, gate_loss
 
 
 class MellotronTrainer(TTSTrainer):
@@ -151,7 +152,7 @@ class MellotronTrainer(TTSTrainer):
         collate_fn = kwargs["collate_fn"]
         criterion = kwargs["criterion"]
         sampler = DistributedSampler(val_set) if self.distributed_run else None
-        total_loss = 0
+        total_loss, total_mel_loss, total_gate_loss = 0, 0, 0
         total_steps = 0
         model.eval()
         with torch.no_grad():
@@ -169,18 +170,29 @@ class MellotronTrainer(TTSTrainer):
                 else:
                     X, y = model.parse_batch(batch)
                 y_pred = model(X)
-                loss = criterion(y_pred, y)
+                mel_loss, gate_loss = criterion(y_pred, y)
                 if self.distributed_run:
-                    reduced_val_loss = reduce_tensor(loss, self.world_size).item()
+                    reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
+                    reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
+                    reduced_val_loss = reduced_mel_loss + reduced_gate_loss
                 else:
-                    reduced_val_loss = loss.item()
+                    reduced_mel_loss = mel_loss.item()
+                    reduced_gate_loss = gate_loss.item()
+                reduced_val_loss = reduced_mel_loss + reduced_gate_loss
+                total_mel_loss += reduced_mel_loss
+                total_gate_loss += reduced_gate_loss
                 total_loss += reduced_val_loss
+
+            mean_mel_loss = total_mel_loss / total_steps
+            mean_gate_loss = total_gate_loss / total_steps
             mean_loss = total_loss / total_steps
             print(f"Average loss: {mean_loss}")
             self.log("Loss/val", self.global_step, scalar=mean_loss)
+            self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
+            self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
             # Generate the sample from a random item from the last y_pred batch.
-            sample_idx = randint(0, mel_out_postnet.size(0) - 1)
             _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+            sample_idx = randint(0, mel_out_postnet.size(0) - 1)
             mel_target, gate_target = y
             audio = self.sample(mel=mel_out_postnet[sample_idx])
             self.log("AudioSample/val", self.global_step, audio=audio)
@@ -293,15 +305,21 @@ class MellotronTrainer(TTSTrainer):
                 if self.fp16_run:
                     with autocast():
                         y_pred = model(X)
-                        loss = criterion(y_pred, y)
+                        mel_loss, gate_loss = criterion(y_pred, y)
+                        loss = mel_loss + gate_loss
                 else:
                     y_pred = model(X)
-                    loss = criterion(y_pred, y)
+                    mel_loss, gate_loss = criterion(y_pred, y)
+                    loss = mel_loss + gate_loss
 
                 if self.distributed_run:
-                    reduced_loss = reduce_tensor(loss, self.world_size).item()
+                    reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
+                    reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
+                    reduced_loss = reduce_mel_loss + reduced_gate_loss
                 else:
-                    reduced_loss = loss.item()
+                    reduced_mel_loss = mel_loss.item()
+                    reduced_gate_loss = gate_loss.item()
+                reduced_loss = reduced_mel_loss + reduced_gate_loss
 
                 if self.fp16_run:
                     scaler.scale(loss).backward()
@@ -320,6 +338,8 @@ class MellotronTrainer(TTSTrainer):
                 step_duration_seconds = time.perf_counter() - start_time
                 print(f"Loss: {reduced_loss}")
                 self.log("Loss/train", self.global_step, scalar=reduced_loss)
+                self.log("MelLoss/train", self.global_step, scalar=reduced_mel_loss)
+                self.log("GateLoss/train", self.global_step, scalar=reduced_gate_loss)
                 self.log("GradNorm", self.global_step, scalar=grad_norm.item())
                 self.log("LearningRate", self.global_step, scalar=self.learning_rate)
                 self.log(
