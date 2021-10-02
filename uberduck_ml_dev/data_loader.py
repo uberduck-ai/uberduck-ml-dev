@@ -19,7 +19,6 @@ from .text.util import text_to_sequence
 from .utils.audio import compute_yin
 from .utils.utils import load_filepaths_and_text
 
-
 # Cell
 
 
