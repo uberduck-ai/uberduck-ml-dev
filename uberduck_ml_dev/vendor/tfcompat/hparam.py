@@ -6,7 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-__all__ = ['parse_values', 'HParams', 'PARAM_RE']
+__all__ = ["parse_values", "HParams", "PARAM_RE"]
 
 # Cell
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
@@ -24,11 +24,11 @@ __all__ = ['parse_values', 'HParams', 'PARAM_RE']
 # limitations under the License.
 # ==============================================================================
 """Hyperparameter values."""
-#nbdev_comment from __future__ import absolute_import
-#nbdev_comment from __future__ import division
-#nbdev_comment from __future__ import print_function
+# nbdev_comment from __future__ import absolute_import
+# nbdev_comment from __future__ import division
+# nbdev_comment from __future__ import print_function
 
-#export
+# export
 import json
 import numbers
 import re
@@ -52,6 +52,7 @@ PARAM_RE = re.compile(
     re.VERBOSE,
 )
 
+
 def _parse_fail(name, var_type, value, values):
     """Helper function for raising a value error for bad assignment."""
     raise ValueError(
@@ -59,9 +60,11 @@ def _parse_fail(name, var_type, value, values):
         % (name, var_type.__name__, value, values)
     )
 
+
 def _reuse_fail(name, values):
     """Helper function for raising a value error for reuse of name."""
     raise ValueError("Multiple assignments to variable '%s' in %s" % (name, values))
+
 
 def _process_scalar_value(name, parse_fn, var_type, m_dict, values, results_dictionary):
     """Update results_dictionary with a scalar value.
@@ -106,6 +109,7 @@ def _process_scalar_value(name, parse_fn, var_type, m_dict, values, results_dict
             _reuse_fail("{}[{}]".format(name, index), values)
         results_dictionary[name][index] = parsed_value
 
+
 def _process_list_value(name, parse_fn, var_type, m_dict, values, results_dictionary):
     """Update results_dictionary from a list of values.
     Used to update results_dictionary to be returned by parse_values when
@@ -133,6 +137,7 @@ def _process_list_value(name, parse_fn, var_type, m_dict, values, results_dictio
         results_dictionary[name] = [parse_fn(e) for e in elements]
     except ValueError:
         _parse_fail(name, var_type, m_dict["vals"], values)
+
 
 def _cast_to_type_if_compatible(name, param_type, value):
     """Cast hparam to the provided type, if compatible.
@@ -180,6 +185,7 @@ def _cast_to_type_if_compatible(name, param_type, value):
         raise ValueError(fail_msg)
 
     return param_type(value)
+
 
 def parse_values(values, type_map):
     """Parses hyperparameter values from a string into a python map.
@@ -278,6 +284,7 @@ def parse_values(values, type_map):
             _parse_fail(name, type_, "", values)
 
     return results_dictionary
+
 
 class HParams(object):
     """Class to hold a set of hyperparameters as name-value pairs.
