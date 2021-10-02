@@ -71,8 +71,8 @@ class TTSTrainer:
             checkpoint, os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt")
         )
 
-    def load_checkpoint(self, checkpoint_name):
-        return torch.load(os.path.join(self.checkpoint_path, checkpoint_name))
+    def load_checkpoint(self):
+        return torch.load(os.path.join(self.warm_start_name))
 
     def log(self, tag, step, scalar=None, audio=None, image=None, figure=None):
         if self.rank is not None and self.rank != 0:
@@ -128,7 +128,8 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        gate_loss = nn.BCEWithLogitsLoss()(gate_out, gate_target)
+        pos_weight = self.pos_weight
+        gate_loss = nn.BCEWithLogitsLoss(pos_weight = pos_weight)(gate_out, gate_target)
         return mel_loss + gate_loss
 
 
@@ -136,7 +137,6 @@ class MellotronTrainer(TTSTrainer):
     REQUIRED_HPARAMS = [
         "audiopaths_and_text",
         "checkpoint_path",
-        "dataset_path",
         "epochs",
         "mel_fmax",
         "mel_fmin",
@@ -211,7 +211,6 @@ class MellotronTrainer(TTSTrainer):
     @property
     def training_dataset_args(self):
         return [
-            self.dataset_path,
             self.training_audiopaths_and_text,
             self.text_cleaners,
             self.p_arpabet,
@@ -225,6 +224,7 @@ class MellotronTrainer(TTSTrainer):
             self.win_length,
             self.max_wav_value,
             self.include_f0,
+            self.pos_weight,
         ]
 
     @property
@@ -254,7 +254,7 @@ class MellotronTrainer(TTSTrainer):
             sampler=sampler,
             collate_fn=collate_fn,
         )
-        criterion = Tacotron2Loss()
+        criterion = Tacotron2Loss(pos_weight = self.pos_weight) #keep higher than 5 to make clips not stretch on
 
         model = Tacotron2(self.hparams)
         if torch.cuda.is_available():
@@ -267,8 +267,8 @@ class MellotronTrainer(TTSTrainer):
             weight_decay=self.weight_decay,
         )
         start_epoch = 0
-        if self.checkpoint_name:
-            checkpoint = self.load_checkpoint(self.checkpoint_name)
+        if self.warm_start_name:
+            checkpoint = self.load_checkpoint()
             model.load_state_dict(checkpoint["model"])
             optimizer.load_state_dict(checkpoint["optimizer"])
             start_epoch = checkpoint["iteration"]

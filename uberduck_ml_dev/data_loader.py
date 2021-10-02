@@ -31,7 +31,6 @@ def _orig_to_dense_speaker_id(speaker_ids):
 class TextMelDataset(Dataset):
     def __init__(
         self,
-        dataset_path: str,
         audiopaths_and_text: str,
         text_cleaners: List[str],
         p_arpabet: float,
@@ -44,6 +43,7 @@ class TextMelDataset(Dataset):
         win_length: int,
         max_wav_value: float = 32768.0,
         include_f0: bool = False,
+        pos_weight: int = 10,
         f0_min: int = 80,
         f0_max: int = 880,
         harmonic_thresh=0.25,
@@ -51,8 +51,7 @@ class TextMelDataset(Dataset):
         debug_dataset_size: int = None,
     ):
         super().__init__()
-        path = str(Path(dataset_path) / audiopaths_and_text)
-        self.dataset_path = dataset_path
+        path = str(audiopaths_and_text)
         self.audiopaths_and_text = load_filepaths_and_text(path)
         self.text_cleaners = text_cleaners
         self.p_arpabet = p_arpabet
@@ -99,7 +98,6 @@ class TextMelDataset(Dataset):
     def _get_data(self, audiopath_and_text):
         path, transcription, speaker_id = audiopath_and_text
         speaker_id = self._speaker_id_map[speaker_id]
-        path = Path(self.dataset_path) / path
         sample_rate, wav_data = read(path)
         text_sequence = torch.LongTensor(
             text_to_sequence(
