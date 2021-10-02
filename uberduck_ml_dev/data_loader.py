@@ -51,7 +51,7 @@ class TextMelDataset(Dataset):
         debug_dataset_size: int = None,
     ):
         super().__init__()
-        path = str(audiopaths_and_text)
+        path = audiopaths_and_text
         self.audiopaths_and_text = load_filepaths_and_text(path)
         self.text_cleaners = text_cleaners
         self.p_arpabet = p_arpabet
