@@ -1,3 +1,0 @@
-[submodule "path_to_submodule"] 
-  path = src/vendor/mellotron 
-  url = git:https://github.com/NVIDIA/mellotron
