@@ -19,6 +19,7 @@ from ..utils.plot import (
     plot_gate_outputs,
     plot_spectrogram,
 )
+from ..text.util import text_to_sequence, random_utterance
 
 
 class TTSTrainer:
@@ -111,6 +112,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.mellotron import Tacotron2
+from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
 
 
@@ -200,27 +202,51 @@ class MellotronTrainer(TTSTrainer):
             self.log(
                 "MelPredicted/val",
                 self.global_step,
-                figure=plot_spectrogram(mel_out_postnet[sample_idx].data.cpu()),
+                image=save_figure_to_numpy(
+                    plot_spectrogram(mel_out_postnet[sample_idx].data.cpu())
+                ),
             )
             self.log(
                 "MelTarget/val",
                 self.global_step,
-                figure=plot_spectrogram(mel_target[sample_idx].data.cpu()),
+                image=save_figure_to_numpy(
+                    plot_spectrogram(mel_target[sample_idx].data.cpu())
+                ),
             )
             self.log(
                 "Gate/val",
                 self.global_step,
-                figure=plot_gate_outputs(
-                    gate_outputs[sample_idx].data.cpu(),
-                    gate_target[sample_idx].data.cpu(),
+                image=save_figure_to_numpy(
+                    plot_gate_outputs(
+                        gate_outputs[sample_idx].data.cpu(),
+                        gate_target[sample_idx].data.cpu(),
+                    )
                 ),
             )
             self.log(
                 "Attention/val",
                 self.global_step,
-                figure=plot_attention(alignments[sample_idx].data.cpu()),
+                image=save_figure_to_numpy(
+                    plot_attention(alignments[sample_idx].data.cpu())
+                ),
             )
         model.train()
+
+    def sample_inference(self, model):
+        if self.rank is not None and self.rank != 0:
+            return
+        # Generate an audio sample
+        with torch.no_grad():
+            utterance = torch.LongTensor(
+                text_to_sequence(random_utterance(), self.text_cleaners, self.p_arpabet)
+            )[None].cuda()
+            speaker_id = torch.randint(0, self.n_speakers - 1)
+            input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
+            model.eval()
+            _, mel, *_ = model.inference(input_)
+            model.train()
+            audio = self.sample(mel)
+            self.log("SampleInference", self.global_step, audio=audio)
 
     @property
     def training_dataset_args(self):
@@ -359,26 +385,35 @@ class MellotronTrainer(TTSTrainer):
                     self.log(
                         "MelPredicted/train",
                         self.global_step,
-                        figure=plot_spectrogram(mel_out_postnet[sample_idx].data.cpu()),
+                        image=save_figure_to_numpy(
+                            plot_spectrogram(mel_out_postnet[sample_idx].data.cpu())
+                        ),
                     )
                     self.log(
                         "MelTarget/train",
                         self.global_step,
-                        figure=plot_spectrogram(mel_target[sample_idx].data.cpu()),
+                        image=save_figure_to_numpy(
+                            plot_spectrogram(mel_target[sample_idx].data.cpu())
+                        ),
                     )
                     self.log(
                         "Gate/train",
                         self.global_step,
-                        figure=plot_gate_outputs(
-                            gate_outputs[sample_idx].data.cpu(),
-                            gate_target[sample_idx].data.cpu(),
+                        image=save_figure_to_numpy(
+                            plot_gate_outputs(
+                                gate_outputs[sample_idx].data.cpu(),
+                                gate_target[sample_idx].data.cpu(),
+                            )
                         ),
                     )
                     self.log(
                         "Attention/train",
                         self.global_step,
-                        figure=plot_attention(alignments[sample_idx].data.cpu()),
+                        image=save_figure_to_numpy(
+                            plot_attention(alignments[sample_idx].data.cpu())
+                        ),
                     )
+                    self.sample_inference()
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"mellotron_{epoch}",
@@ -388,9 +423,6 @@ class MellotronTrainer(TTSTrainer):
                     learning_rate=self.learning_rate,
                     global_step=self.global_step,
                 )
-
-            # Generate an audio sample
-            # TODO(zach)
 
             # There's no need to validate in debug mode since we're not really training.
             if self.debug:
