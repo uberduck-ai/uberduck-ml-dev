@@ -1,3 +1,7 @@
+experiments/outputs/*
+experiments/outputs_processed/*
+experiments/logs/*
+src/vendor_tools/*
 *.bak
 .gitattributes
 .last_checked
