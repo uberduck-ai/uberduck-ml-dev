@@ -43,6 +43,7 @@ DEFAULTS = HParams(
     p_attention_dropout=0.1,
     p_decoder_dropout=0.1,
     p_teacher_forcing=1.0,
+    pos_weight = 10,
     # attention parameters
     attention_rnn_dim=1024,
     attention_dim=128,
@@ -633,6 +634,7 @@ class Tacotron2(TTSModel):
         self.mask_padding = hparams.mask_padding
         self.fp16_run = hparams.fp16_run
         self.include_f0 = hparams.include_f0
+        self.pos_weight = hparams.pos_weight
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step = hparams.n_frames_per_step
         self.embedding = nn.Embedding(hparams.n_symbols, hparams.symbols_embedding_dim)
