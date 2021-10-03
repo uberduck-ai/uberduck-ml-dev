@@ -283,10 +283,24 @@ class MellotronTrainer(TTSTrainer):
 
         if self.warm_start_name:
             checkpoint = self.load_checkpoint()
-            model.load_state_dict(checkpoint["model"])
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            start_epoch = checkpoint["iteration"]
+            if "state_dict" in checkpoint.keys():
+                model_dict = checkpoint["state_dict"]
+                if self.ignore_layers:
+                    model_dict = {k: v for k, v in model_dict.items()
+                                  if k not in self.ignore_layers}
+                    dummy_dict = model.state_dict()
+                    dummy_dict.update(model_dict)
+                    model_dict = dummy_dict
+                model.load_state_dict(model_dict)
+            if "optimizer" in checkpoint.keys():
+                optimizer.load_state_dict(checkpoint["optimizer"])
+            if "iteration" in checkpoint.keys():
+                start_epoch = checkpoint["iteration"]
+            if "learning_rate" in checkpoint.keys():
+                optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
+                self.learning_rate = checkpoint["learning_rate"]
             # self.global_step = checkpoint["global_step"]
+
         if self.fp16_run:
             scaler = GradScaler()
 
