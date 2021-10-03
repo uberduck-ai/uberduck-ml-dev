@@ -59,6 +59,7 @@ def synthesize_speakerids2(filelists, fix_indices_index=None):
             data_dict_out[source_file] = data
     return data_dict_out
 
+
 def parse_vctk(root):
     """Parse VCTK dataset and return a dict representation."""
     wav_dir = os.path.join(root, "wav48_silence_trimmed")
@@ -187,8 +188,15 @@ from scipy.signal import get_window
 import librosa.util as librosa_util
 
 
-def window_sumsquare(window, n_frames, hop_length=200, win_length=800,
-                     n_fft=800, dtype=np.float32, norm=None):
+def window_sumsquare(
+    window,
+    n_frames,
+    hop_length=200,
+    win_length=800,
+    n_fft=800,
+    dtype=np.float32,
+    norm=None,
+):
     """
     # from librosa 0.6
     Compute the sum-square envelope of a window function at a given hop length.
@@ -229,13 +237,13 @@ def window_sumsquare(window, n_frames, hop_length=200, win_length=800,
 
     # Compute the squared window at the desired length
     win_sq = get_window(window, win_length, fftbins=True)
-    win_sq = librosa_util.normalize(win_sq, norm=norm)**2
+    win_sq = librosa_util.normalize(win_sq, norm=norm) ** 2
     win_sq = librosa_util.pad_center(win_sq, n_fft)
 
     # Fill the envelope
     for i in range(n_frames):
         sample = i * hop_length
-        x[sample:min(n, sample + n_fft)] += win_sq[:max(0, min(n_fft, n - sample))]
+        x[sample : min(n, sample + n_fft)] += win_sq[: max(0, min(n_fft, n - sample))]
     return x
 
 
@@ -275,7 +283,6 @@ def dynamic_range_decompression(x, C=1):
     """
     return torch.exp(x) / C
 
-
 # Cell
 def to_gpu(x):
     x = x.contiguous()
@@ -286,16 +293,22 @@ def to_gpu(x):
 
 # Cell
 
+
 def get_mask_from_lengths(lengths):
     """Return a mask matrix. Unmasked entires are true."""
     max_len = torch.max(lengths).item()
-    tensor_cls = torch.cuda.LongTensor if isinstance(lengths,torch.cuda.LongTensor) else torch.LongTensor
+    tensor_cls = (
+        torch.cuda.LongTensor
+        if isinstance(lengths, torch.cuda.LongTensor)
+        else torch.LongTensor
+    )
     ids = torch.arange(0, max_len, out=tensor_cls(max_len))
     mask = (ids < lengths.unsqueeze(1)).bool()
     return mask
 
 # Cell
 import torch.distributed as dist
+
 
 def reduce_tensor(tensor, n_gpus):
     rt = tensor.clone()

@@ -25,7 +25,7 @@ def run(
     val_percent=0.2,
     val_num=None,
     train_file="train.txt",
-    val_file="val.txt"
+    val_file="val.txt",
 ):
     """Split file in t
     Default behavior only creates a training and validation set (not test set).
@@ -37,11 +37,10 @@ def run(
     write_filenames(train, Path(os.path.dirname(path)), train_file)
     write_filenames(val, Path(os.path.dirname(path)), val_file)
 
-
-
 # Cell
 import argparse
 import sys
+
 
 def parse_args(args):
     parser = argparse.ArgumentParser()

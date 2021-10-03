@@ -59,14 +59,14 @@ def differenceFunction(x, N, tau_max):
     x = np.array(x, np.float64)
     w = x.size
     tau_max = min(tau_max, w)
-    x_cumsum = np.concatenate((np.array([0.]), (x * x).cumsum()))
+    x_cumsum = np.concatenate((np.array([0.0]), (x * x).cumsum()))
     size = w + tau_max
     p2 = (size // 32).bit_length()
     nice_numbers = (16, 18, 20, 24, 25, 27, 30, 32)
     size_pad = min(x * 2 ** p2 for x in nice_numbers if x * 2 ** p2 >= size)
     fc = np.fft.rfft(x, size_pad)
     conv = np.fft.irfft(fc * fc.conjugate())[:tau_max]
-    return x_cumsum[w:w - tau_max:-1] + x_cumsum[w] - x_cumsum[:tau_max] - 2 * conv
+    return x_cumsum[w : w - tau_max : -1] + x_cumsum[w] - x_cumsum[:tau_max] - 2 * conv
 
 
 def cumulativeMeanNormalizedDifferenceFunction(df, N):
@@ -81,7 +81,7 @@ def cumulativeMeanNormalizedDifferenceFunction(df, N):
     :rtype: list
     """
 
-    cmndf = df[1:] * range(1, N) / np.cumsum(df[1:]).astype(float) #scipy method
+    cmndf = df[1:] * range(1, N) / np.cumsum(df[1:]).astype(float)  # scipy method
     return np.insert(cmndf, 0, 1)
 
 
@@ -104,11 +104,12 @@ def getPitch(cmdf, tau_min, tau_max, harmo_th=0.1):
             return tau
         tau += 1
 
-    return 0    # if unvoiced
+    return 0  # if unvoiced
 
 
-def compute_yin(sig, sr, w_len=512, w_step=256, f0_min=100, f0_max=500,
-                harmo_thresh=0.1):
+def compute_yin(
+    sig, sr, w_len=512, w_step=256, f0_min=100, f0_max=500, harmo_thresh=0.1
+):
     """
 
     Compute the Yin Algorithm. Return fundamental frequency and harmonic rate.
@@ -133,9 +134,11 @@ def compute_yin(sig, sr, w_len=512, w_step=256, f0_min=100, f0_max=500,
     tau_min = int(sr / f0_max)
     tau_max = int(sr / f0_min)
 
-    timeScale = range(0, len(sig) - w_len, w_step)  # time values for each analysis window
-    times = [t/float(sr) for t in timeScale]
-    frames = [sig[t:t + w_len] for t in timeScale]
+    timeScale = range(
+        0, len(sig) - w_len, w_step
+    )  # time values for each analysis window
+    times = [t / float(sr) for t in timeScale]
+    frames = [sig[t : t + w_len] for t in timeScale]
 
     pitches = [0.0] * len(timeScale)
     harmonic_rates = [0.0] * len(timeScale)
@@ -157,7 +160,6 @@ def compute_yin(sig, sr, w_len=512, w_step=256, f0_min=100, f0_max=500,
             harmonic_rates[i] = min(cmdf)
 
     return pitches, harmonic_rates, argmins, times
-
 
 # Cell
 import os
