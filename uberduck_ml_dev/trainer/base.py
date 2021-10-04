@@ -413,7 +413,7 @@ class MellotronTrainer(TTSTrainer):
                             plot_attention(alignments[sample_idx].data.cpu())
                         ),
                     )
-                    self.sample_inference()
+                    self.sample_inference(model)
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"mellotron_{epoch}",
