@@ -10,6 +10,7 @@ import sys
 
 from ..utils.audio import normalize_audio
 
+
 def run(dirname, backup):
     """Normalize all the audio files in a directory."""
     old_dirname = dirname
@@ -27,9 +28,14 @@ def run(dirname, backup):
                 os.makedirs(os.path.join(dirname, rel_path))
             normalize_audio(old_path, new_path)
 
+
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--dirname", help="Path to the directory which contains audio files to normalize.")
+    parser.add_argument(
+        "-d",
+        "--dirname",
+        help="Path to the directory which contains audio files to normalize.",
+    )
     parser.add_argument("--backup", dest="backup", action="store_true")
     parser.add_argument("--no-backup", dest="backup", action="store_false")
     parser.set_defaults(backup=True)

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+nbqa black nbs
+nbdev_build_lib

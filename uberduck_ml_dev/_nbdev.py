@@ -114,4 +114,5 @@ doc_url = "https://uberduck-ai.github.io/uberduck_ml_dev/"
 
 git_url = "https://github.com/uberduck-ai/uberduck_ml_dev/tree/master/"
 
-def custom_doc_links(name): return None
+def custom_doc_links(name):
+    return None

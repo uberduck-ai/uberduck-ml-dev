@@ -6,6 +6,7 @@ __all__ = ['plot_spectrogram', 'plot_attention', 'plot_gate_outputs']
 import matplotlib
 import matplotlib.pyplot as plt
 
+
 def plot_spectrogram(mel):
     figure = plt.figure()
     plt.xlabel("Spectrogram frame")

@@ -15,12 +15,12 @@ from ..trainer.base import TTSTrainer, MellotronTrainer
 from ..vendor.tfcompat.hparam import HParams
 from ..models.mellotron import DEFAULTS as MELLOTRON_DEFAULTS
 
+
 def parse_args(args):
-    parser= argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("--config", help="Path to JSON config")
     args = parser.parse_args(args)
     return args
-
 
 # Cell
 def run(rank, device_count, hparams):

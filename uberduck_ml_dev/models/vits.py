@@ -31,9 +31,10 @@ class VITSEncoder(nn.Module):
         self.p_dropout = p_dropout
 
         self.embedding = nn.Embedding(n_vocab, hidden_channels)
-        nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
+        nn.init.normal_(self.emb.weight, 0.0, hidden_channels ** -0.5)
 
         self.encoder
+
 
 class VITSModel(TTSModel):
     def __init__(
