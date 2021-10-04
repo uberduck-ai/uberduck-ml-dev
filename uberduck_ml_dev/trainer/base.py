@@ -23,6 +23,7 @@ from ..utils.plot import (
 
 class TTSTrainer:
     def __init__(self, hparams, rank=None, world_size=None, device=None):
+        print("TTSTrainer start", time.perf_counter())
         self.hparams = hparams
         for k, v in hparams.values().items():
             setattr(self, k, v)
@@ -31,13 +32,15 @@ class TTSTrainer:
         self.global_step = 0
         self.rank = rank
         self.world_size = world_size
+        self.log_dir = hparams.log_dir
+
         if device:
             self.device = device
         elif torch.cuda.is_available():
             self.device = "cuda"
         else:
             self.device = "cpu"
-        self.writer = SummaryWriter()
+        self.writer = SummaryWriter(self.log_dir)
         if not hasattr(self, "debug"):
             self.debug = False
         if self.debug:
@@ -255,6 +258,7 @@ class MellotronTrainer(TTSTrainer):
 
     def warm_start(self, model, optimizer, start_epoch=0):
 
+        print("Starting warm_start", time.perf_counter())
         checkpoint = self.load_checkpoint()
         model.from_pretrained(
             model_dict=checkpoint["state_dict"],
@@ -268,10 +272,12 @@ class MellotronTrainer(TTSTrainer):
         if "learning_rate" in checkpoint.keys():
             optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
             self.learning_rate = checkpoint["learning_rate"]
+        print("Ending warm_start", time.perf_counter())
         # self.global_step = checkpoint["global_step"]
         return model, optimizer, start_epoch
 
     def train(self):
+        print("start train", time.perf_counter())
         train_set = TextMelDataset(
             *self.training_dataset_args,
             debug=self.debug,
