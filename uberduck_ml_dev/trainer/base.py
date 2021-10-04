@@ -12,6 +12,7 @@ from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
+import time
 
 from ..models.common import MelSTFT
 from ..utils.plot import (
@@ -22,7 +23,8 @@ from ..utils.plot import (
 
 
 class TTSTrainer:
-    def __init__(self, hparams, rank=None, world_size=None):
+    def __init__(self, hparams, rank=None, world_size=None, device=None):
+        print("TTSTrainer start", time.perf_counter())
         self.hparams = hparams
         for k, v in hparams.values().items():
             setattr(self, k, v)
@@ -31,7 +33,15 @@ class TTSTrainer:
         self.global_step = 0
         self.rank = rank
         self.world_size = world_size
-        self.writer = SummaryWriter()
+        self.log_dir = hparams.log_dir
+
+        if device:
+            self.device = device
+        elif torch.cuda.is_available():
+            self.device = "cuda"
+        else:
+            self.device = "cpu"
+        self.writer = SummaryWriter(self.log_dir)
         if not hasattr(self, "debug"):
             self.debug = False
         if self.debug:
@@ -247,7 +257,28 @@ class MellotronTrainer(TTSTrainer):
         val_args[1] = self.val_audiopaths_and_text
         return val_args
 
+    def warm_start(self, model, optimizer, start_epoch=0):
+
+        print("Starting warm_start", time.perf_counter())
+        checkpoint = self.load_checkpoint()
+        model.from_pretrained(
+            model_dict=checkpoint["state_dict"],
+            device=self.device,
+            ignore_layers=self.ignore_layers,
+        )
+        if "optimizer" in checkpoint.keys():
+            optimizer.load_state_dict(checkpoint["optimizer"])
+        if "iteration" in checkpoint.keys():
+            start_epoch = checkpoint["iteration"]
+        if "learning_rate" in checkpoint.keys():
+            optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
+            self.learning_rate = checkpoint["learning_rate"]
+        print("Ending warm_start", time.perf_counter())
+        # self.global_step = checkpoint["global_step"]
+        return model, optimizer, start_epoch
+
     def train(self):
+        print("start train", time.perf_counter())
         train_set = TextMelDataset(
             *self.training_dataset_args,
             debug=self.debug,
@@ -273,7 +304,7 @@ class MellotronTrainer(TTSTrainer):
         )  # keep higher than 5 to make clips not stretch on
 
         model = Tacotron2(self.hparams)
-        if torch.cuda.is_available():
+        if self.device == "cuda":
             model = model.cuda()
         if self.distributed_run:
             model = DDP(model, device_ids=[self.rank])
@@ -285,11 +316,8 @@ class MellotronTrainer(TTSTrainer):
         start_epoch = 0
 
         if self.warm_start_name:
-            checkpoint = self.load_checkpoint()
-            model.load_state_dict(checkpoint["model"])
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            start_epoch = checkpoint["iteration"]
-            # self.global_step = checkpoint["global_step"]
+            model, optimizer, start_epoch = self.warm_start(model, optimizer)
+
         if self.fp16_run:
             scaler = GradScaler()
 
