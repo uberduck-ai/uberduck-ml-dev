@@ -31,11 +31,12 @@ class TTSTrainer:
         self.global_step = 0
         self.rank = rank
         self.world_size = world_size
-        if device is not None:
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            else:
-                self.device = "cpu"
+        if device:
+            self.device = device
+        elif torch.cuda.is_available():
+            self.device = "cuda"
+        else:
+            self.device = "cpu"
         self.writer = SummaryWriter()
         if not hasattr(self, "debug"):
             self.debug = False
