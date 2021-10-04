@@ -3,6 +3,7 @@
 __all__ = ['TTSModel']
 
 # Cell
+import torch
 from torch import nn
 
 class TTSModel(nn.Module):
@@ -12,8 +13,19 @@ class TTSModel(nn.Module):
     def forward(self):
         raise NotImplemented
 
-    def from_pretrained(self):
-        raise NotImplemented
+    def from_pretrained(self,checkpoint_path,device, ignore_layers = None):
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        if "state_dict" in checkpoint.keys():
+            model_dict = checkpoint["state_dict"]
+            if ignore_layers:
+                model_dict = {k: v for k, v in model_dict.items()
+                              if k not in ignore_layers}
+                dummy_dict = self.state_dict()
+                dummy_dict.update(model_dict)
+                model_dict = dummy_dict
+            self.load_state_dict(model_dict)
+        if device == 'cuda:0':
+            self.cuda()
 
     def to_checkpoint(self):
         return dict(model=self.state_dict())
