@@ -43,7 +43,7 @@ DEFAULTS = HParams(
     p_attention_dropout=0.1,
     p_decoder_dropout=0.1,
     p_teacher_forcing=1.0,
-    pos_weight = 10,
+    pos_weight=10,
     # attention parameters
     attention_rnn_dim=1024,
     attention_dim=128,
@@ -132,12 +132,15 @@ class Postnet(nn.Module):
 
     def forward(self, x):
         for i in range(len(self.convolutions) - 1):
-            x = F.dropout(torch.tanh(self.convolutions[i](x)), self.dropout_rate, self.training)
+            x = F.dropout(
+                torch.tanh(self.convolutions[i](x)), self.dropout_rate, self.training
+            )
         x = F.dropout(self.convolutions[-1](x), self.dropout_rate, self.training)
 
         return x
 
 # Cell
+
 
 class Prenet(nn.Module):
     def __init__(self, in_dim, sizes):
@@ -199,7 +202,9 @@ class Encoder(nn.Module):
             for b_ind in range(x.size()[0]):  # TODO: Speed up
                 curr_x = x[b_ind : b_ind + 1, :, : input_lengths[b_ind]].clone()
                 for conv in self.convolutions:
-                    curr_x = F.dropout(F.relu(conv(curr_x)), self.dropout_rate, self.training)
+                    curr_x = F.dropout(
+                        F.relu(conv(curr_x)), self.dropout_rate, self.training
+                    )
                 x_embedded.append(curr_x[0].transpose(0, 1))
             x = torch.nn.utils.rnn.pad_sequence(x_embedded, batch_first=True)
         else:
@@ -229,6 +234,7 @@ class Encoder(nn.Module):
         return outputs
 
 # Cell
+
 
 class Decoder(nn.Module):
     def __init__(self, hparams):
@@ -506,7 +512,10 @@ class Decoder(nn.Module):
                 or np.random.uniform(0.0, 1.0) <= self.p_teacher_forcing
             ):
                 if self.include_f0:
-                    to_concat = (decoder_inputs[len(mel_outputs)], f0s[len(mel_outputs)])
+                    to_concat = (
+                        decoder_inputs[len(mel_outputs)],
+                        f0s[len(mel_outputs)],
+                    )
                 else:
                     to_concat = (decoder_inputs[len(mel_outputs)],)
                 decoder_input = torch.cat(to_concat, dim=1)
@@ -565,7 +574,6 @@ class Decoder(nn.Module):
                 to_cat = (self.prenet(decoder_input), f0)
             else:
                 to_cat = (self.prenet(decoder_input),)
-
 
             decoder_input = torch.cat(to_cat, dim=1)
             mel_output, gate_output, alignment = self.decode(decoder_input)

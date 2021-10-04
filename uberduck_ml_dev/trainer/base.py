@@ -115,10 +115,9 @@ from ..utils.utils import reduce_tensor
 
 
 class Tacotron2Loss(nn.Module):
-    def __init__(self,pos_weight):
+    def __init__(self, pos_weight):
         self.pos_weight = pos_weight
         super().__init__()
-
 
     def forward(self, model_output: List, target: List):
         mel_target, gate_target = target[0], target[1]
@@ -130,7 +129,9 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        gate_loss = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(self.pos_weight))(gate_out, gate_target)
+        gate_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(self.pos_weight))(
+            gate_out, gate_target
+        )
         return mel_loss, gate_loss
 
 
@@ -267,7 +268,9 @@ class MellotronTrainer(TTSTrainer):
             sampler=sampler,
             collate_fn=collate_fn,
         )
-        criterion = Tacotron2Loss(pos_weight = self.pos_weight) #keep higher than 5 to make clips not stretch on
+        criterion = Tacotron2Loss(
+            pos_weight=self.pos_weight
+        )  # keep higher than 5 to make clips not stretch on
 
         model = Tacotron2(self.hparams)
         if torch.cuda.is_available():
@@ -286,8 +289,11 @@ class MellotronTrainer(TTSTrainer):
             if "state_dict" in checkpoint.keys():
                 model_dict = checkpoint["state_dict"]
                 if self.ignore_layers:
-                    model_dict = {k: v for k, v in model_dict.items()
-                                  if k not in self.ignore_layers}
+                    model_dict = {
+                        k: v
+                        for k, v in model_dict.items()
+                        if k not in self.ignore_layers
+                    }
                     dummy_dict = model.state_dict()
                     dummy_dict.update(model_dict)
                     model_dict = dummy_dict
