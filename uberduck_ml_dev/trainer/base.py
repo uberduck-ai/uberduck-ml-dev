@@ -240,12 +240,12 @@ class MellotronTrainer(TTSTrainer):
             utterance = torch.LongTensor(
                 text_to_sequence(random_utterance(), self.text_cleaners, self.p_arpabet)
             )[None].cuda()
-            speaker_id = torch.randint(0, self.n_speakers - 1)
+            speaker_id = randint(0, self.n_speakers - 1)
             input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
             model.eval()
-            _, mel, *_ = model.inference(input_)
+            mel, *_ = model.inference(input_)
             model.train()
-            audio = self.sample(mel)
+            audio = self.sample(mel[0])
             self.log("SampleInference", self.global_step, audio=audio)
 
     @property
