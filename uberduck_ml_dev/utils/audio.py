@@ -2,7 +2,7 @@
 
 __all__ = ['differenceFunction', 'cumulativeMeanNormalizedDifferenceFunction', 'getPitch', 'compute_yin',
            'convert_to_wav', 'match_target_amplitude', 'modify_leading_silence', 'normalize_audio_segment',
-           'normalize_audio']
+           'normalize_audio', 'trim_audio']
 
 # Cell
 """
@@ -196,7 +196,9 @@ def convert_to_wav(filename, output, sr=22050):
 
 # Cell
 
+import librosa
 from pydub import AudioSegment, silence
+from scipy.io.wavfile import write
 
 
 def match_target_amplitude(audio_segment, target_dbfs):
@@ -233,3 +235,13 @@ def normalize_audio(path, new_path):
     audio_segment = AudioSegment.from_wav(path)
     audio_segment = normalize_audio_segment(audio_segment)
     audio_segment.export(new_path, format="wav")
+
+
+def trim_audio(path, new_path, top_db=20):
+    """Trim silence from start and end of the audio file.
+
+    Similar functionality to normalize_audio_segment, but uses librosa instead of pydub.
+    """
+    signal, sr = librosa.load(path)
+    trimmed, _ = librosa.effects.trim(signal, top_db=top_db)
+    write(new_path, sr, trimmed)
