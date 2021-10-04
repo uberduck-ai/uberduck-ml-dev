@@ -80,11 +80,11 @@ class TTSTrainer:
             return
         if audio is not None:
             self.writer.add_audio(tag, audio, step, sample_rate=self.sample_rate)
-        if scalar:
+        if scalar is not None:
             self.writer.add_scalar(tag, scalar, step)
-        if image:
+        if image is not None:
             self.writer.add_image(tag, image, step, dataformats="HWC")
-        if figure:
+        if figure is not None:
             self.writer.add_figure(tag, figure, step)
 
     def sample(self, mel, algorithm="griffin-lim", **kwargs):

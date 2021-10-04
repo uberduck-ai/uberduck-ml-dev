@@ -51,4 +51,4 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    run(args.dirname, args.backup)
+    run(args.dirname, args.backup, args.top_db)
