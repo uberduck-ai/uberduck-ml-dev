@@ -30,7 +30,6 @@ def plot_spectrogram(mel):
 
 def plot_attention(attention):
     figure = plt.figure()
-    figure.canvas.draw()
     plt.xlabel("Decoder timestep")
     plt.ylabel("Encoder timestep")
     plt.imshow(
@@ -40,12 +39,12 @@ def plot_attention(attention):
         interpolation="none",
         cmap="inferno",
     )
+    figure.canvas.draw()
     return figure
 
 
 def plot_gate_outputs(gate_targets, gate_outputs):
     figure = plt.figure()
-    figure.canvas.draw()
     plt.xlabel("Frames")
     plt.ylabel("Gate state")
     ax = figure.add_axes([0, 0, 1, 1])
@@ -67,4 +66,5 @@ def plot_gate_outputs(gate_targets, gate_outputs):
         s=1,
         label="predicted",
     )
+    figure.canvas.draw()
     return figure

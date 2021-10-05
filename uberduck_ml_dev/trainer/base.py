@@ -150,6 +150,7 @@ class MellotronTrainer(TTSTrainer):
     ]
 
     def log_training(
+        self,
         model,
         y_pred,
         y,
@@ -209,7 +210,7 @@ class MellotronTrainer(TTSTrainer):
             )
             self.sample_inference(model)
 
-    def log_validation(y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
+    def log_validation(self, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
         print(f"Average loss: {mean_loss}")
         self.log("Loss/val", self.global_step, scalar=mean_loss)
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
