@@ -2,7 +2,7 @@
 
 __all__ = ['differenceFunction', 'cumulativeMeanNormalizedDifferenceFunction', 'getPitch', 'compute_yin',
            'convert_to_wav', 'match_target_amplitude', 'modify_leading_silence', 'normalize_audio_segment',
-           'normalize_audio', 'trim_audio']
+           'normalize_audio', 'trim_audio', 'MAX_WAV_INT16']
 
 # Cell
 """
@@ -200,6 +200,8 @@ import librosa
 from pydub import AudioSegment, silence
 from scipy.io.wavfile import write
 
+MAX_WAV_INT16 = 32768
+
 
 def match_target_amplitude(audio_segment, target_dbfs):
     change_in_dbfs = target_dbfs - audio_segment.dBFS
@@ -244,4 +246,5 @@ def trim_audio(path, new_path, top_db=20):
     """
     signal, sr = librosa.load(path)
     trimmed, _ = librosa.effects.trim(signal, top_db=top_db)
+    trimmed = (MAX_WAV_INT16 * trimmed).astype(np.int16)
     write(new_path, sr, trimmed)
