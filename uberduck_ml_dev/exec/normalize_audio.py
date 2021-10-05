@@ -8,10 +8,10 @@ import argparse
 import os
 import sys
 
-from ..utils.audio import normalize_audio
+from ..utils.audio import normalize_audio, trim_audio
 
 
-def run(dirname, backup):
+def run(dirname, backup, top_db):
     """Normalize all the audio files in a directory."""
     old_dirname = dirname
     if backup:
@@ -26,7 +26,7 @@ def run(dirname, backup):
             new_path = os.path.join(dirname, rel_path, filename)
             if not os.path.exists(os.path.join(dirname, rel_path)):
                 os.makedirs(os.path.join(dirname, rel_path))
-            normalize_audio(old_path, new_path)
+            trim_audio(old_path, new_path, top_db)
 
 
 def parse_args(args):
@@ -38,7 +38,8 @@ def parse_args(args):
     )
     parser.add_argument("--backup", dest="backup", action="store_true")
     parser.add_argument("--no-backup", dest="backup", action="store_false")
-    parser.set_defaults(backup=True)
+    parser.add_argument("--top-db", type=int)
+    parser.set_defaults(backup=True, top_db=20)
     return parser.parse_args(args)
 
 # Cell
@@ -50,4 +51,4 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    run(args.dirname, args.backup)
+    run(args.dirname, args.backup, args.top_db)
