@@ -372,7 +372,9 @@ class Decoder(nn.Module):
 
         """
         # (B, n_mel_channels, T_out) -> (B, T_out, n_mel_channels)
+
         decoder_inputs = decoder_inputs.transpose(1, 2)
+        decoder_inputs = decoder_inputs.contiguous()
         decoder_inputs = decoder_inputs.view(
             decoder_inputs.size(0),
             int(decoder_inputs.size(1) / self.n_frames_per_step),
@@ -531,7 +533,7 @@ class Decoder(nn.Module):
             with autocast(enabled=False):
                 mel_output, gate_output, attention_weights = self.decode(decoder_input)
             mel_outputs += [mel_output.squeeze(1)]
-            gate_outputs += [gate_output.squeeze()]
+            gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step
             alignments += [attention_weights]
 
         mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
