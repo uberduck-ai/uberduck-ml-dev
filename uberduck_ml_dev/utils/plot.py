@@ -19,10 +19,10 @@ def save_figure_to_numpy(fig):
 
 def plot_spectrogram(mel):
     figure = plt.figure()
-    figure.canvas.draw()
     plt.xlabel("Spectrogram frame")
     plt.ylabel("Channel")
     plt.imshow(mel, aspect="auto", origin="lower", interpolation="none", cmap="inferno")
+    figure.canvas.draw()
     return figure
 
 # Cell
