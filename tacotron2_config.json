@@ -14,6 +14,7 @@
     "hop_length": 256,
     "include_f0": false,
     "learning_rate": 1e-3,
+    "log_dir": "runs",
     "mask_padding": true,
     "max_wav_value": 32768.0,
     "mel_fmax": 8000,
