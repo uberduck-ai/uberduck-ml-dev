@@ -344,7 +344,7 @@ class MellotronTrainer(TTSTrainer):
     @property
     def val_dataset_args(self):
         val_args = [a for a in self.training_dataset_args]
-        val_args[1] = self.val_audiopaths_and_text
+        val_args[0] = self.val_audiopaths_and_text
         return val_args
 
     def warm_start(self, model, optimizer, start_epoch=0):
