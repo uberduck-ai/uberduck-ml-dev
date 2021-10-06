@@ -30,6 +30,7 @@ DEFAULTS = HParams(
     encoder_n_convolutions=3,
     encoder_embedding_dim=512,
     # decoder parameters
+    coarse_n_frames_per_step=None,
     n_frames_per_step=1,  # currently only 1 is supported
     decoder_rnn_dim=1024,
     prenet_dim=256,
@@ -428,6 +429,7 @@ class Decoder(nn.Module):
         gate_output: gate output energies
         attention_weights:
         """
+        print("decode")
         cell_input = torch.cat((decoder_input, self.attention_context), -1)
         self.attention_hidden, self.attention_cell = self.attention_rnn(
             cell_input, (self.attention_hidden, self.attention_cell)
@@ -474,6 +476,7 @@ class Decoder(nn.Module):
         decoder_output = self.linear_projection(decoder_hidden_attention_context)
 
         gate_prediction = self.gate_layer(decoder_hidden_attention_context)
+        print("decoder output shape: ", decoder_output.shape)
         return decoder_output, gate_prediction, self.attention_weights
 
     def forward(self, memory, decoder_inputs, memory_lengths, f0s):
@@ -701,6 +704,7 @@ class Tacotron2(TTSModel):
             mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
             mask = F.pad(mask, (0, outputs[0].size(2) - mask.size(2)))
             mask = mask.permute(1, 0, 2)
+            print("mask size: ", mask.shape)
 
             outputs[0].data.masked_fill_(mask, 0.0)
             outputs[1].data.masked_fill_(mask, 0.0)
@@ -718,6 +722,7 @@ class Tacotron2(TTSModel):
             speaker_ids,
             *_,
         ) = inputs
+        print("include f0: ", self.include_f0)
         if self.include_f0:
             f0s = inputs[6]
         else:
@@ -741,6 +746,10 @@ class Tacotron2(TTSModel):
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+        print("mel outputs shape: ", mel_outputs.shape)
+        print("mel outputs postnet shape: ", mel_outputs_postnet.shape)
+        print("gate outputs shape: ", gate_outputs.shape)
+        print("attn shape: ", alignments.shape)
 
         return self.parse_output(
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments], output_lengths
