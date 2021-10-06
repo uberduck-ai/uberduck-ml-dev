@@ -352,7 +352,9 @@ class MellotronTrainer(TTSTrainer):
         print("Starting warm_start", time.perf_counter())
         checkpoint = self.load_checkpoint()
         # TODO(zach): Once we are no longer using checkpoints of the old format, remove the conditional and use checkpoint["model"] only.
-        model_state_dict = checkpoint["model"] if "model" in checkpoint else checkpoint["state_dict"]
+        model_state_dict = (
+            checkpoint["model"] if "model" in checkpoint else checkpoint["state_dict"]
+        )
         model.from_pretrained(
             model_dict=model_state_dict,
             device=self.device,
@@ -379,7 +381,9 @@ class MellotronTrainer(TTSTrainer):
         val_set = TextMelDataset(
             *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
         )
-        collate_fn = TextMelCollate(n_frames_per_step=1, include_f0=self.include_f0)
+        collate_fn = TextMelCollate(
+            n_frames_per_step=self.n_frames_per_step, include_f0=self.include_f0
+        )
         sampler = None
         if self.distributed_run:
             self.init_distributed()
