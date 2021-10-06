@@ -126,7 +126,11 @@ from ..utils.utils import reduce_tensor
 
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
-        self.pos_weight = pos_weight
+        if pos_weight:
+            self.pos_weight = torch.tensor(self.pos_weight)
+        else:
+            self.pos_weight = pos_weight
+
         super().__init__()
 
     def forward(self, model_output: List, target: List):
@@ -139,9 +143,7 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        if self.pos_weight:
-            pos_weight = torch.tensor(self.pos_weight)
-            gate_loss = nn.BCEWithLogitsLoss(pos_weight)(gate_out, gate_target)
+        gate_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)(gate_out, gate_target)
         return mel_loss, gate_loss
 
 
