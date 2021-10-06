@@ -34,6 +34,7 @@ class TTSTrainer:
         self.rank = rank
         self.world_size = world_size
         self.log_dir = hparams.log_dir
+        self.seed = hparams.seed
 
         if device:
             self.device = device
@@ -143,7 +144,9 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        gate_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)(gate_out, gate_target)
+        gate_loss = nn.BCEWithLogitsLoss(pos_weight=self.pos_weight)(
+            gate_out, gate_target
+        )
         return mel_loss, gate_loss
 
 
@@ -305,6 +308,8 @@ class MellotronTrainer(TTSTrainer):
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
 
+        # set seed
+        torch.manual_seed(self.seed)
         model = Tacotron2(self.hparams)
         if self.device == "cuda":
             model = model.cuda()
