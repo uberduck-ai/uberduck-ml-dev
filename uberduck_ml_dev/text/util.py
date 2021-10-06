@@ -2,7 +2,8 @@
 
 __all__ = ['normalize_numbers', 'expand_abbreviations', 'expand_numbers', 'lowercase', 'collapse_whitespace',
            'convert_to_ascii', 'convert_to_arpabet', 'basic_cleaners', 'transliteration_cleaners', 'english_cleaners',
-           'g2p', 'clean_text', 'english_to_arpabet', 'text_to_sequence', 'sequence_to_text', 'CLEANERS']
+           'g2p', 'clean_text', 'english_to_arpabet', 'text_to_sequence', 'sequence_to_text', 'CLEANERS',
+           'random_utterance', 'utterances']
 
 # Cell
 """ from https://github.com/keithito/tacotron """
@@ -263,3 +264,70 @@ def sequence_to_text(sequence):
                 s = "{%s}" % s[1:]
             result += s
     return result.replace("}{", " ")
+
+# Cell
+import random
+
+utterances = [
+    "Stop posting about Among Us, I'm tired of seeing it!",
+    "My friends on TikTok send me memes, on Discord it's fucking memes.",
+    "I'd just like to interject for a moment.",
+    "What you're referring to as Linux, is in fact, gnu slash Linux.",
+    "Wow! That was intense! Woo I just flew in from the new ruins level and boy are my arms tired.",
+    "Oh my god! They killed Kenny!",
+    "It needs to be about, twenty percent cooler.",
+    "Hey relax guy! I'm just your average joe! Take a rest!",
+    "I'm not bad, I'm just drawn that way.",
+    "Alright! we're here just sitting in the car. I want you to show me if you can get far.",
+    "Isn't it nice to have a computer that will talk to you?",
+    "This is where we hold them. This is where we fight!",
+    "I'll have two number nines, a number nine large, a number six with extra dip.",
+    "A number seven, two number forty fives, one with cheese, and a large soda.",
+    "Can you tell me how to get to Sesame Street?",
+    "You know what they say, all toasters toast toast.",
+    "Don't turn me into a marketable plushie!",
+    "I am speaking straight opinions, and that's all that matters.",
+    "Excuse me sir, but it appears that a package has arrived in the mailbox as of recent.",
+    "I'm going to order pizza, look at me, I'm on the phone, right now.",
+    "I started calling and I am hungry to the bone.",
+    "so while I wait, I start to sing the song of my people I know it since I was a baby.",
+    "When I was a lad, I ate four dozen eggs every morning to help me get large.",
+    "Now that I'm grown I eat five dozen eggs, so I'm roughly the size of a barge!",
+    "There's no crying. There's no crying in baseball.",
+    "Sphinx of black quartz, judge my vow.",
+    "Go to the Winchester, have a pint, and wait for all of this to blow over.",
+    "You should really stop pressing this button.",
+    "Minecraft is honestly a block game.",
+    "I like that song. Let it play.",
+    "When a zebras in the zone, leave him alone!",
+    "The FitnessGram Pacer Test is a multistage aerobic capacity test that progressively gets more difficult as it continues.",
+    "The 20 meter pacer test will begin in 30 seconds.",
+    "The running speed starts slowly, but gets faster each minute after you hear this signal. beep.",
+    "A single lap should be completed each time you hear this sound. ding.",
+    "Remember to run in a straight line, and run as long as possible.",
+    "The second time you fail to complete a lap before the sound, your test is over.",
+    "The test will begin on the word start. On your mark, get ready, start.",
+    "Oh my gosh. Nemo's swimming out to sea!",
+    "Go back. I want to be monkey!",
+    "Whoops! You have to put the C D in your computer.",
+    "Now the animators are gonna have to draw all this fire!",
+    "The mitochondria is the powerhouse of the cell.",
+    "Now that's something you don't see every day!",
+    "You know, what can I say? I die hard.",
+    "Gosh darn it Kris, where the heck are we?",
+    "This is a test voice message.",
+    "I swear the toilet was full of guacamole when I bought it!",
+    "Did you ever hear the Tragedy of Darth Plagueis the wise?",
+    "I thought not. It's not a story the Jedi would tell you, it's a sith legend.",
+    "Darth Plagueis was a dark lord of the Sith, so powerful and so wise",
+    "He could use the force to influence the midichlorians to create life.",
+    "Never gonna give you up. Never gonna let you down.",
+    "I am the Milkman. My milk is delicious.",
+    "I'm just like my country. I'm young, scrappy, and hungry, and I am not throwing away my shot.",
+    "I'm still a piece of garbage.",
+    "Looks like you're the first one here! Use the people tab on your watch to invite your friends to join you!",
+]
+
+
+def random_utterance():
+    return utterances[random.randint(0, len(utterances) - 1)]

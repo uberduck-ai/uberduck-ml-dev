@@ -20,6 +20,7 @@ from ..utils.plot import (
     plot_gate_outputs,
     plot_spectrogram,
 )
+from ..text.util import text_to_sequence, random_utterance
 
 
 class TTSTrainer:
@@ -90,11 +91,11 @@ class TTSTrainer:
             return
         if audio is not None:
             self.writer.add_audio(tag, audio, step, sample_rate=self.sample_rate)
-        if scalar:
+        if scalar is not None:
             self.writer.add_scalar(tag, scalar, step)
-        if image:
+        if image is not None:
             self.writer.add_image(tag, image, step, dataformats="HWC")
-        if figure:
+        if figure is not None:
             self.writer.add_figure(tag, figure, step)
 
     def sample(self, mel, algorithm="griffin-lim", **kwargs):
@@ -122,6 +123,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.mellotron import Tacotron2
+from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
 
 
@@ -161,6 +163,110 @@ class MellotronTrainer(TTSTrainer):
         "text_cleaners",
         "pos_weight",
     ]
+
+    def log_training(
+        self,
+        model,
+        y_pred,
+        y,
+        loss,
+        mel_loss,
+        gate_loss,
+        grad_norm,
+        step_duration_seconds,
+    ):
+        print(f"Loss: {loss}")
+        self.log("Loss/train", self.global_step, scalar=loss)
+        self.log("MelLoss/train", self.global_step, scalar=mel_loss)
+        self.log("GateLoss/train", self.global_step, scalar=gate_loss)
+        self.log("GradNorm", self.global_step, scalar=grad_norm.item())
+        self.log("LearningRate", self.global_step, scalar=self.learning_rate)
+        self.log(
+            "StepDurationSeconds",
+            self.global_step,
+            scalar=step_duration_seconds,
+        )
+        if self.global_step % self.steps_per_sample == 0:
+            _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+            mel_target, gate_target = y
+            sample_idx = randint(0, mel_out_postnet.size(0) - 1)
+            audio = self.sample(mel=mel_out_postnet[sample_idx])
+            self.log("AudioSample/train", self.global_step, audio=audio)
+            self.log(
+                "MelPredicted/train",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_spectrogram(mel_out_postnet[sample_idx].data.cpu())
+                ),
+            )
+            self.log(
+                "MelTarget/train",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_spectrogram(mel_target[sample_idx].data.cpu())
+                ),
+            )
+            self.log(
+                "Gate/train",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_gate_outputs(
+                        gate_outputs[sample_idx].data.cpu(),
+                        gate_target[sample_idx].data.cpu(),
+                    )
+                ),
+            )
+            self.log(
+                "Attention/train",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_attention(alignments[sample_idx].data.cpu())
+                ),
+            )
+            self.sample_inference(model)
+
+    def log_validation(self, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
+        print(f"Average loss: {mean_loss}")
+        self.log("Loss/val", self.global_step, scalar=mean_loss)
+        self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
+        self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
+        # Generate the sample from a random item from the last y_pred batch.
+        _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+        sample_idx = randint(0, mel_out_postnet.size(0) - 1)
+        mel_target, gate_target = y
+        audio = self.sample(mel=mel_out_postnet[sample_idx])
+        self.log("AudioSample/val", self.global_step, audio=audio)
+        self.log(
+            "MelPredicted/val",
+            self.global_step,
+            image=save_figure_to_numpy(
+                plot_spectrogram(mel_out_postnet[sample_idx].data.cpu())
+            ),
+        )
+        self.log(
+            "MelTarget/val",
+            self.global_step,
+            image=save_figure_to_numpy(
+                plot_spectrogram(mel_target[sample_idx].data.cpu())
+            ),
+        )
+        self.log(
+            "Gate/val",
+            self.global_step,
+            image=save_figure_to_numpy(
+                plot_gate_outputs(
+                    gate_outputs[sample_idx].data.cpu(),
+                    gate_target[sample_idx].data.cpu(),
+                )
+            ),
+        )
+        self.log(
+            "Attention/val",
+            self.global_step,
+            image=save_figure_to_numpy(
+                plot_attention(alignments[sample_idx].data.cpu())
+            ),
+        )
 
     def validate(self, **kwargs):
         model = kwargs["model"]
@@ -202,40 +308,24 @@ class MellotronTrainer(TTSTrainer):
             mean_mel_loss = total_mel_loss / total_steps
             mean_gate_loss = total_gate_loss / total_steps
             mean_loss = total_loss / total_steps
-            print(f"Average loss: {mean_loss}")
-            self.log("Loss/val", self.global_step, scalar=mean_loss)
-            self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
-            self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
-            # Generate the sample from a random item from the last y_pred batch.
-            _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
-            sample_idx = randint(0, mel_out_postnet.size(0) - 1)
-            mel_target, gate_target = y
-            audio = self.sample(mel=mel_out_postnet[sample_idx])
-            self.log("AudioSample/val", self.global_step, audio=audio)
-            self.log(
-                "MelPredicted/val",
-                self.global_step,
-                figure=plot_spectrogram(mel_out_postnet[sample_idx].data.cpu()),
-            )
-            self.log(
-                "MelTarget/val",
-                self.global_step,
-                figure=plot_spectrogram(mel_target[sample_idx].data.cpu()),
-            )
-            self.log(
-                "Gate/val",
-                self.global_step,
-                figure=plot_gate_outputs(
-                    gate_outputs[sample_idx].data.cpu(),
-                    gate_target[sample_idx].data.cpu(),
-                ),
-            )
-            self.log(
-                "Attention/val",
-                self.global_step,
-                figure=plot_attention(alignments[sample_idx].data.cpu()),
-            )
+            self.log_validation(y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss)
         model.train()
+
+    def sample_inference(self, model):
+        if self.rank is not None and self.rank != 0:
+            return
+        # Generate an audio sample
+        with torch.no_grad():
+            utterance = torch.LongTensor(
+                text_to_sequence(random_utterance(), self.text_cleaners, self.p_arpabet)
+            )[None].cuda()
+            speaker_id = randint(0, self.n_speakers - 1)
+            input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
+            model.eval()
+            mel, *_ = model.inference(input_)
+            model.train()
+            audio = self.sample(mel[0])
+            self.log("SampleInference", self.global_step, audio=audio)
 
     @property
     def training_dataset_args(self):
@@ -259,7 +349,7 @@ class MellotronTrainer(TTSTrainer):
     @property
     def val_dataset_args(self):
         val_args = [a for a in self.training_dataset_args]
-        val_args[1] = self.val_audiopaths_and_text
+        val_args[0] = self.val_audiopaths_and_text
         return val_args
 
     def warm_start(self, model, optimizer, start_epoch=0):
@@ -374,46 +464,16 @@ class MellotronTrainer(TTSTrainer):
                     )
                     optimizer.step()
                 step_duration_seconds = time.perf_counter() - start_time
-                print(f"Loss: {reduced_loss}")
-                self.log("Loss/train", self.global_step, scalar=reduced_loss)
-                self.log("MelLoss/train", self.global_step, scalar=reduced_mel_loss)
-                self.log("GateLoss/train", self.global_step, scalar=reduced_gate_loss)
-                self.log("GradNorm", self.global_step, scalar=grad_norm.item())
-                self.log("LearningRate", self.global_step, scalar=self.learning_rate)
-                self.log(
-                    "StepDurationSeconds",
-                    self.global_step,
-                    scalar=step_duration_seconds,
+                self.log_training(
+                    model,
+                    y_pred,
+                    y,
+                    reduced_loss,
+                    reduced_mel_loss,
+                    reduced_gate_loss,
+                    grad_norm,
+                    step_duration_seconds,
                 )
-                if self.global_step % self.steps_per_sample == 0:
-                    _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
-                    mel_target, gate_target = y
-                    sample_idx = randint(0, mel_out_postnet.size(0) - 1)
-                    audio = self.sample(mel=mel_out_postnet[sample_idx])
-                    self.log("AudioSample/train", self.global_step, audio=audio)
-                    self.log(
-                        "MelPredicted/train",
-                        self.global_step,
-                        figure=plot_spectrogram(mel_out_postnet[sample_idx].data.cpu()),
-                    )
-                    self.log(
-                        "MelTarget/train",
-                        self.global_step,
-                        figure=plot_spectrogram(mel_target[sample_idx].data.cpu()),
-                    )
-                    self.log(
-                        "Gate/train",
-                        self.global_step,
-                        figure=plot_gate_outputs(
-                            gate_outputs[sample_idx].data.cpu(),
-                            gate_target[sample_idx].data.cpu(),
-                        ),
-                    )
-                    self.log(
-                        "Attention/train",
-                        self.global_step,
-                        figure=plot_attention(alignments[sample_idx].data.cpu()),
-                    )
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"mellotron_{epoch}",
@@ -423,9 +483,6 @@ class MellotronTrainer(TTSTrainer):
                     learning_rate=self.learning_rate,
                     global_step=self.global_step,
                 )
-
-            # Generate an audio sample
-            # TODO(zach)
 
             # There's no need to validate in debug mode since we're not really training.
             if self.debug:
