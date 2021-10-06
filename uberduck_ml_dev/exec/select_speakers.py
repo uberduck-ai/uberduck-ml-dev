@@ -77,7 +77,7 @@ def _convert_standard_multispeaker(
         for line in transcriptions:
             line = line.strip("\n")
             try:
-                line_path, line_txn = line.split("|")
+                line_path, line_txn, *_ = line.split("|")
             except Exception as e:
                 print(e)
                 print(line)
@@ -88,11 +88,12 @@ def _convert_standard_multispeaker(
         speaker_out_path = Path(out_path) / speaker
         if not speaker_out_path.exists():
             os.makedirs(speaker_out_path)
-        if wavs_dvc.exists():
-            copyfile(wavs_dvc, speaker_out_path / "wavs.dvc")
+        # if wavs_dvc.exists():
+        #     copyfile(wavs_dvc, speaker_out_path / "wavs.dvc")
         wavs_dir = path / "wavs"
         if wavs_dir.exists():
-            copytree(wavs_dir, speaker_out_path / "wavs")
+            # copytree(wavs_dir, speaker_out_path / "wavs")
+            os.symlink(wavs_dir, speaker_out_path / "wavs", target_is_directory=True)
         speaker_id += 1
     return speaker_id - start_speaker_id
 
