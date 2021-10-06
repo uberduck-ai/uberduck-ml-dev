@@ -139,9 +139,9 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        gate_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(self.pos_weight))(
-            gate_out, gate_target
-        )
+        if self.pos_weight:
+            pos_weight = torch.tensor(self.pos_weight)
+            gate_loss = nn.BCEWithLogitsLoss(pos_weight)(gate_out, gate_target)
         return mel_loss, gate_loss
 
 
