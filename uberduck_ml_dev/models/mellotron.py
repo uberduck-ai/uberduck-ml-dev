@@ -564,8 +564,7 @@ class Decoder(nn.Module):
                 [
                     mel_outputs,
                     mel_output[
-                        :,
-                        0: self.n_mel_channels * self.n_frames_per_step_current
+                        :, 0 : self.n_mel_channels * self.n_frames_per_step_current
                     ].unsqueeze(1),
                 ],
                 dim=1,
@@ -592,7 +591,7 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        decoder_input = decoder_input[:, -1 * self.n_mel_channels : ]
+        decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
         self.initialize_decoder_states(memory, mask=None)
         if f0s is not None:
             f0_dummy = self.get_end_f0(f0s)
@@ -655,7 +654,7 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        decoder_input = decoder_input[:, -1 * self.n_mel_channels : ]
+        decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
 
         self.initialize_decoder_states(memory, mask=None)
         f0_dummy = self.get_end_f0(f0s)
@@ -800,10 +799,6 @@ class Tacotron2(TTSModel):
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-        print("mel outputs shape: ", mel_outputs.shape)
-        print("mel outputs postnet shape: ", mel_outputs_postnet.shape)
-        print("gate outputs shape: ", gate_outputs.shape)
-        print("attn shape: ", alignments.shape)
 
         return self.parse_output(
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments], output_lengths

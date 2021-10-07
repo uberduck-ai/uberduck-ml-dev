@@ -159,6 +159,11 @@ class MellotronTrainer(TTSTrainer):
         "pos_weight",
     ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.n_frames_per_step_current = self.n_frames_per_step_initial
+        self.reduction_window_idx = 0
+
     def log_training(
         self,
         model,
@@ -263,6 +268,33 @@ class MellotronTrainer(TTSTrainer):
             ),
         )
 
+    def adjust_frames_per_step(
+        self,
+        model: Tacotron2,
+        train_loader: DataLoader,
+        sampler,
+        collate_fn: TextMelCollate,
+    ):
+        """If necessary, adjust model and loader's n_frames_per_step."""
+        if not self.reduction_window_schedule:
+            return train_loader, sampler, collate_fn
+        settings = self.reduction_window_schedule[self.reduction_window_idx]
+        if settings["until_step"] is None:
+            return train_loader, sampler, collate_fn
+        if self.global_step < settings["until_step"]:
+            return train_loader, sampler, collate_fn
+        self.reduction_window_idx += 1
+        new_settings = self.reduction_window_schedule[self.reduction_window_idx]
+        print(
+            f"Adjusting frames per step from {settings['n_frames_per_step']} to {new_settings['n_frames_per_step']}"
+        )
+        fps = new_settings["n_frames_per_step"]
+        bs = new_settings["batch_size"]
+        self.batch_size = bs
+        model.set_current_frames_per_step(fps)
+        _, _, train_loader, sampler, collate_fn = self.initialize_loader()
+        return train_loader, sampler, collate_fn
+
     def validate(self, **kwargs):
         model = kwargs["model"]
         val_set = kwargs["val_set"]
@@ -347,6 +379,31 @@ class MellotronTrainer(TTSTrainer):
         val_args[0] = self.val_audiopaths_and_text
         return val_args
 
+    def initialize_loader(self):
+        train_set = TextMelDataset(
+            *self.training_dataset_args,
+            debug=self.debug,
+            debug_dataset_size=self.batch_size,
+        )
+        val_set = TextMelDataset(
+            *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
+        )
+        collate_fn = TextMelCollate(
+            n_frames_per_step=self.n_frames_per_step_current, include_f0=self.include_f0
+        )
+        sampler = None
+        if self.distributed_run:
+            self.init_distributed()
+            sampler = DistributedSampler(train_set, rank=self.rank)
+        train_loader = DataLoader(
+            train_set,
+            batch_size=self.batch_size,
+            shuffle=(sampler is None),
+            sampler=sampler,
+            collate_fn=collate_fn,
+        )
+        return train_set, val_set, train_loader, sampler, collate_fn
+
     def warm_start(self, model, optimizer, start_epoch=0):
 
         print("Starting warm_start", time.perf_counter())
@@ -373,28 +430,7 @@ class MellotronTrainer(TTSTrainer):
 
     def train(self):
         print("start train", time.perf_counter())
-        train_set = TextMelDataset(
-            *self.training_dataset_args,
-            debug=self.debug,
-            debug_dataset_size=self.batch_size,
-        )
-        val_set = TextMelDataset(
-            *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
-        )
-        collate_fn = TextMelCollate(
-            n_frames_per_step=self.n_frames_per_step, include_f0=self.include_f0
-        )
-        sampler = None
-        if self.distributed_run:
-            self.init_distributed()
-            sampler = DistributedSampler(train_set, rank=self.rank)
-        train_loader = DataLoader(
-            train_set,
-            batch_size=self.batch_size,
-            shuffle=(sampler is None),
-            sampler=sampler,
-            collate_fn=collate_fn,
-        )
+        train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
         criterion = Tacotron2Loss(
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
@@ -419,6 +455,9 @@ class MellotronTrainer(TTSTrainer):
 
         # main training loop
         for epoch in range(start_epoch, self.epochs):
+            train_loader, sampler, collate_fn = self.adjust_frames_per_step(
+                model, train_loader, sampler, collate_fn
+            )
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
