@@ -211,8 +211,8 @@ class MellotronTrainer(TTSTrainer):
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_gate_outputs(
-                        gate_outputs[sample_idx].data.cpu(),
-                        gate_target[sample_idx].data.cpu(),
+                        gate_targets=gate_target[sample_idx].data.cpu(),
+                        gate_outputs=gate_outputs[sample_idx].data.cpu(),
                     )
                 ),
             )
@@ -255,8 +255,8 @@ class MellotronTrainer(TTSTrainer):
             self.global_step,
             image=save_figure_to_numpy(
                 plot_gate_outputs(
-                    gate_outputs[sample_idx].data.cpu(),
-                    gate_target[sample_idx].data.cpu(),
+                    gate_targets=gate_target[sample_idx].data.cpu(),
+                    gate_outputs=gate_outputs[sample_idx].data.cpu(),
                 )
             ),
         )
@@ -349,10 +349,31 @@ class MellotronTrainer(TTSTrainer):
             speaker_id = randint(0, self.n_speakers - 1)
             input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
             model.eval()
-            mel, *_ = model.inference(input_)
+            mel, gate, attn = model.inference(input_)
             model.train()
             audio = self.sample(mel[0])
             self.log("SampleInference", self.global_step, audio=audio)
+            self.log(
+                "Attention/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_attention(attn[0].data.cpu())
+                ),
+            )
+            self.log(
+                "MelPredicted/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_spectrogram(mel[0].data.cpu())
+                ),
+            )
+            self.log(
+                "Gate/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_gate_outputs(gate_outputs=gate[0].data.cpu())
+                ),
+            )
 
     @property
     def training_dataset_args(self):
