@@ -528,6 +528,8 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
+        if torch.cuda.is_available():
+            mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         desired_output_frames = decoder_inputs.size(0) / self.n_frames_per_step_current
         while mel_outputs.size(1) < desired_output_frames - 1:
@@ -603,6 +605,8 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
+        if torch.cuda.is_available():
+            mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         while True:
             f0 = None
@@ -666,6 +670,8 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
+        if torch.cuda.is_available():
+            mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         for i in range(len(attention_map)):
             f0 = f0s[i]
