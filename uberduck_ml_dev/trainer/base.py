@@ -292,6 +292,7 @@ class MellotronTrainer(TTSTrainer):
         bs = new_settings["batch_size"]
         self.batch_size = bs
         model.set_current_frames_per_step(fps)
+        self.n_frames_per_step_current = fps
         _, _, train_loader, sampler, collate_fn = self.initialize_loader()
         return train_loader, sampler, collate_fn
 
@@ -349,7 +350,7 @@ class MellotronTrainer(TTSTrainer):
             speaker_id = randint(0, self.n_speakers - 1)
             input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
             model.eval()
-            mel, gate, attn = model.inference(input_)
+            _, mel, gate, attn = model.inference(input_)
             model.train()
             audio = self.sample(mel[0])
             self.log("SampleInference", self.global_step, audio=audio)
