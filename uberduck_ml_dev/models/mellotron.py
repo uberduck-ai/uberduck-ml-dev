@@ -327,13 +327,7 @@ class Decoder(nn.Module):
         decoder_input: all zeros frames
         """
         B = memory.size(0)
-        decoder_input = Variable(
-            memory.data.new(
-                # self.n_frames_per_step_current, B, self.n_mel_channels
-                B,
-                self.n_mel_channels * self.n_frames_per_step_current,
-            ).zero_()
-        )
+        decoder_input = Variable(memory.data.new(B, self.n_mel_channels).zero_())
         return decoder_input
 
     def get_end_f0(self, f0s):
@@ -506,12 +500,12 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         B = memory.size(0)
-        decoder_input = self.get_go_frame(memory).unsqueeze(0)
         decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
-        decoder_inputs = torch.cat((decoder_input, decoder_inputs), dim=0)
         decoder_inputs = decoder_inputs.reshape(
             -1, decoder_inputs.size(1), self.n_mel_channels
         )
+        decoder_input = self.get_go_frame(memory).unsqueeze(0)
+        decoder_inputs = torch.cat((decoder_input, decoder_inputs), dim=0)
         decoder_inputs = self.prenet(decoder_inputs)
 
         # audio features
@@ -593,7 +587,7 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
+        # decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
         self.initialize_decoder_states(memory, mask=None)
         if f0s is not None:
             f0_dummy = self.get_end_f0(f0s)
@@ -658,7 +652,7 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
+        # decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
 
         self.initialize_decoder_states(memory, mask=None)
         f0_dummy = self.get_end_f0(f0s)
