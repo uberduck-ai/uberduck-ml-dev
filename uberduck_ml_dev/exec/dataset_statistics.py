@@ -3,6 +3,7 @@
 __all__ = ['get_summary_statistics', 'calculate_statistics', 'generate_markdown', 'parse_args', 'run']
 
 # Cell
+
 import argparse
 import os
 import sys
@@ -36,21 +37,14 @@ def get_summary_statistics(arr):
     if len(arr) == 0:
         return {}
     arr_np = np.array(arr)
-    p10 = np.percentile(arr_np, 10)
-    p25 = np.percentile(arr_np, 25)
-    p50 = np.percentile(arr_np, 50)
-    p75 = np.percentile(arr_np, 75)
-    p90 = np.percentile(arr_np, 90)
-    arr_max = np.max(arr_np)
-    arr_min = np.min(arr_np)
     return {
-        "p10": p10,
-        "p25": p25,
-        "p50": p50,
-        "p75": p75,
-        "p90": p90,
-        "max": arr_max,
-        "min": arr_min,
+        "p10": float(np.percentile(arr_np, 10)),
+        "p25": float(np.percentile(arr_np, 25)),
+        "p50": float(np.percentile(arr_np, 50)),
+        "p75": float(np.percentile(arr_np, 75)),
+        "p90": float(np.percentile(arr_np, 90)),
+        "max": float(np.max(arr_np)),
+        "min": float(np.min(arr_np)),
     }
 
 
@@ -372,7 +366,7 @@ def generate_markdown(output_file, dataset_path, output_folder, data):
     )
 
     mdFile.new_line(
-        f'**Arpabet sequences obtained via g2P RNN:** {", ".join(data["lookup_results"]["RNN"])}'
+        f'**Words not found in CMU:** {", ".join(data["lookup_results"]["RNN"])}'
     )
     mdFile.create_md_file()
 
@@ -398,13 +392,6 @@ def parse_args(args):
         type=str,
         default="README",
     )
-    parser.add_argument("--metrics", dest="metrics", action="store_true")
-    parser.add_argument("--no-metrics", dest="metrics", action="store_false")
-
-    parser.add_argument("--wordcloud", dest="wordcloud", action="store_true")
-    parser.add_argument("--no-wordcloud", dest="wordcloud", action="store_false")
-    parser.set_defaults(metrics=True, wordcloud=True)
-
     parser.add_argument(
         "--output_folder",
         help="Folder to save plots and images.",
@@ -414,7 +401,11 @@ def parse_args(args):
     parser.add_argument(
         "--delimiter", help="Transcription file delimiter.", type=str, default="|"
     )
-
+    parser.add_argument("--metrics", dest="metrics", action="store_true")
+    parser.add_argument("--no-metrics", dest="metrics", action="store_false")
+    parser.add_argument("--wordcloud", dest="wordcloud", action="store_true")
+    parser.add_argument("--no-wordcloud", dest="wordcloud", action="store_false")
+    parser.set_defaults(metrics=True, wordcloud=True)
     return parser.parse_args(args)
 
 
@@ -432,7 +423,7 @@ def run(
     )
     if data:
         generate_markdown(output_file, dataset_path, output_folder, data)
-        with open("stats.json", "w") as outfile:
+        with open(os.path.join(dataset_path, "stats.json"), "w") as outfile:
             keys = [
                 "n_clips",
                 "total_lengths_summary",
@@ -458,13 +449,14 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    if "readme" in args.output_file.lower():
-        inp = None
-        while inp not in ["y", "n"]:
-            inp = input(
-                "This script will overwite everything in the README file with dataset statistics. Would you like to continue? (y/n) "
-            ).lower()
-        if inp == "n":
+
+    if os.path.exists(
+        os.path.join(args.dataset_path, args.output_file)
+    ) or os.path.exists(os.path.join(args.dataset_path, args.output_file + ".md")):
+        inp = input(
+            f"This script will overwite everything in the {args.output_file} file with dataset statistics. Would you like to continue? (y/n) "
+        ).lower()
+        if inp != "y":
             print("Not calculating statistics...")
             print("HINT: Use -o/--output-file to specify a new markdown file name")
             sys.exit()
