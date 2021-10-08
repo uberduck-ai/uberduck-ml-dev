@@ -357,16 +357,12 @@ class MellotronTrainer(TTSTrainer):
             self.log(
                 "Attention/sample_inference",
                 self.global_step,
-                image=save_figure_to_numpy(
-                    plot_attention(attn[0].data.cpu())
-                ),
+                image=save_figure_to_numpy(plot_attention(attn[0].data.cpu())),
             )
             self.log(
                 "MelPredicted/sample_inference",
                 self.global_step,
-                image=save_figure_to_numpy(
-                    plot_spectrogram(mel[0].data.cpu())
-                ),
+                image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
             )
             self.log(
                 "Gate/sample_inference",
@@ -477,9 +473,9 @@ class MellotronTrainer(TTSTrainer):
 
         # main training loop
         for epoch in range(start_epoch, self.epochs):
-            train_loader, sampler, collate_fn = self.adjust_frames_per_step(
-                model, train_loader, sampler, collate_fn
-            )
+            # train_loader, sampler, collate_fn = self.adjust_frames_per_step(
+            #     model, train_loader, sampler, collate_fn
+            # )
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
