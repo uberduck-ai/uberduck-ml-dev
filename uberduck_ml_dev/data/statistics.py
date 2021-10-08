@@ -6,6 +6,7 @@ __all__ = ['word_frequencies', 'create_wordcloud', 'count_frequency', 'pace_char
 # Cell
 
 from typing import List, Any, Dict, Union, Optional
+from collections import Counter
 import os
 
 import librosa
@@ -48,11 +49,15 @@ def create_wordcloud(text: str, output_file: str):
         background_color="white",
         max_words=3000,
         mask=mask,
-        stopwords=set(STOPWORDS),
         contour_width=7,
         contour_color="steelblue",
     )
-    wc.generate(text)
+    frequency_dict = dict(Counter(text.lower().split()).most_common())
+    for k in STOPWORDS:
+        if k in frequency_dict.keys():
+            frequency_dict.pop(k)
+
+    wc.generate_from_frequencies(frequency_dict)
     wc.to_file(output_file)
 
 
@@ -60,20 +65,7 @@ def count_frequency(arr: List[Any]) -> Dict[Any, int]:
     """
     Calculates the frequency that a value appears in a list
     """
-
-    frequency_dict = {}
-    for val in arr:
-        if val in frequency_dict.keys():
-            frequency_dict[val] += 1
-        else:
-            frequency_dict[val] = 1
-
-    return {
-        k: v
-        for k, v in sorted(
-            frequency_dict.items(), key=lambda item: item[1], reverse=True
-        )
-    }
+    return dict(Counter(arr).most_common())
 
 
 def pace_character(
