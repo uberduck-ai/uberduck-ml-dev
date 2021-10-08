@@ -111,7 +111,7 @@ class TTSTrainer:
         raise NotImplemented
 
 # Cell
-from random import randint
+from random import choice, randint
 import time
 from typing import List
 
@@ -347,7 +347,11 @@ class MellotronTrainer(TTSTrainer):
             utterance = torch.LongTensor(
                 text_to_sequence(random_utterance(), self.text_cleaners, self.p_arpabet)
             )[None].cuda()
-            speaker_id = randint(0, self.n_speakers - 1)
+            speaker_id = (
+                choice(self.sample_inference_speaker_ids)
+                if self.sample_inference_speaker_ids
+                else randint(0, self.n_speakers - 1)
+            )
             input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
             model.eval()
             _, mel, gate, attn = model.inference(input_)
