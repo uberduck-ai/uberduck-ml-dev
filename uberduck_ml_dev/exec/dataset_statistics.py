@@ -11,6 +11,7 @@ from typing import List, Any, Dict
 import json
 
 from g2p_en import G2p
+import librosa
 import math
 import matplotlib.pyplot as plt
 from mdutils.mdutils import MdUtils
@@ -19,7 +20,6 @@ from pydub import AudioSegment, silence
 import seaborn as sns
 from tqdm import tqdm
 
-from ..text.util import clean_text, text_to_sequence
 from ..data.statistics import (
     AbsoluteMetrics,
     count_frequency,
@@ -29,6 +29,8 @@ from ..data.statistics import (
     pace_phoneme,
     word_frequencies,
 )
+from ..text.util import clean_text, text_to_sequence
+from ..utils.audio import compute_yin
 
 # Cell
 
@@ -71,6 +73,9 @@ def calculate_statistics(
     srmr_scores = []
     word_freqs = []
     all_words = []
+    all_pitches = np.array([])
+    all_loudness = []
+
     g2p = G2p()
     files_with_error = []
     if metrics:
@@ -86,6 +91,7 @@ def calculate_statistics(
                 _, file_extension = os.path.splitext(file)
                 path_to_file = os.path.join(dataset_path, file)
                 file_pydub = AudioSegment.from_wav(path_to_file)
+                data_np, _ = librosa.load(path_to_file)
 
                 # Format Metadata
                 sr = file_pydub.frame_rate
@@ -126,6 +132,15 @@ def calculate_statistics(
                 paces_characters.append(
                     pace_character(text=transcription_cleaned, audio=path_to_file)
                 )
+
+                # Pitch
+                pitches, harmonic_rates, argmins, times = compute_yin(data_np, sr=sr)
+                pitches = np.array(pitches)
+                pitches = pitches[pitches > 10]
+                all_pitches = np.append(all_pitches, pitches)
+
+                # Loudness
+                all_loudness.append(file_pydub.dBFS)
 
                 # Quality
                 if metrics:
@@ -170,6 +185,22 @@ def calculate_statistics(
     plt.xlabel("Word frequency")
     plt.ylabel("Count")
     plt.savefig(os.path.join(dataset_path, output_folder, "word_frequencies.png"))
+    plt.close()
+
+    # Pitches graph
+    plt.clf()
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    sns.histplot(all_pitches)
+    plt.title("Pitch distribution")
+    plt.xlabel("Fundamental Frequency (Hz)")
+    plt.ylabel("Count")
+    plt.subplot(1, 2, 2)
+    sns.histplot(all_loudness)
+    plt.title("Loudness distribution")
+    plt.xlabel("Loudness (dBFS)")
+    plt.ylabel("Count")
+    plt.savefig(os.path.join(dataset_path, output_folder, "pitch_loudness.png"))
     plt.close()
 
     # Silences graph
@@ -227,6 +258,8 @@ def calculate_statistics(
         "paces_characters_summary": get_summary_statistics(paces_characters),
         "mosnet_scores_summary": get_summary_statistics(mosnet_scores),
         "srmr_scores_summary": get_summary_statistics(srmr_scores),
+        "pitch_summary": get_summary_statistics(all_pitches),
+        "loudness_summary": get_summary_statistics(all_loudness),
         "total_lengths": total_lengths,
         "paces_phonemes": paces_phonemes,
         "paces_characters": paces_characters,
@@ -349,6 +382,12 @@ def generate_markdown(output_file, dataset_path, output_folder, data):
             path=os.path.join(output_folder, "word_frequencies.png"),
         )
     )
+    mdFile.new_line(
+        mdFile.new_inline_image(
+            text="Pitch and Loudness",
+            path=os.path.join(output_folder, "pitch_loudness.png"),
+        )
+    )
 
     rnn_frequency_counts = count_frequency(data["lookup_results"]["RNN"])
 
@@ -431,6 +470,8 @@ def run(
                 "paces_characters_summary",
                 "mosnet_scores_summary",
                 "srmr_scores_summary",
+                "pitch_summary",
+                "loudness_summary",
                 "sample_rates",
                 "channels",
                 "extensions",
