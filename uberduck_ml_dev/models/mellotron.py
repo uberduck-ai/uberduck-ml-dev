@@ -272,10 +272,6 @@ class Decoder(nn.Module):
         else:
             prenet_f0_dim = 0
 
-        # self.prenet = Prenet(
-        #     hparams.n_mel_channels * hparams.n_frames_per_step_initial,
-        #     [hparams.prenet_dim, hparams.prenet_dim],
-        # )
         self.prenet = Prenet(
             hparams.n_mel_channels,
             [hparams.prenet_dim, hparams.prenet_dim],
@@ -531,13 +527,16 @@ class Decoder(nn.Module):
                 mel_outputs.size(1) == 0
                 or np.random.uniform(0.0, 1.0) <= self.p_teacher_forcing
             ):
+                teacher_forced_frame = decoder_inputs[
+                    mel_outputs.size(1) * self.n_frames_per_step_current
+                ]
                 if self.include_f0:
                     to_concat = (
-                        decoder_inputs[len(mel_outputs)],
+                        teacher_forced_frame,
                         f0s[len(mel_outputs)],
                     )
                 else:
-                    to_concat = (decoder_inputs[mel_outputs.size(1)],)
+                    to_concat = (teacher_forced_frame,)
                 decoder_input = torch.cat(to_concat, dim=1)
             else:
                 if self.include_f0:
