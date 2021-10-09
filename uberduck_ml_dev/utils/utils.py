@@ -208,7 +208,7 @@ def get_alignment_metrics(alignments, average_across_batch=True):
     dist = dist.sum(dim=(1))  # get total dist for each B
     diagonalness = (dist + 1.4142135) / optimums  # dist / optimal dist
 
-    maxes = alignments.max(axis=2)[0].mean(axis=1)
+    maxes = alignments.max(axis=1)[0].mean(axis=1)
     if average_across_batch:
         diagonalness = diagonalness.mean()
         maxx = maxes.mean()
