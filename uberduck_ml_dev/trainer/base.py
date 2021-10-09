@@ -167,6 +167,7 @@ class MellotronTrainer(TTSTrainer):
     def log_training(
         self,
         model,
+        X,
         y_pred,
         y,
         loss,
@@ -216,11 +217,15 @@ class MellotronTrainer(TTSTrainer):
                     )
                 ),
             )
+            input_length = X[sample_idx][1].item()
+            output_length = X[sample_idx][4].item()
             self.log(
                 "Attention/train",
                 self.global_step,
                 image=save_figure_to_numpy(
-                    plot_attention(alignments[sample_idx].data.cpu())
+                    plot_attention(alignments[sample_idx].data.cpu()),
+                    encoder_length=input_length,
+                    decoder_length=output_length,
                 ),
             )
             self.sample_inference(model)
@@ -356,8 +361,12 @@ class MellotronTrainer(TTSTrainer):
             model.eval()
             _, mel, gate, attn = model.inference(input_)
             model.train()
-            audio = self.sample(mel[0])
-            self.log("SampleInference", self.global_step, audio=audio)
+            try:
+                audio = self.sample(mel[0])
+                self.log("SampleInference", self.global_step, audio=audio)
+            except Exception as e:
+                print(f"Exception raised while doing sample inference: {e}")
+                print("Mel shape: ", mel[0].shape)
             self.log(
                 "Attention/sample_inference",
                 self.global_step,
@@ -526,6 +535,7 @@ class MellotronTrainer(TTSTrainer):
                 step_duration_seconds = time.perf_counter() - start_time
                 self.log_training(
                     model,
+                    X,
                     y_pred,
                     y,
                     reduced_loss,
