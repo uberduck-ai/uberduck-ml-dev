@@ -57,12 +57,10 @@ min_python = cfg["min_python"]
 requirements = ["pip", "packaging"]
 if cfg.get("requirements"):
     requirements += cfg.get("requirements", "").split()
-if cfg.get("dep_links"):
-    requirements.extend(eval(cfg.get("dep_links")))
 if cfg.get("pip_requirements"):
     requirements += cfg.get("pip_requirements", "").split()
 dev_requirements = (cfg.get("dev_requirements") or "").split()
-# print(requirements)
+
 long_description = open("README.md").read()
 # ![png](docs/images/output_13_0.png)
 for ext in ["png", "svg"]:
