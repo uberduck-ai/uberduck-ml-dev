@@ -18,7 +18,7 @@ def save_figure_to_numpy(fig):
     return data
 
 
-def plot_spectrogram(mel):
+def plot_spectrogram(mel, encoder_length=None, decoder_length=None):
     figure = plt.figure()
     plt.xlabel("Spectrogram frame")
     plt.ylabel("Channel")
@@ -29,7 +29,7 @@ def plot_spectrogram(mel):
 # Cell
 
 
-def plot_attention(attention):
+def plot_attention(attention, encoder_length=None, decoder_length=None):
     figure = plt.figure()
     plt.xlabel("Decoder timestep")
     plt.ylabel("Encoder timestep")
@@ -40,6 +40,13 @@ def plot_attention(attention):
         interpolation="none",
         cmap="inferno",
     )
+    title_info = []
+    if encoder_length is not None:
+        title_info.append(f"Encoder_length: {encoder_length}")
+    if decoder_length is not None:
+        title_info.append(f"Decoder length: {decoder_length}")
+    title = " ".join(title_info)
+    plt.title(title)
     figure.canvas.draw()
     return figure
 
