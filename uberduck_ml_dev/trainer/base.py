@@ -340,15 +340,10 @@ class MellotronTrainer(TTSTrainer):
                 text_to_sequence(random_utterance(), self.text_cleaners, self.p_arpabet)
             )[None].cuda()
             speaker_id = randint(0, self.n_speakers - 1)
+            input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
             if self.include_f0:
-                input_ = [
-                    utterance,
-                    0,
-                    torch.LongTensor([speaker_id]).cuda(),
-                    torch.zeros([1, 1, 200], device=self.device),
-                ]  # 200 can be changed
-            else:
-                input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
+                input_.append(torch.zeros([1, 1, 200], device=self.device))
+                # 200 can be changed
             model.eval()
             mel, *_ = model.inference(input_)
             model.train()
