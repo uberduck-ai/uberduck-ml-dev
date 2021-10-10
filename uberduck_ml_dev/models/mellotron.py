@@ -43,7 +43,7 @@ DEFAULTS = HParams(
     p_attention_dropout=0.1,
     p_decoder_dropout=0.1,
     p_teacher_forcing=1.0,
-    pos_weight=10,
+    pos_weight=None,
     # attention parameters
     attention_rnn_dim=1024,
     attention_dim=128,

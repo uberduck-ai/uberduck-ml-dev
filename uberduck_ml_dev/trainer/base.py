@@ -35,6 +35,7 @@ class TTSTrainer:
         self.rank = rank
         self.world_size = world_size
         self.log_dir = hparams.log_dir
+        self.seed = hparams.seed
 
         if device:
             self.device = device
@@ -123,12 +124,16 @@ from torch.utils.data.distributed import DistributedSampler
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.mellotron import Tacotron2
 from ..utils.plot import save_figure_to_numpy
-from ..utils.utils import reduce_tensor
+from ..utils.utils import reduce_tensor, get_alignment_metrics
 
 
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
-        self.pos_weight = pos_weight
+        if pos_weight is not None:
+            self.pos_weight = torch.tensor(self.pos_weight)
+        else:
+            self.pos_weight = pos_weight
+
         super().__init__()
 
     def forward(self, model_output: List, target: List):
@@ -141,7 +146,7 @@ class Tacotron2Loss(nn.Module):
         mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
             mel_out_postnet, mel_target
         )
-        gate_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(self.pos_weight))(
+        gate_loss = nn.BCEWithLogitsLoss(pos_weight=self.pos_weight)(
             gate_out, gate_target
         )
         return mel_loss, gate_loss
@@ -181,11 +186,21 @@ class MellotronTrainer(TTSTrainer):
             self.global_step,
             scalar=step_duration_seconds,
         )
+
         if self.global_step % self.steps_per_sample == 0:
             _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
             mel_target, gate_target = y
+            alignment_metrics = get_alignment_metrics(alignments)
+            alignment_diagonalness = alignment_metrics["diagonalness"]
+            alignment_max = alignment_metrics["max"]
             sample_idx = randint(0, mel_out_postnet.size(0) - 1)
             audio = self.sample(mel=mel_out_postnet[sample_idx])
+            self.log(
+                "AlignmentDiagonalness/train",
+                self.global_step,
+                scalar=alignment_diagonalness,
+            )
+            self.log("AlignmentMax/train", self.global_step, scalar=alignment_max)
             self.log("AudioSample/train", self.global_step, audio=audio)
             self.log(
                 "MelPredicted/train",
@@ -218,6 +233,7 @@ class MellotronTrainer(TTSTrainer):
                     plot_attention(alignments[sample_idx].data.cpu())
                 ),
             )
+
             self.sample_inference(model)
 
     def log_validation(self, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
@@ -226,10 +242,19 @@ class MellotronTrainer(TTSTrainer):
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
         self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
         # Generate the sample from a random item from the last y_pred batch.
-        _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
-        sample_idx = randint(0, mel_out_postnet.size(0) - 1)
         mel_target, gate_target = y
+        _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+        alignment_metrics = get_alignment_metrics(alignments)
+        alignment_diagonalness = alignment_metrics["diagonalness"]
+        alignment_max = alignment_metrics["max"]
+
+        sample_idx = randint(0, mel_out_postnet.size(0) - 1)
         audio = self.sample(mel=mel_out_postnet[sample_idx])
+
+        self.log(
+            "AlignmentDiagonalness/val", self.global_step, scalar=alignment_diagonalness
+        )
+        self.log("AlignmentMax/val", self.global_step, scalar=alignment_max)
         self.log("AudioSample/val", self.global_step, audio=audio)
         self.log(
             "MelPredicted/val",
@@ -316,6 +341,9 @@ class MellotronTrainer(TTSTrainer):
             )[None].cuda()
             speaker_id = randint(0, self.n_speakers - 1)
             input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
+            if self.include_f0:
+                input_.append(torch.zeros([1, 1, 200], device=self.device))
+                # 200 can be changed
             model.eval()
             mel, *_ = model.inference(input_)
             model.train()
@@ -393,6 +421,7 @@ class MellotronTrainer(TTSTrainer):
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
 
+        torch.manual_seed(self.seed)
         model = Tacotron2(self.hparams)
         if self.device == "cuda":
             model = model.cuda()
