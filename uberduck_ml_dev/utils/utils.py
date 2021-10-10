@@ -2,8 +2,8 @@
 
 __all__ = ['load_filepaths_and_text', 'synthesize_speakerids2', 'parse_vctk', 'parse_libritts_mellotron',
            'load_filepaths_and_text', 'add_speakerid', 'parse_libritts_mellotron', 'parse_uberduck', 'parse_ljspeech',
-           'window_sumsquare', 'griffin_lim', 'dynamic_range_compression', 'dynamic_range_decompression', 'to_gpu',
-           'get_mask_from_lengths', 'reduce_tensor']
+           'get_alignment_metrics', 'window_sumsquare', 'griffin_lim', 'dynamic_range_compression',
+           'dynamic_range_decompression', 'to_gpu', 'get_mask_from_lengths', 'reduce_tensor']
 
 # Cell
 
@@ -180,6 +180,45 @@ def parse_ljspeech(source_folder):
 
     return output
 
+
+def get_alignment_metrics(alignments, average_across_batch=True):
+
+    """See https://github.com/NVIDIA/tacotron2/pull/284,
+    https://github.com/CookiePPP/cookietts/blob/c871f5f7b5790656d5b57bcd9e63946a2da52f0f/CookieTTS/utils/model/utils.py#L59"""
+    alignments = alignments.transpose(1, 2)  # [B, dec, enc] -> [B, enc, dec]
+    input_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
+        alignments.shape[1] - 1
+    )  # [B]
+    output_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
+        alignments.shape[2] - 1
+    )  # [B]
+    batch_size = alignments.size(0)
+    optimums = torch.sqrt(
+        input_lengths.double().pow(2) + output_lengths.double().pow(2)
+    ).view(batch_size)
+
+    # [B, enc, dec] -> [B, dec], [B, dec]
+    values, cur_idxs = torch.max(alignments, 1)
+
+    cur_idxs = cur_idxs.float()
+    prev_indx = torch.cat((cur_idxs[:, 0][:, None], cur_idxs[:, :-1]), dim=1)
+    dist = ((prev_indx - cur_idxs).pow(2) + 1).pow(0.5)  # [B, dec]
+    dist.masked_fill_(
+        ~get_mask_from_lengths(output_lengths, max_len=dist.size(1)), 0.0
+    )  # set dist of padded to zero
+    dist = dist.sum(dim=(1))  # get total dist for each B
+    diagonalness = (dist + 1.4142135) / optimums  # dist / optimal dist
+
+    maxes = alignments.max(axis=1)[0].mean(axis=1)
+    if average_across_batch:
+        diagonalness = diagonalness.mean()
+        max_ = maxes.mean()
+
+    output = {}
+    output["diagonalness"] = diagonalness
+    output["max"] = max_
+    return output
+
 # Cell
 
 import torch
@@ -294,15 +333,11 @@ def to_gpu(x):
 # Cell
 
 
-def get_mask_from_lengths(lengths):
+def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     """Return a mask matrix. Unmasked entires are true."""
-    max_len = torch.max(lengths).item()
-    tensor_cls = (
-        torch.cuda.LongTensor
-        if isinstance(lengths, torch.cuda.LongTensor)
-        else torch.LongTensor
-    )
-    ids = torch.arange(0, max_len, out=tensor_cls(max_len))
+    if max_len == 0:
+        max_len = int(torch.max(lengths).item())
+    ids = torch.arange(0, max_len, device=lengths.device, dtype=torch.long)
     mask = (ids < lengths.unsqueeze(1)).bool()
     return mask
 
