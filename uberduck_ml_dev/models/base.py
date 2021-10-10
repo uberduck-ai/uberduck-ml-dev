@@ -24,7 +24,12 @@ class TTSModel(nn.Module):
             )
         if checkpoint_path is not None:
             checkpoint = torch.load(checkpoint_path, map_location=device)
-            model_dict = checkpoint["state_dict"]
+            if (
+                "state_dict" in checkpoint.keys()
+            ):  # TODO: remove state_dict once off nvidia
+                model_dict = checkpoint["state_dict"]
+            if "model" in checkpoint.keys():
+                model_dict = checkpoint["model"]
         if ignore_layers:
             model_dict = {k: v for k, v in model_dict.items() if k not in ignore_layers}
         dummy_dict = self.state_dict()
