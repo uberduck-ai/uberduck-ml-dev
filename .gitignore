@@ -3,7 +3,6 @@ experiments/outputs_processed/*
 experiments/logs/*
 src/vendor_tools/*
 *.bak
-events.out.tfevents*
 .gitattributes
 .last_checked
 .gitconfig

@@ -31,7 +31,7 @@ DEFAULTS = HParams(
     encoder_embedding_dim=512,
     # decoder parameters
     coarse_n_frames_per_step=None,
-    n_frames_per_step_initial=1,  # currently only 1 is supported
+    n_frames_per_step_initial=1,
     decoder_rnn_dim=1024,
     prenet_dim=256,
     prenet_f0_n_layers=1,
@@ -380,7 +380,6 @@ class Decoder(nn.Module):
         decoder_inputs = decoder_inputs.contiguous()
         decoder_inputs = decoder_inputs.view(
             decoder_inputs.size(0),
-            # decoder_inputs.size(1),
             int(decoder_inputs.size(1) / self.n_frames_per_step_current),
             -1,
         )
@@ -411,10 +410,7 @@ class Decoder(nn.Module):
         else:
             gate_outputs = gate_outputs[None]
         gate_outputs = gate_outputs.contiguous()
-        # (T_out, B, n_mel_channels) -> (B, T_out, n_mel_channels)
-        # NOTE(zach): this line might not be necessary after forward() change.
-        # mel_outputs = torch.stack(mel_outputs).transpose(0, 1).contiguous()
-        # decouple frames per step
+        # (B, T_out, n_mel_channels * n_frames_per_step) -> (B, T_out * n_frames_per_step, n_mel_channels)
         mel_outputs = mel_outputs.view(mel_outputs.size(0), -1, self.n_mel_channels)
         # (B, T_out, n_mel_channels) -> (B, n_mel_channels, T_out)
         mel_outputs = mel_outputs.transpose(1, 2)
@@ -586,7 +582,6 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        # decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
         self.initialize_decoder_states(memory, mask=None)
         if f0s is not None:
             f0_dummy = self.get_end_f0(f0s)
@@ -651,7 +646,6 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        # decoder_input = decoder_input[:, -1 * self.n_mel_channels :]
 
         self.initialize_decoder_states(memory, mask=None)
         f0_dummy = self.get_end_f0(f0s)
