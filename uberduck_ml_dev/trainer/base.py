@@ -527,9 +527,9 @@ class MellotronTrainer(TTSTrainer):
 
         # main training loop
         for epoch in range(start_epoch, self.epochs):
-            # train_loader, sampler, collate_fn = self.adjust_frames_per_step(
-            #     model, train_loader, sampler, collate_fn
-            # )
+            train_loader, sampler, collate_fn = self.adjust_frames_per_step(
+                model, train_loader, sampler, collate_fn
+            )
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:

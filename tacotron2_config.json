@@ -37,6 +37,7 @@
     ],
     "sample_inference_speaker_ids": null,
     "sample_rate": 22050,
+    "seed": 123,
     "steps_per_sample": 100,
     "text_cleaners": ["english_cleaners"],
     "training_audiopaths_and_text": "train.txt",

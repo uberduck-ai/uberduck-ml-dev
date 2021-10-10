@@ -18,7 +18,7 @@ def save_figure_to_numpy(fig):
     return data
 
 
-def plot_spectrogram(mel, encoder_length=None, decoder_length=None):
+def plot_spectrogram(mel):
     figure = plt.figure()
     plt.xlabel("Spectrogram frame")
     plt.ylabel("Channel")
