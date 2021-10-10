@@ -757,7 +757,6 @@ class Tacotron2(TTSModel):
             mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
             mask = F.pad(mask, (0, outputs[0].size(2) - mask.size(2)))
             mask = mask.permute(1, 0, 2)
-            print("mask size: ", mask.shape)
 
             outputs[0].data.masked_fill_(mask, 0.0)
             outputs[1].data.masked_fill_(mask, 0.0)
