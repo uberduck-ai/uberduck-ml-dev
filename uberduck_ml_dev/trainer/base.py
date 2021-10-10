@@ -223,14 +223,16 @@ class MellotronTrainer(TTSTrainer):
                 "Attention/train",
                 self.global_step,
                 image=save_figure_to_numpy(
-                    plot_attention(alignments[sample_idx].data.cpu()),
-                    encoder_length=input_length,
-                    decoder_length=output_length,
+                    plot_attention(
+                        alignments[sample_idx].data.cpu().transpose(0, 1),
+                        encoder_length=input_length,
+                        decoder_length=output_length,
+                    )
                 ),
             )
             self.sample_inference(model)
 
-    def log_validation(self, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
+    def log_validation(self, X, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
         print(f"Average loss: {mean_loss}")
         self.log("Loss/val", self.global_step, scalar=mean_loss)
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
@@ -265,11 +267,17 @@ class MellotronTrainer(TTSTrainer):
                 )
             ),
         )
+        input_length = X[sample_idx][1].item()
+        output_length = X[sample_idx][4].item()
         self.log(
             "Attention/val",
             self.global_step,
             image=save_figure_to_numpy(
-                plot_attention(alignments[sample_idx].data.cpu())
+                plot_attention(
+                    alignments[sample_idx].data.cpu().transpose(0, 1),
+                    encoder_length=input_length,
+                    decoder_length=output_length,
+                )
             ),
         )
 
@@ -341,7 +349,7 @@ class MellotronTrainer(TTSTrainer):
             mean_mel_loss = total_mel_loss / total_steps
             mean_gate_loss = total_gate_loss / total_steps
             mean_loss = total_loss / total_steps
-            self.log_validation(y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss)
+            self.log_validation(X, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss)
         model.train()
 
     def sample_inference(self, model):
@@ -370,7 +378,9 @@ class MellotronTrainer(TTSTrainer):
             self.log(
                 "Attention/sample_inference",
                 self.global_step,
-                image=save_figure_to_numpy(plot_attention(attn[0].data.cpu())),
+                image=save_figure_to_numpy(
+                    plot_attention(attn[0].data.cpu().transpose(0, 1))
+                ),
             )
             self.log(
                 "MelPredicted/sample_inference",
@@ -448,15 +458,16 @@ class MellotronTrainer(TTSTrainer):
             device=self.device,
             ignore_layers=self.ignore_layers,
         )
-        if "optimizer" in checkpoint.keys():
+        if "optimizer" in checkpoint:
             optimizer.load_state_dict(checkpoint["optimizer"])
-        if "iteration" in checkpoint.keys():
+        if "iteration" in checkpoint:
             start_epoch = checkpoint["iteration"]
-        if "learning_rate" in checkpoint.keys():
+        if "learning_rate" in checkpoint:
             optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
             self.learning_rate = checkpoint["learning_rate"]
+        if "global_step" in checkpoint:
+            self.global_step = checkpoint["global_step"]
         print("Ending warm_start", time.perf_counter())
-        # self.global_step = checkpoint["global_step"]
         return model, optimizer, start_epoch
 
     def train(self):
