@@ -217,8 +217,8 @@ class MellotronTrainer(TTSTrainer):
                     )
                 ),
             )
-            input_length = X[sample_idx][1].item()
-            output_length = X[sample_idx][4].item()
+            input_length = X[1][sample_idx].item()
+            output_length = X[4][sample_idx].item()
             self.log(
                 "Attention/train",
                 self.global_step,
@@ -267,8 +267,8 @@ class MellotronTrainer(TTSTrainer):
                 )
             ),
         )
-        input_length = X[sample_idx][1].item()
-        output_length = X[sample_idx][4].item()
+        input_length = X[1][sample_idx].item()
+        output_length = X[4][sample_idx].item()
         self.log(
             "Attention/val",
             self.global_step,
@@ -296,13 +296,13 @@ class MellotronTrainer(TTSTrainer):
             return train_loader, sampler, collate_fn
         if self.global_step < settings["until_step"]:
             return train_loader, sampler, collate_fn
-        self.reduction_window_idx += 1
-        new_settings = self.reduction_window_schedule[self.reduction_window_idx]
-        print(
-            f"Adjusting frames per step from {settings['n_frames_per_step']} to {new_settings['n_frames_per_step']}"
-        )
+        old_fps = settings["n_frames_per_step"]
+        while settings["until_step"] and self.global_step >= settings["until_step"]:
+            self.reduction_window_idx += 1
+            settings = self.reduction_window_schedule[self.reduction_window_idx]
         fps = new_settings["n_frames_per_step"]
         bs = new_settings["batch_size"]
+        print(f"Adjusting frames per step from {old_fps} to {fps}")
         self.batch_size = bs
         model.set_current_frames_per_step(fps)
         self.n_frames_per_step_current = fps
@@ -467,6 +467,7 @@ class MellotronTrainer(TTSTrainer):
             self.learning_rate = checkpoint["learning_rate"]
         if "global_step" in checkpoint:
             self.global_step = checkpoint["global_step"]
+            print(f"Adjusted global step to {self.global_step}")
         print("Ending warm_start", time.perf_counter())
         return model, optimizer, start_epoch
 
