@@ -150,12 +150,7 @@ def calculate_statistics(
 
                 # Transcription
                 word_freqs.extend(word_frequencies(transcription_cleaned))
-                try:
-                    transcription_lookups = g2p.check_lookup(transcription_cleaned)
-                except:
-                    print(
-                        "[INFO] Install the Uberduck forked g2p to obtain words not found in CMU dict: https://github.com/uberduck-ai/g2p"
-                    )
+                transcription_lookups = g2p.check_lookup(transcription_cleaned)
                 for k in transcription_lookups:
                     lookup_results[k].extend(transcription_lookups[k])
 
