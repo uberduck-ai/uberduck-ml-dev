@@ -29,5 +29,6 @@
     "val_audiopaths_and_text": "val.txt",
     "weight_decay": 1e-6,
     "warm_start_name": null,
-    "win_length": 1024
+    "win_length": 1024,
+    "seed": 123
 }
