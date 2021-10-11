@@ -2,10 +2,20 @@
 
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
-index = {"TextMelDataset": "data_loader.ipynb",
+index = {"word_frequencies": "data.statistics.ipynb",
+         "create_wordcloud": "data.statistics.ipynb",
+         "count_frequency": "data.statistics.ipynb",
+         "pace_character": "data.statistics.ipynb",
+         "pace_phoneme": "data.statistics.ipynb",
+         "get_sample_format": "data.statistics.ipynb",
+         "AbsoluteMetrics": "data.statistics.ipynb",
+         "TextMelDataset": "data_loader.ipynb",
          "TextMelCollate": "data_loader.ipynb",
-         "run": "exec.train_tacotron2.ipynb",
+         "get_summary_statistics": "exec.dataset_statistics.ipynb",
+         "calculate_statistics": "exec.dataset_statistics.ipynb",
+         "generate_markdown": "exec.dataset_statistics.ipynb",
          "parse_args": "exec.train_tacotron2.ipynb",
+         "run": "exec.train_tacotron2.ipynb",
          "Dataset": "exec.select_speakers.ipynb",
          "select_speakers": "exec.select_speakers.ipynb",
          "STANDARD_MULTISPEAKER": "exec.select_speakers.ipynb",
@@ -98,7 +108,9 @@ index = {"TextMelDataset": "data_loader.ipynb",
          "HParams": "vendor.tfcompat.hparam.ipynb",
          "PARAM_RE": "vendor.tfcompat.hparam.ipynb"}
 
-modules = ["data_loader.py",
+modules = ["data/statistics.py",
+           "data_loader.py",
+           "exec/dataset_statistics.py",
            "exec/normalize_audio.py",
            "exec/select_speakers.py",
            "exec/split_train_val.py",
