@@ -6,6 +6,7 @@ __all__ = ['STANDARD_MULTISPEAKER', 'STANDARD_SINGLESPEAKER', 'VCTK', 'FORMATS']
 
 import argparse
 import os
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -43,9 +44,15 @@ def _convert_standard_multispeaker(f, inp: str):
     speakers = os.listdir(inp)
     for speaker in tqdm(speakers):
         path = Path(inp) / Path(speaker)
+        if not path.is_dir() or path.parts[-1].startswith("."):
+            continue
         files = os.listdir(path)
-        transcriptions, *_ = [f for f in files if f.endswith(".txt")]
-        with (Path(root) / speaker / transcriptions).open("r") as txn_f:
+        try:
+            transcriptions, *_ = [f for f in files if f.endswith(".txt")]
+        except:
+            print(files)
+            raise
+        with (path / transcriptions).open("r") as txn_f:
             transcriptions = txn_f.readlines()
         for line in transcriptions:
             line = line.strip("\n")
