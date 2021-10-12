@@ -4,10 +4,12 @@ __all__ = ['STANDARD_MULTISPEAKER', 'STANDARD_SINGLESPEAKER', 'VCTK', 'FORMATS']
 
 # Cell
 
-from ..utils.utils import parse_vctk
-
 import argparse
 import os
+
+from tqdm import tqdm
+
+from ..utils.utils import parse_vctk
 
 STANDARD_MULTISPEAKER = "standard-multispeaker"
 STANDARD_SINGLESPEAKER = "standard-singlespeaker"
@@ -23,7 +25,7 @@ def _convert_vctk(f, inp: str):
     assert fmt == VCTK, "VCTK is the only format supported by this function!"
     vctk_data = parse_vctk(inp)
     speaker_id = 0
-    for speaker_name, speaker_data in vctk_data.items():
+    for speaker_name, speaker_data in tqdm(vctk_data.items()):
         speaker_out_path = Path(out_path) / speaker_name
         if not speaker_out_path.exists():
             os.makedirs(speaker_out_path)
@@ -39,7 +41,7 @@ def _convert_vctk(f, inp: str):
 def _convert_standard_multispeaker(f, inp: str):
     speaker_id = 0
     speakers = os.listdir(inp)
-    for speaker in speakers:
+    for speaker in tqdm(speakers):
         path = Path(inp) / Path(speaker)
         files = os.listdir(path)
         transcriptions, *_ = [f for f in files if f.endswith(".txt")]
@@ -77,6 +79,7 @@ def _generate_filelist(input_dataset, fmt, output_filelist):
 # Cell
 
 from typing import List
+import sys
 
 
 def _parse_args(args: List[str]):
