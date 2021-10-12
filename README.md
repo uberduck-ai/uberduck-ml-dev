@@ -36,15 +36,6 @@ Test a single notebook:
  ```
  (can optionally add `--verbose` for more output)
 
-## 📦️ Pre-trained models
-
-Some example pre-trained models made via this repository are listed here for use:
-
-| Speaker  | Source | Download  |
-| ------------- | ------------- | ------------- |
-| Narrator  | The Stanley Parable  | Content Cell  |
-
-
 ## 📦️ nbdev
 
 This project uses [nbdev](https://nbdev.fast.ai/).
