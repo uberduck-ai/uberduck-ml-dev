@@ -16,6 +16,7 @@ from typing import List, Optional, Set
 import sqlite3
 from tqdm import tqdm
 
+from ..data.cache import ensure_filelist_in_cache, ensure_speaker_table
 from ..utils.audio import convert_to_wav
 from ..utils.utils import parse_vctk
 
@@ -33,14 +34,14 @@ class Filelist:
 def _get_speaker_ids(filelist: Filelist) -> Set[int]:
     if filelist.speaker_ids:
         return set(filelist.speaker_ids)
-    elif filelist.speakers:
+
+    ensure_speaker_table()
+    ensure_filelist_in_cache()
+    if filelist.speakers:
         # conn =
         conn = sqlite3.connect(str(CACHE_LOCATION))
         cursor = conn.cursor()
         params = ",".join("?" for _ in filelist.speakers)
-        print(params)
-        print(filelist.path)
-        print(filelist.speakers)
         results = cursor.execute(
             f"SELECT speaker_id FROM speakers where filepath = ? AND name in ({params})",
             [os.path.expanduser(filelist.path), *filelist.speakers],
@@ -71,6 +72,11 @@ def select_speakers(filelists: List[Filelist], output_filelist: str):
             with open(filelist.path, "r") as f_in:
                 for line in f_in.readlines():
                     path, txn, original_speaker_id = line.strip().split("|")
+                    if (
+                        speaker_ids is not None
+                        and int(original_speaker_id) not in speaker_ids
+                    ):
+                        continue
                     if (filelist.path, original_speaker_id) not in seen_speaker_ids:
                         seen_speaker_ids[
                             (filelist.path, original_speaker_id)
@@ -81,8 +87,7 @@ def select_speakers(filelists: List[Filelist], output_filelist: str):
                         current_speaker_id = seen_speaker_ids[
                             (filelist.path, original_speaker_id)
                         ]
-                    if speaker_ids is None or int(original_speaker_id) in speaker_ids:
-                        f_out.write(f"{path}|{txn}|{current_speaker_id}\n")
+                    f_out.write(f"{path}|{txn}|{current_speaker_id}\n")
 
 
 def parse_args(args):
