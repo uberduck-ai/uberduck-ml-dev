@@ -61,7 +61,8 @@ def _get_speaker_ids(filelist: Filelist) -> Set[int]:
 
 
 def select_speakers(filelists: List[Filelist], output_filelist: str):
-    speaker_id = 0
+    new_speaker_id = 0
+    seen_speaker_ids = set()
     with open(output_filelist, "w") as f_out:
         for filelist in tqdm(filelists):
             speaker_ids = _get_speaker_ids(filelist)
@@ -69,9 +70,19 @@ def select_speakers(filelists: List[Filelist], output_filelist: str):
                 filelist.path = os.path.expanduser(filelist.path)
             with open(filelist.path, "r") as f_in:
                 for line in f_in.readlines():
-                    _, _, speaker_id = line.strip().split("|")
-                    if speaker_ids is None or int(speaker_id) in speaker_ids:
-                        f_out.write(line)
+                    path, txn, original_speaker_id = line.strip().split("|")
+                    if (filelist.path, original_speaker_id) not in seen_speaker_ids:
+                        seen_speaker_ids[
+                            (filelist.path, original_speaker_id)
+                        ] = new_speaker_id
+                        new_speaker_id += 1
+                        current_speaker_id = new_speaker_id
+                    else:
+                        current_speaker_id = seen_speaker_ids[
+                            (filelist.path, original_speaker_id)
+                        ]
+                    if speaker_ids is None or int(original_speaker_id) in speaker_ids:
+                        f_out.write(f"{path}|{txn}|{current_speaker_id}\n")
 
 
 def parse_args(args):
