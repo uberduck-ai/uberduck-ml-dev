@@ -26,12 +26,25 @@ CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
 class Filelist:
     path: str
     sql: str
-    speakers: Optional[List[int]] = None
+    speaker_ids: Optional[List[int]] = None
+    speakers: Optional[List[str]] = None
 
 
 def _get_speaker_ids(filelist: Filelist) -> Set[int]:
-    if filelist.speakers:
-        return set(filelist.speakers)
+    if filelist.speakers_ids:
+        return set(filelist.speakers_ids)
+    elif filelist.speakers:
+        # conn =
+        conn = sqlite3.connect(CACHE_LOCATION)
+        cursor = conn.cursor()
+        params = ",".join("?" for _ in filelist.speakers)
+        print(params)
+        results = cursor.execute(
+            f"SELECT speaker_id FROM speakers where filepath = '?' AND name in ({params})",
+            [filelist.path, *params],
+        ).fetchall()
+        speaker_ids = set([speaker_id for (speaker_id, *_) in results])
+        return speaker_ids
     elif filelist.sql:
         if not CACHE_LOCATION.exists():
             msg = "Filelist cache does not exist! You must generate it."
