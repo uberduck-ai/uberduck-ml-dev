@@ -13,6 +13,7 @@ from shutil import copyfile, copytree
 import sys
 from typing import List, Optional, Set
 
+import sqlite3
 from tqdm import tqdm
 
 from ..utils.audio import convert_to_wav
@@ -24,14 +25,24 @@ CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
 @dataclass
 class Filelist:
     path: str
+    sql: str
     speakers: Optional[List[int]] = None
 
 
 def _get_speaker_ids(filelist: Filelist) -> Set[int]:
     if filelist.speakers:
         return set(filelist.speakers)
-    else:
-        raise Exception("pass a list of speakerss")
+    elif filelist.sql:
+        if not CACHE_LOCATION.exists():
+            msg = "Filelist cache does not exist! You must generate it."
+            print(msg)
+            raise Exception(msg)
+        conn = sqlite3.connect(CACHE_LOCATION)
+        cursor = conn.cursor()
+        results = cursor.execute(filelist.sql).fetchall()
+
+        speaker_ids = set([speaker_id for (speaker_id, *_) in results])
+        return speaker_ids
 
 
 def select_speakers(filelists: List[Filelist], output_filelist: str):
