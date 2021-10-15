@@ -2,7 +2,11 @@
 
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
-index = {"word_frequencies": "data.statistics.ipynb",
+index = {"insert_speaker": "data.cache.ipynb",
+         "ensure_speaker_table": "data.cache.ipynb",
+         "ensure_filelist_in_cache": "data.cache.ipynb",
+         "CACHE_LOCATION": "exec.select_speakers.ipynb",
+         "word_frequencies": "data.statistics.ipynb",
          "create_wordcloud": "data.statistics.ipynb",
          "count_frequency": "data.statistics.ipynb",
          "pace_character": "data.statistics.ipynb",
@@ -16,7 +20,6 @@ index = {"word_frequencies": "data.statistics.ipynb",
          "generate_markdown": "exec.dataset_statistics.ipynb",
          "parse_args": "exec.train_tacotron2.ipynb",
          "run": "exec.train_tacotron2.ipynb",
-         "CACHE_LOCATION": "exec.select_speakers.ipynb",
          "STANDARD_MULTISPEAKER": "exec.generate_filelist.ipynb",
          "STANDARD_SINGLESPEAKER": "exec.generate_filelist.ipynb",
          "VCTK": "exec.generate_filelist.ipynb",
@@ -109,7 +112,8 @@ index = {"word_frequencies": "data.statistics.ipynb",
          "HParams": "vendor.tfcompat.hparam.ipynb",
          "PARAM_RE": "vendor.tfcompat.hparam.ipynb"}
 
-modules = ["data/statistics.py",
+modules = ["data/cache.py",
+           "data/statistics.py",
            "data_loader.py",
            "exec/dataset_statistics.py",
            "exec/generate_filelist.py",

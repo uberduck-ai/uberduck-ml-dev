@@ -11,6 +11,7 @@ from pathlib import Path
 import sqlite3
 from tqdm import tqdm
 
+from ..data.cache import ensure_speaker_table, insert_speaker
 from ..utils.utils import parse_vctk
 
 CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
@@ -25,29 +26,13 @@ FORMATS = [
 ]
 
 
-def _init_speaker_table():
-    if not CACHE_LOCATION.parent.exists():
-        os.makedirs(CACHE_LOCATION.parent)
-    conn = sqlite3.connect(str(CACHE_LOCATION))
-    with conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS speakers (filepath TEXT, name TEXT, speaker_id INT)"
-        )
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS name_speaker_id_idx ON speakers(filepath, name, speaker_id)"
-        )
-
-
 def _convert_vctk(f, inp: str):
     vctk_data = parse_vctk(inp)
     speaker_id = 0
     conn = sqlite3.connect(str(CACHE_LOCATION))
     with conn:
         for speaker_name, speaker_data in tqdm(vctk_data.items()):
-            conn.execute(
-                "INSERT OR REPLACE INTO speakers VALUES (?, ?, ?)",
-                (f.name, speaker_name, speaker_id),
-            )
+            insert_speaker(f.name, speaker_name, speaker_id, conn)
             speaker_out_path = Path(out_path) / speaker_name
             if not speaker_out_path.exists():
                 os.makedirs(speaker_out_path)
@@ -75,10 +60,7 @@ def _convert_standard_multispeaker(f, inp: str):
             except:
                 print(files)
                 raise
-            conn.execute(
-                "INSERT OR REPLACE INTO speakers VALUES (?, ?, ?)",
-                (f.name, speaker, speaker_id),
-            )
+            insert_speaker(f.name, speaker, speaker_id, conn)
             with (path / transcriptions).open("r") as txn_f:
                 transcriptions = txn_f.readlines()
             for line in transcriptions:
@@ -96,7 +78,7 @@ def _convert_standard_multispeaker(f, inp: str):
 
 def _generate_filelist(input_dataset, fmt, output_filelist):
     full_path = Path(output_filelist).resolve()
-    _init_speaker_table()
+    ensure_speaker_table()
     with open(full_path, "w") as f:
         print(f.name)
         _convert_to_multispeaker(f, input_dataset, fmt)
