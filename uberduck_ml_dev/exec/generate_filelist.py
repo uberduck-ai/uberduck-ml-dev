@@ -90,7 +90,7 @@ def _convert_standard_multispeaker(f, inp: str):
                     print(line)
                     raise
                 full_path = (path / line_path).resolve()
-                f.write(f"{full_path}|{speaker_id}\n")
+                f.write(f"{full_path}|{line_txn}|{speaker_id}\n")
             speaker_id += 1
 
 
