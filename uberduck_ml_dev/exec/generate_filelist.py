@@ -39,7 +39,6 @@ def _init_speaker_table():
 
 
 def _convert_vctk(f, inp: str):
-    assert fmt == VCTK, "VCTK is the only format supported by this function!"
     vctk_data = parse_vctk(inp)
     speaker_id = 0
     conn = sqlite3.connect(str(CACHE_LOCATION))
