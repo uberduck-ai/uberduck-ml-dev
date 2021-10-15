@@ -25,23 +25,25 @@ CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
 @dataclass
 class Filelist:
     path: str
-    sql: str
+    sql: Optional[str] = None
     speaker_ids: Optional[List[int]] = None
     speakers: Optional[List[str]] = None
 
 
 def _get_speaker_ids(filelist: Filelist) -> Set[int]:
-    if filelist.speakers_ids:
-        return set(filelist.speakers_ids)
+    if filelist.speaker_ids:
+        return set(filelist.speaker_ids)
     elif filelist.speakers:
         # conn =
-        conn = sqlite3.connect(CACHE_LOCATION)
+        conn = sqlite3.connect(str(CACHE_LOCATION))
         cursor = conn.cursor()
         params = ",".join("?" for _ in filelist.speakers)
         print(params)
+        print(filelist.path)
+        print(filelist.speakers)
         results = cursor.execute(
-            f"SELECT speaker_id FROM speakers where filepath = '?' AND name in ({params})",
-            [filelist.path, *params],
+            f"SELECT speaker_id FROM speakers where filepath = ? AND name in ({params})",
+            [os.path.expanduser(filelist.path), *filelist.speakers],
         ).fetchall()
         speaker_ids = set([speaker_id for (speaker_id, *_) in results])
         return speaker_ids
@@ -50,7 +52,7 @@ def _get_speaker_ids(filelist: Filelist) -> Set[int]:
             msg = "Filelist cache does not exist! You must generate it."
             print(msg)
             raise Exception(msg)
-        conn = sqlite3.connect(CACHE_LOCATION)
+        conn = sqlite3.connect(str(CACHE_LOCATION))
         cursor = conn.cursor()
         results = cursor.execute(filelist.sql).fetchall()
 
@@ -63,10 +65,12 @@ def select_speakers(filelists: List[Filelist], output_filelist: str):
     with open(output_filelist, "w") as f_out:
         for filelist in tqdm(filelists):
             speaker_ids = _get_speaker_ids(filelist)
+            if filelist.path:
+                filelist.path = os.path.expanduser(filelist.path)
             with open(filelist.path, "r") as f_in:
                 for line in f_in.readlines():
                     _, _, speaker_id = line.strip().split("|")
-                    if int(speaker_id) in speaker_ids:
+                    if speaker_ids is None or int(speaker_id) in speaker_ids:
                         f_out.write(line)
 
 
@@ -84,8 +88,9 @@ except:
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
     if args.config:
-        config = json.load(args.config)
-        filelists = config["filelists"]
+        with open(args.config) as f:
+            config = json.load(f)
+        filelists = [Filelist(**f) for f in config["filelists"]]
         output_filelist = config["output"]
     else:
         raise Exception("You must pass a config file!")
