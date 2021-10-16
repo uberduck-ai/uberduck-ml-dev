@@ -46,12 +46,12 @@ def ensure_speaker_table():
 def ensure_filelist_in_cache(filelist, speaker_idx_in_path=None):
     with open(filelist) as f:
         lines = f.readlines()
-    num_speakers = set([line.strip().split("|")[2] for line in lines])
+    num_speakers = len(set([line.strip().split("|")[2] for line in lines]))
     conn = sqlite3.connect(str(CACHE_LOCATION))
     with conn:
         count = conn.execute(
             "SELECT COUNT(*) FROM speakers WHERE filepath = ?", (filelist,)
-        ).fetchone()
+        ).fetchone()[0]
         speaker_name_to_id = {}
         if count != num_speakers:
             for line in lines:
