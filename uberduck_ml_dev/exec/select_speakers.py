@@ -65,7 +65,7 @@ def _get_speaker_ids(filelist: Filelist) -> Set[int]:
 
 def select_speakers(filelists: List[Filelist], output_filelist: str):
     new_speaker_id = 0
-    seen_speaker_ids = set()
+    seen_speaker_ids = dict()
     with open(output_filelist, "w") as f_out:
         for filelist in tqdm(filelists):
             speaker_ids = _get_speaker_ids(filelist)
