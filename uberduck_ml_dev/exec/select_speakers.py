@@ -29,15 +29,16 @@ class Filelist:
     sql: Optional[str] = None
     speaker_ids: Optional[List[int]] = None
     speakers: Optional[List[str]] = None
+    speaker_idx_in_path: int = None
 
 
-def _get_speaker_ids(filelist: Filelist, speaker_idx_in_path: int = None) -> Set[int]:
+def _get_speaker_ids(filelist: Filelist) -> Set[int]:
     if filelist.speaker_ids:
         return set(filelist.speaker_ids)
 
     path = os.path.expanduser(filelist.path)
     ensure_speaker_table()
-    ensure_filelist_in_cache(path, speaker_idx_in_path=speaker_idx_in_path)
+    ensure_filelist_in_cache(path, speaker_idx_in_path=filelist.speaker_idx_in_path)
     if filelist.speakers:
         # conn =
         conn = sqlite3.connect(str(CACHE_LOCATION))
