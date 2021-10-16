@@ -83,8 +83,8 @@ def select_speakers(filelists: List[Filelist], output_filelist: str):
                         seen_speaker_ids[
                             (filelist.path, original_speaker_id)
                         ] = new_speaker_id
-                        new_speaker_id += 1
                         current_speaker_id = new_speaker_id
+                        new_speaker_id += 1
                     else:
                         current_speaker_id = seen_speaker_ids[
                             (filelist.path, original_speaker_id)
