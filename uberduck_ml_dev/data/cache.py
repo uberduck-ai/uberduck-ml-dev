@@ -51,9 +51,12 @@ def ensure_filelist_in_cache(filelist, speaker_idx_in_path=None):
     with conn:
         count = conn.execute(
             "SELECT COUNT(*) FROM speakers WHERE filepath = ?", (filelist,)
-        ).fetchone()
+        ).fetchone()[0]
         speaker_name_to_id = {}
         if count != num_speakers:
+            print(
+                f"Filelist not found in cache. Cache count: {count}. Filelist count: {num_speakers}."
+            )
             for line in lines:
                 path, txn, sid = line.strip().split("|")
                 speaker_name = _path_to_speaker_name(
