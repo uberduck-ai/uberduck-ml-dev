@@ -19,10 +19,25 @@
     "max_wav_value": 32768.0,
     "mel_fmax": 8000,
     "mel_fmin": 0,
+    "n_frames_per_step_initial": 7,
     "n_mel_channels": 80,
     "n_speakers": 2,
     "p_arpabet": 1.0,
+    "reduction_window_schedule": [
+        {
+            "until_step": 3,
+            "batch_size": 6,
+            "n_frames_per_step": 7
+        },
+        {
+            "until_step": null,
+            "batch_size": 2,
+            "n_frames_per_step": 1
+        }
+    ],
+    "sample_inference_speaker_ids": null,
     "sample_rate": 22050,
+    "seed": 123,
     "steps_per_sample": 100,
     "text_cleaners": ["english_cleaners"],
     "training_audiopaths_and_text": "train.txt",

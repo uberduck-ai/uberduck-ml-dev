@@ -105,7 +105,6 @@ def parse_vctk(root: str):
 
 
 def parse_libritts_mellotron(source_folder, mellotron_filelist):
-
     data = pd.read_csv(mellotron_filelist, sep="|", header=None, error_bad_lines=False)
 
     data[0] = data[0].str[17:]
@@ -115,7 +114,6 @@ def parse_libritts_mellotron(source_folder, mellotron_filelist):
 
 
 def add_speakerid(data, speaker_key=0):
-
     if data.shape[1] == 3:
         if type(data[2]) == int:
             pass
@@ -134,7 +132,6 @@ def add_speakerid(data, speaker_key=0):
 
 
 def parse_libritts_mellotron(source_folder, mellotron_filelist):
-
     data = load_filepaths_and_text(mellotron_filelist)
     data = pd.DataFrame(data)
     data[0] = data[0].str[17:]
@@ -144,7 +141,6 @@ def parse_libritts_mellotron(source_folder, mellotron_filelist):
 
 
 def parse_uberduck(source_folder):
-
     source_file = source_folder + "/all.txt"
     data = load_filepaths_and_text(source_file)
     data = pd.DataFrame(data)
@@ -161,7 +157,6 @@ def parse_uberduck(source_folder):
 
 
 def parse_ljspeech(source_folder):
-
     source_file = source_folder + "/metadata.csv"
     data = load_filepaths_and_text(source_file)
     data = pd.DataFrame(data)
@@ -176,7 +171,6 @@ def parse_ljspeech(source_folder):
 
 
 def get_alignment_metrics(alignments, average_across_batch=True):
-
     """See https://github.com/NVIDIA/tacotron2/pull/284,
     https://github.com/CookiePPP/cookietts/blob/c871f5f7b5790656d5b57bcd9e63946a2da52f0f/CookieTTS/utils/model/utils.py#L59"""
     alignments = alignments.transpose(1, 2)  # [B, dec, enc] -> [B, enc, dec]

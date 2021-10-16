@@ -133,6 +133,17 @@ class TextMelCollate:
         self.n_frames_per_step = n_frames_per_step
         self.include_f0 = include_f0
 
+    def set_frames_per_step(self, n_frames_per_step):
+        """Set n_frames_step.
+
+        This is used to train with gradual training, where we start with a large
+        n_frames_per_step in order to learn attention quickly and decrease it
+        over the course of training in order to increase accuracy. Gradual training
+        reference:
+        https://erogol.com/gradual-training-with-tacotron-for-faster-convergence/
+        """
+        self.n_frames_per_step = n_frames_per_step
+
     def __call__(self, batch):
         """Collate's training batch from normalized text and mel-spectrogram
         PARAMS
