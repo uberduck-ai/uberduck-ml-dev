@@ -82,7 +82,7 @@ def calculate_statistics(
         abs_metrics = AbsoluteMetrics()
 
     with open(os.path.join(dataset_path, input_file)) as transcripts:
-        for line in tqdm(transcripts):
+        for line in tqdm(transcripts.readlines()):
             try:
                 line = line.strip()  # remove trailing newline character
                 file, transcription = line.lower().split(delimiter)
@@ -479,7 +479,7 @@ def run(
             ]
             json_data = {k: data[k] for k in keys}
             json_data["arpabet_rnn"] = data["lookup_results"]["RNN"]
-            json.dump(json_data, outfile)
+            json.dump(json_data, outfile, indent=2)
 
 # Cell
 
