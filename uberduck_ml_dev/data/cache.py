@@ -12,9 +12,11 @@ import sqlite3
 CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
 
 
-def _path_to_speaker_name(path: str):
+def _path_to_speaker_name(path: str, speaker_idx_in_path=None):
     p = Path(path)
-    assert "wavs" in p.parts, "Can't autodetect speaker name from path!"
+    if speaker_idx_in_path is not None:
+        return p.parts[speaker_idx_in_path]
+    assert "wavs" in p.parts, f"Can't autodetect speaker name from path: {p.parts}"
     wavs_idx = p.parts.index("wavs")
     return p.parts[wavs_idx - 1]
 
@@ -41,20 +43,22 @@ def ensure_speaker_table():
         )
 
 
-def ensure_filelist_in_cache(filelist):
+def ensure_filelist_in_cache(filelist, speaker_idx_in_path=None):
     with open(filelist) as f:
         lines = f.readlines()
     num_speakers = set([line.strip().split("|")[2] for line in lines])
     conn = sqlite3.connect(str(CACHE_LOCATION))
     with conn:
         count = conn.execute(
-            "SELECT COUNT(*) FROM speakers WHERE filelist = ?", filelist
+            "SELECT COUNT(*) FROM speakers WHERE filepath = ?", (filelist,)
         ).fetchone()
         speaker_name_to_id = {}
-        if not count == num_speakers:
+        if count != num_speakers:
             for line in lines:
                 path, txn, sid = line.strip().split("|")
-                speaker_name = _path_to_speaker_name(path)
+                speaker_name = _path_to_speaker_name(
+                    path, speaker_idx_in_path=speaker_idx_in_path
+                )
                 if speaker_name in speaker_name_to_id:
                     continue
                 else:

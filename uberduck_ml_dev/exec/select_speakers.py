@@ -31,12 +31,13 @@ class Filelist:
     speakers: Optional[List[str]] = None
 
 
-def _get_speaker_ids(filelist: Filelist) -> Set[int]:
+def _get_speaker_ids(filelist: Filelist, speaker_idx_in_path: int = None) -> Set[int]:
     if filelist.speaker_ids:
         return set(filelist.speaker_ids)
 
+    path = os.path.expanduser(filelist.path)
     ensure_speaker_table()
-    ensure_filelist_in_cache()
+    ensure_filelist_in_cache(path, speaker_idx_in_path=speaker_idx_in_path)
     if filelist.speakers:
         # conn =
         conn = sqlite3.connect(str(CACHE_LOCATION))
@@ -44,7 +45,7 @@ def _get_speaker_ids(filelist: Filelist) -> Set[int]:
         params = ",".join("?" for _ in filelist.speakers)
         results = cursor.execute(
             f"SELECT speaker_id FROM speakers where filepath = ? AND name in ({params})",
-            [os.path.expanduser(filelist.path), *filelist.speakers],
+            [path, *filelist.speakers],
         ).fetchall()
         speaker_ids = set([speaker_id for (speaker_id, *_) in results])
         return speaker_ids
