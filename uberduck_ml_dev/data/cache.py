@@ -39,7 +39,7 @@ def ensure_speaker_table():
             "CREATE TABLE IF NOT EXISTS speakers (filepath TEXT, name TEXT, speaker_id INT)"
         )
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS name_speaker_id_idx ON speakers(filepath, name, speaker_id)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS name_speaker_id_idx ON speakers(filepath, name)"
         )
 
 
@@ -51,7 +51,7 @@ def ensure_filelist_in_cache(filelist, speaker_idx_in_path=None):
     with conn:
         count = conn.execute(
             "SELECT COUNT(*) FROM speakers WHERE filepath = ?", (filelist,)
-        ).fetchone()[0]
+        ).fetchone()
         speaker_name_to_id = {}
         if count != num_speakers:
             for line in lines:
