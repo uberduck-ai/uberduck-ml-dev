@@ -112,7 +112,7 @@ class TTSTrainer:
         raise NotImplemented
 
 # Cell
-from random import randint
+from random import choice, randint
 import time
 from typing import List
 
@@ -164,9 +164,15 @@ class MellotronTrainer(TTSTrainer):
         "pos_weight",
     ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.n_frames_per_step_current = self.n_frames_per_step_initial
+        self.reduction_window_idx = 0
+
     def log_training(
         self,
         model,
+        X,
         y_pred,
         y,
         loss,
@@ -221,22 +227,28 @@ class MellotronTrainer(TTSTrainer):
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_gate_outputs(
-                        gate_outputs[sample_idx].data.cpu(),
-                        gate_target[sample_idx].data.cpu(),
+                        gate_targets=gate_target[sample_idx].data.cpu(),
+                        gate_outputs=gate_outputs[sample_idx].data.cpu(),
                     )
                 ),
             )
+            input_length = X[1][sample_idx].item()
+            output_length = X[4][sample_idx].item()
             self.log(
                 "Attention/train",
                 self.global_step,
                 image=save_figure_to_numpy(
-                    plot_attention(alignments[sample_idx].data.cpu())
+                    plot_attention(
+                        alignments[sample_idx].data.cpu().transpose(0, 1),
+                        encoder_length=input_length,
+                        decoder_length=output_length,
+                    )
                 ),
             )
 
             self.sample_inference(model)
 
-    def log_validation(self, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
+    def log_validation(self, X, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
         print(f"Average loss: {mean_loss}")
         self.log("Loss/val", self.global_step, scalar=mean_loss)
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
@@ -275,18 +287,52 @@ class MellotronTrainer(TTSTrainer):
             self.global_step,
             image=save_figure_to_numpy(
                 plot_gate_outputs(
-                    gate_outputs[sample_idx].data.cpu(),
-                    gate_target[sample_idx].data.cpu(),
+                    gate_targets=gate_target[sample_idx].data.cpu(),
+                    gate_outputs=gate_outputs[sample_idx].data.cpu(),
                 )
             ),
         )
+        input_length = X[1][sample_idx].item()
+        output_length = X[4][sample_idx].item()
         self.log(
             "Attention/val",
             self.global_step,
             image=save_figure_to_numpy(
-                plot_attention(alignments[sample_idx].data.cpu())
+                plot_attention(
+                    alignments[sample_idx].data.cpu().transpose(0, 1),
+                    encoder_length=input_length,
+                    decoder_length=output_length,
+                )
             ),
         )
+
+    def adjust_frames_per_step(
+        self,
+        model: Tacotron2,
+        train_loader: DataLoader,
+        sampler,
+        collate_fn: TextMelCollate,
+    ):
+        """If necessary, adjust model and loader's n_frames_per_step."""
+        if not self.reduction_window_schedule:
+            return train_loader, sampler, collate_fn
+        settings = self.reduction_window_schedule[self.reduction_window_idx]
+        if settings["until_step"] is None:
+            return train_loader, sampler, collate_fn
+        if self.global_step < settings["until_step"]:
+            return train_loader, sampler, collate_fn
+        old_fps = settings["n_frames_per_step"]
+        while settings["until_step"] and self.global_step >= settings["until_step"]:
+            self.reduction_window_idx += 1
+            settings = self.reduction_window_schedule[self.reduction_window_idx]
+        fps = new_settings["n_frames_per_step"]
+        bs = new_settings["batch_size"]
+        print(f"Adjusting frames per step from {old_fps} to {fps}")
+        self.batch_size = bs
+        model.set_current_frames_per_step(fps)
+        self.n_frames_per_step_current = fps
+        _, _, train_loader, sampler, collate_fn = self.initialize_loader()
+        return train_loader, sampler, collate_fn
 
     def validate(self, **kwargs):
         model = kwargs["model"]
@@ -328,7 +374,7 @@ class MellotronTrainer(TTSTrainer):
             mean_mel_loss = total_mel_loss / total_steps
             mean_gate_loss = total_gate_loss / total_steps
             mean_loss = total_loss / total_steps
-            self.log_validation(y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss)
+            self.log_validation(X, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss)
         model.train()
 
     def sample_inference(self, model):
@@ -339,16 +385,43 @@ class MellotronTrainer(TTSTrainer):
             utterance = torch.LongTensor(
                 text_to_sequence(random_utterance(), self.text_cleaners, self.p_arpabet)
             )[None].cuda()
-            speaker_id = randint(0, self.n_speakers - 1)
+            speaker_id = (
+                choice(self.sample_inference_speaker_ids)
+                if self.sample_inference_speaker_ids
+                else randint(0, self.n_speakers - 1)
+            )
             input_ = [utterance, 0, torch.LongTensor([speaker_id]).cuda()]
             if self.include_f0:
                 input_.append(torch.zeros([1, 1, 200], device=self.device))
                 # 200 can be changed
             model.eval()
-            mel, *_ = model.inference(input_)
+            _, mel, gate, attn = model.inference(input_)
             model.train()
-            audio = self.sample(mel[0])
-            self.log("SampleInference", self.global_step, audio=audio)
+            try:
+                audio = self.sample(mel[0])
+                self.log("SampleInference", self.global_step, audio=audio)
+            except Exception as e:
+                print(f"Exception raised while doing sample inference: {e}")
+                print("Mel shape: ", mel[0].shape)
+            self.log(
+                "Attention/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_attention(attn[0].data.cpu().transpose(0, 1))
+                ),
+            )
+            self.log(
+                "MelPredicted/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
+            )
+            self.log(
+                "Gate/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_gate_outputs(gate_outputs=gate[0].data.cpu())
+                ),
+            )
 
     @property
     def training_dataset_args(self):
@@ -375,28 +448,7 @@ class MellotronTrainer(TTSTrainer):
         val_args[0] = self.val_audiopaths_and_text
         return val_args
 
-    def warm_start(self, model, optimizer, start_epoch=0):
-
-        print("Starting warm_start", time.perf_counter())
-        checkpoint = self.load_checkpoint()
-        model.from_pretrained(
-            model_dict=checkpoint["state_dict"],
-            device=self.device,
-            ignore_layers=self.ignore_layers,
-        )
-        if "optimizer" in checkpoint.keys():
-            optimizer.load_state_dict(checkpoint["optimizer"])
-        if "iteration" in checkpoint.keys():
-            start_epoch = checkpoint["iteration"]
-        if "learning_rate" in checkpoint.keys():
-            optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
-            self.learning_rate = checkpoint["learning_rate"]
-        print("Ending warm_start", time.perf_counter())
-        # self.global_step = checkpoint["global_step"]
-        return model, optimizer, start_epoch
-
-    def train(self):
-        print("start train", time.perf_counter())
+    def initialize_loader(self):
         train_set = TextMelDataset(
             *self.training_dataset_args,
             debug=self.debug,
@@ -405,7 +457,9 @@ class MellotronTrainer(TTSTrainer):
         val_set = TextMelDataset(
             *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
         )
-        collate_fn = TextMelCollate(n_frames_per_step=1, include_f0=self.include_f0)
+        collate_fn = TextMelCollate(
+            n_frames_per_step=self.n_frames_per_step_current, include_f0=self.include_f0
+        )
         sampler = None
         if self.distributed_run:
             self.init_distributed()
@@ -417,6 +471,37 @@ class MellotronTrainer(TTSTrainer):
             sampler=sampler,
             collate_fn=collate_fn,
         )
+        return train_set, val_set, train_loader, sampler, collate_fn
+
+    def warm_start(self, model, optimizer, start_epoch=0):
+
+        print("Starting warm_start", time.perf_counter())
+        checkpoint = self.load_checkpoint()
+        # TODO(zach): Once we are no longer using checkpoints of the old format, remove the conditional and use checkpoint["model"] only.
+        model_state_dict = (
+            checkpoint["model"] if "model" in checkpoint else checkpoint["state_dict"]
+        )
+        model.from_pretrained(
+            model_dict=model_state_dict,
+            device=self.device,
+            ignore_layers=self.ignore_layers,
+        )
+        if "optimizer" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer"])
+        if "iteration" in checkpoint:
+            start_epoch = checkpoint["iteration"]
+        if "learning_rate" in checkpoint:
+            optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
+            self.learning_rate = checkpoint["learning_rate"]
+        if "global_step" in checkpoint:
+            self.global_step = checkpoint["global_step"]
+            print(f"Adjusted global step to {self.global_step}")
+        print("Ending warm_start", time.perf_counter())
+        return model, optimizer, start_epoch
+
+    def train(self):
+        print("start train", time.perf_counter())
+        train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
         criterion = Tacotron2Loss(
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
@@ -442,6 +527,9 @@ class MellotronTrainer(TTSTrainer):
 
         # main training loop
         for epoch in range(start_epoch, self.epochs):
+            train_loader, sampler, collate_fn = self.adjust_frames_per_step(
+                model, train_loader, sampler, collate_fn
+            )
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
@@ -488,6 +576,7 @@ class MellotronTrainer(TTSTrainer):
                 step_duration_seconds = time.perf_counter() - start_time
                 self.log_training(
                     model,
+                    X,
                     y_pred,
                     y,
                     reduced_loss,
