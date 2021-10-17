@@ -29,7 +29,7 @@ def plot_spectrogram(mel):
 # Cell
 
 
-def plot_attention(attention):
+def plot_attention(attention, encoder_length=None, decoder_length=None):
     figure = plt.figure()
     plt.xlabel("Decoder timestep")
     plt.ylabel("Encoder timestep")
@@ -40,32 +40,41 @@ def plot_attention(attention):
         interpolation="none",
         cmap="inferno",
     )
+    title_info = []
+    if encoder_length is not None:
+        title_info.append(f"Encoder_length: {encoder_length}")
+    if decoder_length is not None:
+        title_info.append(f"Decoder length: {decoder_length}")
+    title = " ".join(title_info)
+    plt.title(title)
     figure.canvas.draw()
     return figure
 
 
-def plot_gate_outputs(gate_targets, gate_outputs):
+def plot_gate_outputs(gate_targets=None, gate_outputs=None):
     figure = plt.figure()
     plt.xlabel("Frames")
     plt.ylabel("Gate state")
     ax = figure.add_axes([0, 0, 1, 1])
-    ax.scatter(
-        range(gate_targets.size(0)),
-        gate_targets,
-        alpha=0.5,
-        color="green",
-        marker="+",
-        s=1,
-        label="target",
-    )
-    ax.scatter(
-        range(gate_outputs.size(0)),
-        gate_outputs,
-        alpha=0.5,
-        color="red",
-        marker=".",
-        s=1,
-        label="predicted",
-    )
+    if gate_targets is not None:
+        ax.scatter(
+            range(gate_targets.size(0)),
+            gate_targets,
+            alpha=0.5,
+            color="green",
+            marker="+",
+            s=1,
+            label="target",
+        )
+    if gate_outputs is not None:
+        ax.scatter(
+            range(gate_outputs.size(0)),
+            gate_outputs,
+            alpha=0.5,
+            color="red",
+            marker=".",
+            s=1,
+            label="predicted",
+        )
     figure.canvas.draw()
     return figure
