@@ -325,8 +325,8 @@ class MellotronTrainer(TTSTrainer):
         while settings["until_step"] and self.global_step >= settings["until_step"]:
             self.reduction_window_idx += 1
             settings = self.reduction_window_schedule[self.reduction_window_idx]
-        fps = new_settings["n_frames_per_step"]
-        bs = new_settings["batch_size"]
+        fps = settings["n_frames_per_step"]
+        bs = settings["batch_size"]
         print(f"Adjusting frames per step from {old_fps} to {fps}")
         self.batch_size = bs
         model.set_current_frames_per_step(fps)

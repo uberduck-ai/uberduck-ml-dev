@@ -21,7 +21,6 @@ def write_filenames(filenames, output_dir, output_filename):
 
 def run(
     path,
-    train_percent=0.8,
     val_percent=0.2,
     val_num=None,
     train_file="train.txt",
@@ -44,7 +43,10 @@ import sys
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--in", dest="input_path", help="Path to input file list")
+    parser.add_argument(
+        "-i", "--in", dest="input_path", help="Path to input file list", required=True
+    )
+    parser.add_argument("-v", "--val-pct", dest="val_pct", type=float, default=0.1)
     args = parser.parse_args(args)
     return args
 
@@ -56,4 +58,4 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    run(args.input_path)
+    run(args.input_path, val_percent=args.val_pct)
