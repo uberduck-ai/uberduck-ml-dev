@@ -329,6 +329,11 @@ class MelSTFT(torch.nn.Module):
         output = dynamic_range_decompression(magnitudes)
         return output
 
+    def spec_to_mel(self, spec):
+        mel_output = torch.matmul(self.mel_basis, spec)
+        mel_output = self.spectral_normalize(mel_output)
+        return mel_output
+
     def mel_spectrogram(self, y, ref_level_db=20, magnitude_power=1.5):
         """Computes mel-spectrograms from a batch of waves
         PARAMS
@@ -344,9 +349,7 @@ class MelSTFT(torch.nn.Module):
 
         magnitudes, phases = self.stft_fn.transform(y)
         magnitudes = magnitudes.data
-        mel_output = torch.matmul(self.mel_basis, magnitudes)
-        mel_output = self.spectral_normalize(mel_output)
-        return mel_output
+        return self.spec_to_mel(magnitudes)
 
     def griffin_lim(self, mel_spectrogram, n_iters=30):
         mel_dec = self.spectral_de_normalize(mel_spectrogram)
@@ -629,6 +632,7 @@ class DDSConv(nn.Module):
 
 from .transforms import piecewise_rational_quadratic_transform
 
+
 class ConvFlow(nn.Module):
     def __init__(
         self,
@@ -690,6 +694,7 @@ class ConvFlow(nn.Module):
 
 # Cell
 from ..utils.utils import fused_add_tanh_sigmoid_multiply
+
 
 class WN(torch.nn.Module):
     def __init__(
