@@ -318,19 +318,19 @@ class MelSTFT(torch.nn.Module):
         sampling_rate=22050,
         mel_fmin=0.0,
         mel_fmax=8000.0,
+        device="cpu",
     ):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.sampling_rate = sampling_rate
-        self.stft_fn = STFT(filter_length, hop_length, win_length)
+        self.stft_fn = STFT(filter_length, hop_length, win_length, device=device)
         mel_basis = librosa_mel(
             sampling_rate, filter_length, n_mel_channels, mel_fmin, mel_fmax
         )
         mel_basis = torch.from_numpy(mel_basis).float()
+        if device == "cuda":
+            mel_basis = mel_basis.cuda()
         self.register_buffer("mel_basis", mel_basis)
-
-    def to_gpu(self):
-        self.mel_basis = self.mel_basis.cuda()
 
     def spectral_normalize(self, magnitudes):
         output = dynamic_range_compression(magnitudes)
