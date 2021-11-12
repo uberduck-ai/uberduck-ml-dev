@@ -271,9 +271,7 @@ class VITSTrainer(TTSTrainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mel_stft = MelSTFT()
-        if self.device == "cuda":
-            self.mel_stft.to_gpu()
+        self.mel_stft = MelSTFT(device=self.device)
         for param in self.REQUIRED_HPARAMS:
             if not hasattr(self, param):
                 raise Exception(f"VITSTrainer missing a required param: {param}")
