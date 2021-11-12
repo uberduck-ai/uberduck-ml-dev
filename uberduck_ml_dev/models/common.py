@@ -186,6 +186,7 @@ class STFT(torch.nn.Module):
         hop_length=200,
         win_length=800,
         window="hann",
+        device="cpu",
     ):
         super().__init__()
         self.filter_length = filter_length
@@ -201,8 +202,9 @@ class STFT(torch.nn.Module):
             [np.real(fourier_basis[:cutoff, :]), np.imag(fourier_basis[:cutoff, :])]
         )
 
-        forward_basis = torch.FloatTensor(fourier_basis[:, None, :])
-        inverse_basis = torch.FloatTensor(
+        tensor_cls = torch.cuda.FloatTensor if device == "cuda" else torch.FloatTensor
+        forward_basis = tensor_cls(fourier_basis[:, None, :])
+        inverse_basis = tensor_cls(
             np.linalg.pinv(scale * fourier_basis).T[:, None, :].astype(np.float32)
         )
 
