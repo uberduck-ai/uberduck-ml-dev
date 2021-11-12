@@ -5,7 +5,7 @@ __all__ = []
 # Cell
 import argparse
 
-from ..text.util import clean_text
+from ..text.util import batch_clean_text, clean_text
 from ..utils.utils import load_filepaths_and_text
 
 try:
@@ -34,10 +34,11 @@ if __name__ == "__main__" and not IN_NOTEBOOK:
     for filelist in args.filelists:
         print("START:", filelist)
         filepaths_and_text = load_filepaths_and_text(filelist)
+        text_batch = [fat[args.text_index] for fat in filepaths_and_text]
+        cleaned_text_batch = batch_clean_text(text_batch, args.text_cleaners)
+
         for i in range(len(filepaths_and_text)):
-            original_text = filepaths_and_text[i][args.text_index]
-            cleaned_text = clean_text(original_text, args.text_cleaners)
-            filepaths_and_text[i][args.text_index] = cleaned_text
+            filepaths_and_text[i][args.text_index] = cleaned_text_batch[i]
 
         new_filelist = filelist + "." + args.out_extension
         with open(new_filelist, "w", encoding="utf-8") as f:
