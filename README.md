@@ -1,6 +1,6 @@
 # 🦆 Uberduck TTS ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
-[**Uberduck**](https://uberduck.ai/) is a tool that is all about synthesizing peoples' voices. This repository includes some development tools to get started with creating your own synthesizable model.
+[**Uberduck**](https://uberduck.ai/) is a tool that is all about synthesizing peoples' voices. This repository includes some development tools to get started with creating your own synthesis model.
 
 ## Development
 
