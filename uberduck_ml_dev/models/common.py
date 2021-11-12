@@ -13,6 +13,7 @@ import torch
 from torch.autograd import Variable
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.utils import remove_weight_norm, weight_norm
 
 from ..utils.utils import *
 from ..vendor.tfcompat.hparam import HParams
@@ -186,7 +187,7 @@ class STFT(torch.nn.Module):
         win_length=800,
         window="hann",
     ):
-        super(STFT, self).__init__()
+        super().__init__()
         self.filter_length = filter_length
         self.hop_length = hop_length
         self.win_length = win_length
@@ -229,7 +230,12 @@ class STFT(torch.nn.Module):
         input_data = input_data.view(num_batches, 1, num_samples)
         input_data = F.pad(
             input_data.unsqueeze(1),
-            (int(self.filter_length / 2), int(self.filter_length / 2), 0, 0),
+            (
+                (self.filter_length - self.hop_length) // 2,
+                (self.filter_length - self.hop_length) // 2,
+                0,
+                0,
+            ),
             mode="reflect",
         )
         input_data = input_data.squeeze(1)
@@ -241,7 +247,7 @@ class STFT(torch.nn.Module):
             padding=0,
         )
 
-        cutoff = int((self.filter_length / 2) + 1)
+        cutoff = self.filter_length // 2 + 1
         real_part = forward_transform[:, :cutoff, :]
         imag_part = forward_transform[:, cutoff:, :]
 
@@ -333,6 +339,12 @@ class MelSTFT(torch.nn.Module):
         mel_output = torch.matmul(self.mel_basis, spec)
         mel_output = self.spectral_normalize(mel_output)
         return mel_output
+
+    def spectrogram(self, y):
+        assert torch.min(y.data) >= -1
+        assert torch.max(y.data) <= 1
+        magnitudes, phases = self.stft_fn.transform(y)
+        return magnitudes.data
 
     def mel_spectrogram(self, y, ref_level_db=20, magnitude_power=1.5):
         """Computes mel-spectrograms from a batch of waves
@@ -630,6 +642,8 @@ class DDSConv(nn.Module):
 
 # Cell
 
+import math
+
 from .transforms import piecewise_rational_quadratic_transform
 
 
@@ -641,7 +655,8 @@ class ConvFlow(nn.Module):
         kernel_size,
         n_layers,
         num_bins=10,
-        tail_bound=5.0,
+        # tail_bound=5.0,
+        tail_bound=10.0,
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -720,22 +735,20 @@ class WN(torch.nn.Module):
         self.drop = nn.Dropout(p_dropout)
 
         if gin_channels != 0:
-            cond_layer = torch.nn.Conv1d(
-                gin_channels, 2 * hidden_channels * n_layers, 1
-            )
-            self.cond_layer = torch.nn.utils.weight_norm(cond_layer, name="weight")
+            cond_layer = nn.Conv1d(gin_channels, 2 * hidden_channels * n_layers, 1)
+            self.cond_layer = weight_norm(cond_layer, name="weight")
 
         for i in range(n_layers):
             dilation = dilation_rate ** i
             padding = int((kernel_size * dilation - dilation) / 2)
-            in_layer = torch.nn.Conv1d(
+            in_layer = nn.Conv1d(
                 hidden_channels,
                 2 * hidden_channels,
                 kernel_size,
                 dilation=dilation,
                 padding=padding,
             )
-            in_layer = torch.nn.utils.weight_norm(in_layer, name="weight")
+            in_layer = weight_norm(in_layer, name="weight")
             self.in_layers.append(in_layer)
 
             # last one is not necessary
@@ -744,8 +757,8 @@ class WN(torch.nn.Module):
             else:
                 res_skip_channels = hidden_channels
 
-            res_skip_layer = torch.nn.Conv1d(hidden_channels, res_skip_channels, 1)
-            res_skip_layer = torch.nn.utils.weight_norm(res_skip_layer, name="weight")
+            res_skip_layer = nn.Conv1d(hidden_channels, res_skip_channels, 1)
+            res_skip_layer = weight_norm(res_skip_layer, name="weight")
             self.res_skip_layers.append(res_skip_layer)
 
     def forward(self, x, x_mask, g=None, **kwargs):
@@ -777,11 +790,11 @@ class WN(torch.nn.Module):
 
     def remove_weight_norm(self):
         if self.gin_channels != 0:
-            torch.nn.utils.remove_weight_norm(self.cond_layer)
+            remove_weight_norm(self.cond_layer)
         for l in self.in_layers:
-            torch.nn.utils.remove_weight_norm(l)
+            remove_weight_norm(l)
         for l in self.res_skip_layers:
-            torch.nn.utils.remove_weight_norm(l)
+            remove_weight_norm(l)
 
 # Cell
 class ResidualCouplingLayer(nn.Module):
@@ -849,7 +862,7 @@ class ResBlock1(torch.nn.Module):
         self.convs1 = nn.ModuleList(
             [
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -859,7 +872,7 @@ class ResBlock1(torch.nn.Module):
                     )
                 ),
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -869,7 +882,7 @@ class ResBlock1(torch.nn.Module):
                     )
                 ),
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -885,7 +898,7 @@ class ResBlock1(torch.nn.Module):
         self.convs2 = nn.ModuleList(
             [
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -895,7 +908,7 @@ class ResBlock1(torch.nn.Module):
                     )
                 ),
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -905,7 +918,7 @@ class ResBlock1(torch.nn.Module):
                     )
                 ),
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -946,7 +959,7 @@ class ResBlock2(torch.nn.Module):
         self.convs = nn.ModuleList(
             [
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,
@@ -956,7 +969,7 @@ class ResBlock2(torch.nn.Module):
                     )
                 ),
                 weight_norm(
-                    Conv1d(
+                    nn.Conv1d(
                         channels,
                         channels,
                         kernel_size,

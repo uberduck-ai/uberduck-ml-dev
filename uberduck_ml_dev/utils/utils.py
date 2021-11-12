@@ -5,7 +5,7 @@ __all__ = ['load_filepaths_and_text', 'synthesize_speakerids2', 'parse_vctk', 'p
            'window_sumsquare', 'griffin_lim', 'dynamic_range_compression', 'dynamic_range_decompression', 'to_gpu',
            'get_mask_from_lengths', 'reduce_tensor', 'subsequent_mask', 'convert_pad_shape', 'sequence_mask',
            'generate_path', 'slice_segments', 'rand_slice_segments', 'init_weights', 'get_padding',
-           'fused_add_tanh_sigmoid_multiply', 'clip_grad_value_']
+           'fused_add_tanh_sigmoid_multiply', 'clip_grad_value_', 'intersperse']
 
 # Cell
 
@@ -437,3 +437,9 @@ def clip_grad_value_(parameters, clip_value, norm_type=2):
             p.grad.data.clamp_(min=-clip_value, max=clip_value)
     total_norm = total_norm ** (1.0 / norm_type)
     return total_norm
+
+# Cell
+def intersperse(lst, item):
+    result = [item] * (len(lst) * 2 + 1)
+    result[1::2] = lst
+    return result

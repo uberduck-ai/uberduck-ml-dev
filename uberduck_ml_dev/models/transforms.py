@@ -45,7 +45,7 @@ def piecewise_rational_quadratic_transform(
         min_bin_width=min_bin_width,
         min_bin_height=min_bin_height,
         min_derivative=min_derivative,
-        **spline_kwargs
+        **spline_kwargs,
     )
     return outputs, logabsdet
 
@@ -82,7 +82,7 @@ def unconstrained_rational_quadratic_spline(
         outputs[outside_interval_mask] = inputs[outside_interval_mask]
         logabsdet[outside_interval_mask] = 0
     else:
-        raise RuntimeError("{} tails are not implemented.".format(tails))
+        raise RuntimeError(f"{tails} tails are not implemented.")
 
     (
         outputs[inside_interval_mask],
@@ -119,6 +119,7 @@ def rational_quadratic_spline(
     min_bin_height=DEFAULT_MIN_BIN_HEIGHT,
     min_derivative=DEFAULT_MIN_DERIVATIVE,
 ):
+    print("rational_quadratic_spline inputs: ", inputs)
     if torch.min(inputs) < left or torch.max(inputs) > right:
         raise ValueError("Input to a transform is not within its domain")
 
