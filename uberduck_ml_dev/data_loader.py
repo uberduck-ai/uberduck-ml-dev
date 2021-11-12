@@ -300,9 +300,7 @@ class TextAudioSpeakerLoader(Dataset):
         return (text, spec, wav, sid)
 
     def get_audio(self, filename):
-        print(filename)
         audio, sampling_rate = load_wav_to_torch(filename)
-        print("loaded wav to torch")
         if sampling_rate != self.sampling_rate:
             raise ValueError(
                 "{} {} SR doesn't match target {} SR".format(
