@@ -231,8 +231,10 @@ class STFT(torch.nn.Module):
         input_data = F.pad(
             input_data.unsqueeze(1),
             (
-                (self.filter_length - self.hop_length) // 2,
-                (self.filter_length - self.hop_length) // 2,
+                # (self.filter_length - self.hop_length) // 2,
+                # (self.filter_length - self.hop_length) // 2,
+                (self.filter_length) // 2,
+                (self.filter_length) // 2,
                 0,
                 0,
             ),
@@ -326,6 +328,9 @@ class MelSTFT(torch.nn.Module):
         )
         mel_basis = torch.from_numpy(mel_basis).float()
         self.register_buffer("mel_basis", mel_basis)
+
+    def to_gpu(self):
+        self.mel_basis.cuda()
 
     def spectral_normalize(self, magnitudes):
         output = dynamic_range_compression(magnitudes)
