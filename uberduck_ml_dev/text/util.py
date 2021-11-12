@@ -2,8 +2,8 @@
 
 __all__ = ['normalize_numbers', 'expand_abbreviations', 'expand_numbers', 'lowercase', 'collapse_whitespace',
            'convert_to_ascii', 'convert_to_arpabet', 'basic_cleaners', 'transliteration_cleaners', 'english_cleaners',
-           'g2p', 'clean_text', 'english_to_arpabet', 'cleaned_text_to_sequence', 'text_to_sequence',
-           'sequence_to_text', 'CLEANERS', 'random_utterance', 'utterances']
+           'english_cleaners_phonemizer', 'g2p', 'clean_text', 'english_to_arpabet', 'cleaned_text_to_sequence',
+           'text_to_sequence', 'sequence_to_text', 'CLEANERS', 'random_utterance', 'utterances']
 
 # Cell
 """ from https://github.com/keithito/tacotron """
@@ -23,6 +23,7 @@ hyperparameter. Some cleaners are English-specific. You'll typically want to use
 import re
 
 from g2p_en import G2p
+from phonemizer import phonemize
 from unidecode import unidecode
 
 from .symbols import curly_re, words_re
@@ -182,6 +183,24 @@ def english_cleaners(text):
     text = lowercase(text)
     text = expand_numbers(text)
     text = expand_abbreviations(text)
+    text = collapse_whitespace(text)
+    return text
+
+
+def english_cleaners_phonemizer(text):
+    """Pipeline for English text to phonemization, including number and abbreviation expansion."""
+    text = convert_to_ascii(text)
+    text = lowercase(text)
+    text = expand_numbers(text)
+    text = expand_abbreviations(text)
+    text = phonemize(
+        text,
+        language="en-us",
+        backend="espeak",
+        strip=True,
+        preserve_punctuation=True,
+        with_stress=True,
+    )
     text = collapse_whitespace(text)
     return text
 
