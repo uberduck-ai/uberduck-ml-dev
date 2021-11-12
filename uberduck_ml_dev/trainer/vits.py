@@ -192,6 +192,7 @@ from ..data_loader import (
     DistributedBucketSampler,
 )
 from ..vendor.tfcompat.hparam import HParams
+from ..utils.plot import save_figure_to_numpy, plot_spectrogram
 from ..utils.utils import slice_segments, clip_grad_value_
 
 # Cell
@@ -275,17 +276,83 @@ class VITSTrainer(TTSTrainer):
             if not hasattr(self, param):
                 raise Exception(f"VITSTrainer missing a required param: {param}")
 
-    def log_training(self):
+    def _log_training(self, loss_gen_all):
         print("log training placeholder...")
+        if self.rank != 0:
+            return
+        self.log("loss/g/total", self.global_step, scalar=loss_gen_all)
+        # self.log("loss/d/total")
+        # self.log("learning_rate")
+        # self.log("grad_norm_d")
+        # self.log("grad_norm_g")
+        # self.log("loss/g/fm")
+        # self.log("loss/g/mel")
+        # self.log("loss/g/dur")
+        # self.log("loss/g/kl")
+        # # images
+        # self.log("slice/mel_org")
+        # self.log("slice/mel_gen")
+        # self.log("all/mel")
+        # sef.log("all/attn")
 
-    def log_validation(self):
+    def _log_validation(self):
+        print("log validation...")
         pass
 
     def warm_start(self):
         pass
 
+    def _batch_to_device(self, *args):
+        ret = []
+        if self.device == "cuda":
+            for arg in args:
+                arg = arg.cuda(self.rank, non_blocking=True)
+                ret.append(arg)
+            return ret
+        else:
+            return args
+
     def _evaluate(self, generator, val_loader):
-        pass
+        print("Validation ...")
+        generator.eval()
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(val_loader):
+                (
+                    x,
+                    x_lengths,
+                    spec,
+                    spec_lengths,
+                    y,
+                    y_lengths,
+                    speakers,
+                ) = self._batch_to_device(*batch)
+                x = x[:1]
+                x_lengths = x_lengths[:1]
+                spec = spec[:1]
+                spec_lengths[:1]
+                y = y[:1]
+                y_lengths = y_lengths[:1]
+                speakers = speakers[:1]
+                break
+            if self.distributed_run:
+                y_hat, attn, mask, *_ = generator.module.infer(
+                    x, x_lengths, speakers, max_len=1000
+                )
+            else:
+                y_hat, attn, mask, *_ = generator.infer(
+                    x, x_lengths, speakers, max_len=1000
+                )
+            y_hat_lengths = mask.sum([1, 2]).long() * self.hparams.hop_length
+            mel = self.mel_stft.spec_to_mel(spec)
+            print("y_hat: ", y_hat.shape)
+            y_hat_mel = self.mel_stft.mel_spectrogram(y_hat.squeeze(1).float())
+        self.log(
+            "Val/mel",
+            self.global_step,
+            image=save_figure_to_numpy(plot_spectrogram(y_hat_mel[0].data.cpu())),
+        )
+        self.log("Val/audio", self.global_step, audio=y_hat[0, :, : y_hat_lengths[0]])
+        generator.train()
 
     def _train_and_evaluate(
         self, epoch, nets, optims, schedulers, scaler: GradScaler, loaders
@@ -297,27 +364,21 @@ class VITSTrainer(TTSTrainer):
         train_loader.batch_sampler.set_epoch(epoch)
         net_g.train()
         net_d.train()
-        for batch_idx, (
-            x,
-            x_lengths,
-            spec,
-            spec_lengths,
-            y,
-            y_lengths,
-            speakers,
-        ) in enumerate(train_loader):
-            print("here")
-            if self.device == "cuda":
-                x, x_lengths = x.cuda(self.rank, non_blocking=True), x_lengths.cuda(
-                    self.rank, non_blocking=True
-                )
-                y, y_lengths = y.cuda(self.rank, non_blocking=True), y_lengths.cuda(
-                    self.rank, non_blocking=True
-                )
-                spec, spec_lengths = spec.cuda(
-                    self.rank, non_blocking=True
-                ), spec_lengths.cuda(self.rank, non_blocking=True)
-                speakers = speakers.cuda(self.rank, non_blocking=True)
+        # TODO (zach): remove.
+        # self._evaluate(net_g, val_loader)
+        for batch_idx, batch in enumerate(train_loader):
+            print(f"global step: {self.global_step}")
+            print(f"batch idx: {batch_idx}")
+            (
+                x,
+                x_lengths,
+                spec,
+                spec_lengths,
+                y,
+                y_lengths,
+                speakers,
+            ) = self._batch_to_device(*batch)
+
             with autocast(enabled=self.fp16_run):
                 (
                     y_hat,
@@ -366,13 +427,16 @@ class VITSTrainer(TTSTrainer):
             scaler.step(optim_g)
             scaler.update()
 
-            self.log_training()
+            self._log_training(loss_gen_all)
             self.global_step += 1
         self._evaluate(net_g, val_loader)
 
     def train(self):
         train_dataset = TextAudioSpeakerLoader(
-            self.training_audiopaths_and_text, self.hparams
+            self.training_audiopaths_and_text,
+            self.hparams,
+            debug=self.debug,
+            debug_dataset_size=self.debug_dataset_size,
         )
         train_sampler = DistributedBucketSampler(
             train_dataset,
@@ -393,7 +457,10 @@ class VITSTrainer(TTSTrainer):
         )
         if self.rank == 0:
             val_dataset = TextAudioSpeakerLoader(
-                self.val_audiopaths_and_text, self.hparams
+                self.val_audiopaths_and_text,
+                self.hparams,
+                debug=self.debug,
+                debug_dataset_size=self.debug_dataset_size,
             )
             val_loader = DataLoader(
                 val_dataset,
