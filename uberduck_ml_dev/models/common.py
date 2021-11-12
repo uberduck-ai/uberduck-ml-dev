@@ -215,6 +215,9 @@ class STFT(torch.nn.Module):
             fft_window = pad_center(fft_window, filter_length)
             fft_window = torch.from_numpy(fft_window).float()
 
+            if device == "cuda":
+                fft_window = fft_window.cuda()
+
             # window the bases
             forward_basis *= fft_window
             inverse_basis *= fft_window
