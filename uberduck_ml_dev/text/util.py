@@ -218,6 +218,7 @@ from .symbols import (
 
 CLEANERS = {
     "english_cleaners": english_cleaners,
+    "english_cleaners_phonemizer": english_cleaners_phonemizer,
     "basic_cleaners": basic_cleaners,
     "transliteration_cleaners": transliteration_cleaners,
 }
