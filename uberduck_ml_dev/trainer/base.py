@@ -90,7 +90,7 @@ class TTSTrainer:
         if self.rank is not None and self.rank != 0:
             return
         if audio is not None:
-            self.writer.add_audio(tag, audio, step, sample_rate=self.sample_rate)
+            self.writer.add_audio(tag, audio, step, sample_rate=self.sampling_rate)
         if scalar is not None:
             self.writer.add_scalar(tag, scalar, step)
         if image is not None:
@@ -431,7 +431,7 @@ class MellotronTrainer(TTSTrainer):
             self.p_arpabet,
             # audio params
             self.n_mel_channels,
-            self.sample_rate,
+            self.sampling_rate,
             self.mel_fmin,
             self.mel_fmax,
             self.filter_length,

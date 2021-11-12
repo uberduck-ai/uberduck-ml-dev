@@ -738,9 +738,7 @@ class SynthesizerTrn(nn.Module):
         w = torch.exp(logw) * x_mask * length_scale
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_mask = torch.unsqueeze(get_mask_from_lengths(y_lengths, None), 1).to(
-            x_mask.dtype
-        )
+        y_mask = torch.unsqueeze(get_mask_from_lengths(y_lengths), 1).to(x_mask.dtype)
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = generate_path(w_ceil, attn_mask)
 

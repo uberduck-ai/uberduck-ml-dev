@@ -233,7 +233,9 @@ class TextAudioSpeakerLoader(Dataset):
     3) computes spectrograms from audio files.
     """
 
-    def __init__(self, audiopaths_sid_text, hparams):
+    def __init__(
+        self, audiopaths_sid_text, hparams, debug=False, debug_dataset_size=None
+    ):
         self.audiopaths_sid_text = load_filepaths_and_text(audiopaths_sid_text)
         self.text_cleaners = hparams.text_cleaners
         self.max_wav_value = hparams.max_wav_value
@@ -242,6 +244,9 @@ class TextAudioSpeakerLoader(Dataset):
         self.hop_length = hparams.hop_length
         self.win_length = hparams.win_length
         self.sampling_rate = hparams.sampling_rate
+
+        self.debug = debug
+        self.debug_dataset_size = debug_dataset_size
 
         self.stft = MelSTFT(
             filter_length=self.filter_length,
@@ -336,7 +341,12 @@ class TextAudioSpeakerLoader(Dataset):
         return self.get_audio_text_speaker_pair(self.audiopaths_sid_text[index])
 
     def __len__(self):
-        return len(self.audiopaths_sid_text)
+        print("debug: ", self.debug)
+        print("debug size: ", self.debug_dataset_size)
+        if self.debug and self.debug_dataset_size:
+            return min(self.debug_dataset_size, len(self.audiopaths_sid_text))
+        else:
+            return len(self.audiopaths_sid_text)
 
 # Cell
 
