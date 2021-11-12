@@ -11,7 +11,7 @@ from ..utils.utils import load_filepaths_and_text
 
 
 def batch(arr, batch_size):
-    for i in range(0, len(ar), batch_size):
+    for i in range(0, len(arr), batch_size):
         yield arr[i : i + batch_size]
 
 
