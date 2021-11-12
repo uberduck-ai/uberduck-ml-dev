@@ -36,6 +36,7 @@ class TTSTrainer:
         self.world_size = world_size
         self.log_dir = hparams.log_dir
         self.seed = hparams.seed
+        torch.manual_seed(self.seed)
 
         if device:
             self.device = device
@@ -506,7 +507,6 @@ class MellotronTrainer(TTSTrainer):
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
 
-        torch.manual_seed(self.seed)
         model = Tacotron2(self.hparams)
         if self.device == "cuda":
             model = model.cuda()
