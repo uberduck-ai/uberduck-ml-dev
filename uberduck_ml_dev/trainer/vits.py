@@ -272,6 +272,8 @@ class VITSTrainer(TTSTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mel_stft = MelSTFT()
+        if self.device == "cuda":
+            self.mel_stft.to_gpu()
         for param in self.REQUIRED_HPARAMS:
             if not hasattr(self, param):
                 raise Exception(f"VITSTrainer missing a required param: {param}")
@@ -390,8 +392,12 @@ class VITSTrainer(TTSTrainer):
                     (z, z_p, m_p, logs_p, m_q, logs_q),
                 ) = net_g(x, x_lengths, spec, spec_lengths, speakers)
                 mel = self.mel_stft.spec_to_mel(spec)
+                # NOTE(zach): slight difference from the original VITS implementation due to padding differences in the spectrograms
                 y_mel = slice_segments(
-                    mel, ids_slice, self.segment_size // self.hop_length
+                    mel,
+                    ids_slice,
+                    self.segment_size // self.hop_length + 1
+                    # mel, ids_slice, self.segment_size // self.hop_length
                 )
                 y_hat_mel = self.mel_stft.mel_spectrogram(y_hat.squeeze(1))
                 y = slice_segments(y, ids_slice * self.hop_length, self.segment_size)
