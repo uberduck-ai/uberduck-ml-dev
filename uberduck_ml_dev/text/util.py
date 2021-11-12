@@ -2,8 +2,8 @@
 
 __all__ = ['normalize_numbers', 'expand_abbreviations', 'expand_numbers', 'lowercase', 'collapse_whitespace',
            'convert_to_ascii', 'convert_to_arpabet', 'basic_cleaners', 'transliteration_cleaners', 'english_cleaners',
-           'g2p', 'clean_text', 'english_to_arpabet', 'text_to_sequence', 'sequence_to_text', 'CLEANERS',
-           'random_utterance', 'utterances']
+           'g2p', 'clean_text', 'english_to_arpabet', 'cleaned_text_to_sequence', 'text_to_sequence',
+           'sequence_to_text', 'CLEANERS', 'random_utterance', 'utterances']
 
 # Cell
 """ from https://github.com/keithito/tacotron """
@@ -190,6 +190,8 @@ def english_cleaners(text):
 import random
 
 from .symbols import (
+    DEFAULT_SYMBOLS,
+    IPA_SYMBOLS,
     id_to_symbol,
     symbols_to_sequence,
     arpabet_to_sequence,
@@ -213,7 +215,11 @@ def english_to_arpabet(english_text):
     arpabet_symbols = g2p(english_text)
 
 
-def text_to_sequence(text, cleaner_names, p_arpabet=0.0):
+def cleaned_text_to_sequence(cleaned_text, symbol_set):
+    return symbols_to_sequence(cleaned_text, symbol_set=symbol_set, ignore_symbols=[])
+
+
+def text_to_sequence(text, cleaner_names, p_arpabet=0.0, symbol_set=DEFAULT_SYMBOLS):
     """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
     in it. For example, "Turn left on {HH AW1 S S T AH0 N} Street."
@@ -253,12 +259,12 @@ def text_to_sequence(text, cleaner_names, p_arpabet=0.0):
     return sequence
 
 
-def sequence_to_text(sequence):
+def sequence_to_text(sequence, symbol_set=DEFAULT_SYMBOLS):
     """Converts a sequence of IDs back to a string"""
     result = ""
     for symbol_id in sequence:
-        if symbol_id in id_to_symbol:
-            s = id_to_symbol[symbol_id]
+        if symbol_id in id_to_symbol[symbol_set]:
+            s = id_to_symbol[symbol_set][symbol_id]
             # Enclose ARPAbet back in curly braces:
             if len(s) > 1 and s[0] == "@":
                 s = "{%s}" % s[1:]

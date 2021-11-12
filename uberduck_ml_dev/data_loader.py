@@ -17,9 +17,10 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from .models.common import STFT, MelSTFT
-from .text.util import text_to_sequence
-from .utils.audio import compute_yin
-from .utils.utils import load_filepaths_and_text
+from .text.symbols import DEFAULT_SYMBOLS, IPA_SYMBOLS
+from .text.util import cleaned_text_to_sequence, text_to_sequence
+from .utils.audio import compute_yin, load_wav_to_torch
+from .utils.utils import load_filepaths_and_text, intersperse
 
 # Cell
 
@@ -242,7 +243,19 @@ class TextAudioSpeakerLoader(Dataset):
         self.win_length = hparams.win_length
         self.sampling_rate = hparams.sampling_rate
 
+        self.stft = MelSTFT(
+            filter_length=self.filter_length,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            n_mel_channels=hparams.n_mel_channels,
+            sampling_rate=hparams.sampling_rate,
+            mel_fmin=hparams.mel_fmin,
+            mel_fmax=hparams.mel_fmax,
+        )
+
         self.cleaned_text = getattr(hparams, "cleaned_text", False)
+        # NOTE(zach): Parametrize this later if desired.
+        self.symbol_set = IPA_SYMBOLS
 
         self.add_blank = hparams.add_blank
         self.min_text_len = getattr(hparams, "min_text_len", 1)
@@ -282,38 +295,36 @@ class TextAudioSpeakerLoader(Dataset):
         return (text, spec, wav, sid)
 
     def get_audio(self, filename):
+        print(filename)
         audio, sampling_rate = load_wav_to_torch(filename)
+        print("loaded wav to torch")
         if sampling_rate != self.sampling_rate:
             raise ValueError(
                 "{} {} SR doesn't match target {} SR".format(
                     sampling_rate, self.sampling_rate
                 )
             )
+
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
         spec_filename = filename.replace(".wav", ".spec.pt")
         if os.path.exists(spec_filename):
             spec = torch.load(spec_filename)
         else:
-            spec = spectrogram_torch(
-                audio_norm,
-                self.filter_length,
-                self.sampling_rate,
-                self.hop_length,
-                self.win_length,
-                center=False,
-            )
+            spec = self.stft.spectrogram(audio_norm)
             spec = torch.squeeze(spec, 0)
             torch.save(spec, spec_filename)
         return spec, audio_norm
 
     def get_text(self, text):
         if self.cleaned_text:
-            text_norm = cleaned_text_to_sequence(text)
+            text_norm = cleaned_text_to_sequence(text, symbol_set=self.symbol_set)
         else:
-            text_norm = text_to_sequence(text, self.text_cleaners)
+            text_norm = text_to_sequence(
+                text, self.text_cleaners, symbol_set=self.symbol_set
+            )
         if self.add_blank:
-            text_norm = commons.intersperse(text_norm, 0)
+            text_norm = intersperse(text_norm, 0)
         text_norm = torch.LongTensor(text_norm)
         return text_norm
 
@@ -458,6 +469,7 @@ class DistributedBucketSampler(DistributedSampler):
         # deterministically shuffle based on epoch
         g = torch.Generator()
         g.manual_seed(self.epoch)
+        print("SFJKSJFLJDSKFJ")
 
         indices = []
         if self.shuffle:
