@@ -330,7 +330,7 @@ class MelSTFT(torch.nn.Module):
         self.register_buffer("mel_basis", mel_basis)
 
     def to_gpu(self):
-        self.mel_basis.cuda()
+        self.mel_basis = self.mel_basis.cuda()
 
     def spectral_normalize(self, magnitudes):
         output = dynamic_range_compression(magnitudes)
