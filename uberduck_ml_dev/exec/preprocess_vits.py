@@ -20,7 +20,7 @@ def flatten(arr):
 
     Only works for depth of 1.
     """
-    reduce(lambda a, b: a + b, arr)
+    return reduce(lambda a, b: a + b, arr)
 
 
 try:
