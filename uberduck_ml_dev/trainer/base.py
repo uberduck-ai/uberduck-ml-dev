@@ -130,7 +130,7 @@ from ..utils.utils import reduce_tensor, get_alignment_metrics
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
         if pos_weight is not None:
-            self.pos_weight = torch.tensor(self.pos_weight)
+            self.pos_weight = torch.tensor(pos_weight)
         else:
             self.pos_weight = pos_weight
 
@@ -486,7 +486,7 @@ class MellotronTrainer(TTSTrainer):
             device=self.device,
             ignore_layers=self.ignore_layers,
         )
-        if "optimizer" in checkpoint:
+        if "optimizer" in checkpoint and len(self.ignore_layers) == 0:
             optimizer.load_state_dict(checkpoint["optimizer"])
         if "iteration" in checkpoint:
             start_epoch = checkpoint["iteration"]
