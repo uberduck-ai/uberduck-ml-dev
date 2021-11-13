@@ -2,7 +2,7 @@
 
 __all__ = ['differenceFunction', 'cumulativeMeanNormalizedDifferenceFunction', 'getPitch', 'compute_yin',
            'convert_to_wav', 'match_target_amplitude', 'modify_leading_silence', 'normalize_audio_segment',
-           'normalize_audio', 'trim_audio', 'MAX_WAV_INT16']
+           'normalize_audio', 'trim_audio', 'MAX_WAV_INT16', 'load_wav_to_torch']
 
 # Cell
 """
@@ -41,6 +41,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # adapted from https://github.com/patriceguyot/Yin
 
 import numpy as np
+from scipy.io.wavfile import read
+import torch
 
 
 def differenceFunction(x, N, tau_max):
@@ -248,3 +250,10 @@ def trim_audio(path, new_path, top_db=20):
     trimmed, _ = librosa.effects.trim(signal, top_db=top_db)
     trimmed = (MAX_WAV_INT16 * trimmed).astype(np.int16)
     write(new_path, sr, trimmed)
+
+# Cell
+
+
+def load_wav_to_torch(path):
+    sr, data = read(path)
+    return torch.FloatTensor(data.astype(np.float32)), sr

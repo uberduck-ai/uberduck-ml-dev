@@ -36,6 +36,7 @@ class TTSTrainer:
         self.world_size = world_size
         self.log_dir = hparams.log_dir
         self.seed = hparams.seed
+        torch.manual_seed(self.seed)
 
         if device:
             self.device = device
@@ -90,7 +91,7 @@ class TTSTrainer:
         if self.rank is not None and self.rank != 0:
             return
         if audio is not None:
-            self.writer.add_audio(tag, audio, step, sample_rate=self.sample_rate)
+            self.writer.add_audio(tag, audio, step, sample_rate=self.sampling_rate)
         if scalar is not None:
             self.writer.add_scalar(tag, scalar, step)
         if image is not None:
@@ -130,7 +131,7 @@ from ..utils.utils import reduce_tensor, get_alignment_metrics
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
         if pos_weight is not None:
-            self.pos_weight = torch.tensor(self.pos_weight)
+            self.pos_weight = torch.tensor(pos_weight)
         else:
             self.pos_weight = pos_weight
 
@@ -431,7 +432,7 @@ class MellotronTrainer(TTSTrainer):
             self.p_arpabet,
             # audio params
             self.n_mel_channels,
-            self.sample_rate,
+            self.sampling_rate,
             self.mel_fmin,
             self.mel_fmax,
             self.filter_length,
@@ -486,7 +487,7 @@ class MellotronTrainer(TTSTrainer):
             device=self.device,
             ignore_layers=self.ignore_layers,
         )
-        if "optimizer" in checkpoint:
+        if "optimizer" in checkpoint and len(self.ignore_layers) == 0:
             optimizer.load_state_dict(checkpoint["optimizer"])
         if "iteration" in checkpoint:
             start_epoch = checkpoint["iteration"]
@@ -506,7 +507,6 @@ class MellotronTrainer(TTSTrainer):
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
 
-        torch.manual_seed(self.seed)
         model = Tacotron2(self.hparams)
         if self.device == "cuda":
             model = model.cuda()
