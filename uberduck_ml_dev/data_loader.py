@@ -117,8 +117,13 @@ class TextMelDataset(Dataset):
         return (text_sequence, melspec, speaker_id, f0)
 
     def __getitem__(self, idx):
-        """Return"""
-        return self._get_data(self.audiopaths_and_text[idx])
+        """Return data for a single audio file + transcription."""
+        try:
+            data = self._get_data(self.audiopaths_and_text[idx])
+        except Exception:
+            print(f"Error while getting data: {self.audiopaths_and_text[idx]}")
+            raise
+        return data
 
     def __len__(self):
         if self.debug and self.debug_dataset_size:
