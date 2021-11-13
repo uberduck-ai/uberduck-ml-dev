@@ -12,7 +12,7 @@ jobs:
     - name: Install OS dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install libsndfile-dev
+        sudo apt-get install espeak libsndfile-dev
     - name: Install the library
       run: |
         pip install nbdev jupyter
