@@ -276,11 +276,14 @@ class VITSTrainer(TTSTrainer):
             if not hasattr(self, param):
                 raise Exception(f"VITSTrainer missing a required param: {param}")
 
-    def _log_training(self, loss_gen_all):
+    def _log_training(self, scalars):
         print("log training placeholder...")
         if self.rank != 0:
             return
-        self.log("loss/g/total", self.global_step, scalar=loss_gen_all)
+        for k, v in scalars.items():
+            pieces = k.split("_")
+            key = "/".join(pieces)
+            self.log(key, self.global_step, scalar=v)
         # self.log("loss/d/total")
         # self.log("learning_rate")
         # self.log("grad_norm_d")
@@ -431,7 +434,21 @@ class VITSTrainer(TTSTrainer):
             scaler.step(optim_g)
             scaler.update()
 
-            self._log_training(loss_gen_all)
+            self._log_training(
+                scalars=dict(
+                    loss_g_total=loss_gen_all,
+                    loss_d_total=loss_disc_all,
+                    gradnorm_d=grad_norm_d,
+                    gradnorm_g=grad_norm_g,
+                    loss_g_fm=loss_fm,
+                    loss_g_dur=loss_dur,
+                    loss_g_mel=loss_mel,
+                    loss_g_kl=loss_kl,
+                )
+                # images=dict(
+                #     slice
+                # )
+            )
             self.global_step += 1
         self._evaluate(net_g, val_loader)
 
@@ -480,7 +497,7 @@ class VITSTrainer(TTSTrainer):
         net_g = SynthesizerTrn(
             len(symbols_with_ipa),
             self.filter_length // 2 + 1,
-            self.segment_size // self.hop_length,
+            self.segment_size // self.hop_length + 1,
             n_speakers=self.n_speakers,
             **model_kwargs,
         )
