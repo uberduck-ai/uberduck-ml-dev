@@ -497,7 +497,7 @@ class VITSTrainer(TTSTrainer):
         net_g = SynthesizerTrn(
             len(symbols_with_ipa),
             self.filter_length // 2 + 1,
-            self.segment_size // self.hop_length + 1,
+            self.segment_size // self.hop_length,
             n_speakers=self.n_speakers,
             **model_kwargs,
         )
