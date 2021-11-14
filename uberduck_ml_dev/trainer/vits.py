@@ -387,7 +387,7 @@ class VITSTrainer(TTSTrainer):
         self.log(
             "Val/audio_gen", self.global_step, audio=y_hat[0, :, : y_hat_lengths[0]]
         )
-        self.log("Val/audio_gt", self.global_step, audio=y[0, :, : y[0]])
+        self.log("Val/audio_gt", self.global_step, audio=y[0, :, : y_lengths[0]])
         generator.train()
 
     def _train_and_evaluate(
