@@ -57,22 +57,37 @@ hann_window = {}
 
 
 def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False):
-    if torch.min(y) < -1.:
-        print('min value is ', torch.min(y))
-    if torch.max(y) > 1.:
-        print('max value is ', torch.max(y))
+    if torch.min(y) < -1.0:
+        print("min value is ", torch.min(y))
+    if torch.max(y) > 1.0:
+        print("max value is ", torch.max(y))
 
     global hann_window
-    dtype_device = str(y.dtype) + '_' + str(y.device)
-    wnsize_dtype_device = str(win_size) + '_' + dtype_device
+    dtype_device = str(y.dtype) + "_" + str(y.device)
+    wnsize_dtype_device = str(win_size) + "_" + dtype_device
     if wnsize_dtype_device not in hann_window:
-        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
+        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(
+            dtype=y.dtype, device=y.device
+        )
 
-    y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft-hop_size)/2), int((n_fft-hop_size)/2)), mode='reflect')
+    y = torch.nn.functional.pad(
+        y.unsqueeze(1),
+        (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
+        mode="reflect",
+    )
     y = y.squeeze(1)
 
-    spec = torch.stft(y, n_fft, hop_length=hop_size, win_length=win_size, window=hann_window[wnsize_dtype_device],
-                      center=center, pad_mode='reflect', normalized=False, onesided=True)
+    spec = torch.stft(
+        y,
+        n_fft,
+        hop_length=hop_size,
+        win_length=win_size,
+        window=hann_window[wnsize_dtype_device],
+        center=center,
+        pad_mode="reflect",
+        normalized=False,
+        onesided=True,
+    )
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
@@ -80,37 +95,58 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
 
 def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
     global mel_basis
-    dtype_device = str(spec.dtype) + '_' + str(spec.device)
-    fmax_dtype_device = str(fmax) + '_' + dtype_device
+    dtype_device = str(spec.dtype) + "_" + str(spec.device)
+    fmax_dtype_device = str(fmax) + "_" + dtype_device
     if fmax_dtype_device not in mel_basis:
         mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(dtype=spec.dtype, device=spec.device)
+        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
+            dtype=spec.dtype, device=spec.device
+        )
     spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
     spec = spectral_normalize_torch(spec)
     return spec
 
 
-def mel_spectrogram_torch(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False):
-    if torch.min(y) < -1.:
-        print('min value is ', torch.min(y))
-    if torch.max(y) > 1.:
-        print('max value is ', torch.max(y))
+def mel_spectrogram_torch(
+    y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False
+):
+    if torch.min(y) < -1.0:
+        print("min value is ", torch.min(y))
+    if torch.max(y) > 1.0:
+        print("max value is ", torch.max(y))
 
     global mel_basis, hann_window
-    dtype_device = str(y.dtype) + '_' + str(y.device)
-    fmax_dtype_device = str(fmax) + '_' + dtype_device
-    wnsize_dtype_device = str(win_size) + '_' + dtype_device
+    dtype_device = str(y.dtype) + "_" + str(y.device)
+    fmax_dtype_device = str(fmax) + "_" + dtype_device
+    wnsize_dtype_device = str(win_size) + "_" + dtype_device
     if fmax_dtype_device not in mel_basis:
         mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(dtype=y.dtype, device=y.device)
+        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
+            dtype=y.dtype, device=y.device
+        )
     if wnsize_dtype_device not in hann_window:
-        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
+        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(
+            dtype=y.dtype, device=y.device
+        )
 
-    y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft-hop_size)/2), int((n_fft-hop_size)/2)), mode='reflect')
+    y = torch.nn.functional.pad(
+        y.unsqueeze(1),
+        (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
+        mode="reflect",
+    )
     y = y.squeeze(1)
 
-    spec = torch.stft(y, n_fft, hop_length=hop_size, win_length=win_size, window=hann_window[wnsize_dtype_device],
-                      center=center, pad_mode='reflect', normalized=False, onesided=True)
+    spec = torch.stft(
+        y,
+        n_fft,
+        hop_length=hop_size,
+        win_length=win_size,
+        window=hann_window[wnsize_dtype_device],
+        center=center,
+        pad_mode="reflect",
+        normalized=False,
+        onesided=True,
+    )
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
 
@@ -231,6 +267,8 @@ class VITSTrainer(TTSTrainer):
         "segment_size",
         "training_audiopaths_and_text",
         "val_audiopaths_and_text",
+        "warm_start_name_g",
+        "warm_start_name_d",
     ]
 
     def __init__(self, *args, **kwargs):
@@ -258,8 +296,39 @@ class VITSTrainer(TTSTrainer):
         print("log validation...")
         pass
 
-    def warm_start(self):
-        pass
+    def save_checkpoint(self, checkpoint_name, model, optimizer, learning_rate, epoch):
+        if self.rank != 0:
+            return
+        if hasattr(model, "module"):
+            state_dict = model.module.state_dict()
+        else:
+            state_dict = model.state_dict()
+        torch.save(
+            {
+                "model": model,
+                "global_step": self.global_step,
+                "optimizer": optimizer.state_dict(),
+                "learning_rate": learning_rate,
+                "epoch": epoch,
+            },
+            os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt"),
+        )
+
+    def warm_start(self, net_g, net_d, optim_g, optim_d):
+        if not (self.warm_start_name_g and self.warm_start_name_d):
+            return net_g, net_d, optim_g, optim_d, 0
+        if self.warm_start_name_g:
+            checkpoint = torch.load(self.warm_start_name_g)
+            net_g.load_state_dict(checkpoint["model"])
+            optim_g.load_state_dict(checkpoint["optimizer"])
+        if self.warm_start_name_d:
+            checkpoint = torch.load(self.warm_start_name_d)
+            net_d.load_state_dict(checkpoint["model"])
+            optim_d.load_state_dict(checkpoint["optimizer"])
+        self.global_step = checkpoint["global_step"]
+        self.learning_rate = checkpoint["learning_rate"]
+        start_epoch = checkpoint["epoch"]
+        return net_g, net_d, optim_g, optim_d, start_epoch
 
     def _batch_to_device(self, *args):
         ret = []
@@ -315,7 +384,9 @@ class VITSTrainer(TTSTrainer):
             self.global_step,
             image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
         )
-        self.log("Val/audio_gen", self.global_step, audio=y_hat[0, :, : y_hat_lengths[0]])
+        self.log(
+            "Val/audio_gen", self.global_step, audio=y_hat[0, :, : y_hat_lengths[0]]
+        )
         self.log("Val/audio_gt", self.global_step, audio=y[0, :, : y[0]])
         generator.train()
 
@@ -329,8 +400,8 @@ class VITSTrainer(TTSTrainer):
         train_loader.batch_sampler.set_epoch(epoch)
         net_g.train()
         net_d.train()
-        # TODO (zach): remove.
-        # self._evaluate(net_g, val_loader)
+        # TODO (zach): remove when you want to.
+        self._evaluate(net_g, val_loader)
         for batch_idx, batch in enumerate(train_loader):
             print(f"global step: {self.global_step}")
             print(f"batch idx: {batch_idx}")
@@ -509,9 +580,9 @@ class VITSTrainer(TTSTrainer):
             net_d = DDP(net_d, device_ids=[self.rank])
 
         start_epoch = 0
-        if self.warm_start_name:
-            # TODO
-            pass
+        net_g, net_d, optim_g, optim_d, start_epoch = self.warm_start(
+            net_g, net_d, optim_g, optim_d, start_epoch
+        )
 
         scheduler_g = ExponentialLR(
             optim_g, gamma=self.lr_decay, last_epoch=start_epoch - 1
@@ -531,4 +602,17 @@ class VITSTrainer(TTSTrainer):
                 [train_loader, val_loader],
             )
             if epoch % self.epochs_per_checkpoint == 0:
-                self.save_checkpoint(f"vits_{epoch}")
+                self.save_checkpoint(
+                    f"vits_G_{self.global_step}",
+                    net_g,
+                    optim_g,
+                    self.learning_rate,
+                    epoch,
+                )
+                self.save_checkpoint(
+                    f"vits_D_{self.global_step}",
+                    net_d,
+                    optim_d,
+                    self.learning_rate,
+                    epoch,
+                )
