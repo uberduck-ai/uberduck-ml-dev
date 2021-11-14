@@ -345,6 +345,7 @@ class MelSTFT(torch.nn.Module):
         output = dynamic_range_decompression(magnitudes)
         return output
 
+    @torch.no_grad()
     def spec_to_mel(self, spec):
         mel_output = torch.matmul(self.mel_basis, spec)
         mel_output = self.spectral_normalize(mel_output)
@@ -356,6 +357,7 @@ class MelSTFT(torch.nn.Module):
         magnitudes, phases = self.stft_fn.transform(y)
         return magnitudes.data
 
+    @torch.no_grad()
     def mel_spectrogram(self, y, ref_level_db=20, magnitude_power=1.5):
         """Computes mel-spectrograms from a batch of waves
         PARAMS
@@ -373,6 +375,7 @@ class MelSTFT(torch.nn.Module):
         magnitudes = magnitudes.data
         return self.spec_to_mel(magnitudes)
 
+    @torch.no_grad()
     def griffin_lim(self, mel_spectrogram, n_iters=30):
         mel_dec = self.spectral_de_normalize(mel_spectrogram)
         # Float cast required for fp16 training.
