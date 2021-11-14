@@ -351,6 +351,7 @@ class MelSTFT(torch.nn.Module):
         mel_output = self.spectral_normalize(mel_output)
         return mel_output
 
+    @torch.no_grad()
     def spectrogram(self, y):
         assert torch.min(y.data) >= -1
         assert torch.max(y.data) <= 1
