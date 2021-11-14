@@ -581,7 +581,10 @@ class VITSTrainer(TTSTrainer):
 
         start_epoch = 0
         net_g, net_d, optim_g, optim_d, start_epoch = self.warm_start(
-            net_g, net_d, optim_g, optim_d,
+            net_g,
+            net_d,
+            optim_g,
+            optim_d,
         )
 
         scheduler_g = ExponentialLR(
