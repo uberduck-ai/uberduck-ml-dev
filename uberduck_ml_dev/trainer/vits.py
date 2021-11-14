@@ -401,7 +401,7 @@ class VITSTrainer(TTSTrainer):
         net_g.train()
         net_d.train()
         # TODO (zach): remove when you want to.
-        self._evaluate(net_g, val_loader)
+        # self._evaluate(net_g, val_loader)
         for batch_idx, batch in enumerate(train_loader):
             print(f"global step: {self.global_step}")
             print(f"batch idx: {batch_idx}")
@@ -425,15 +425,15 @@ class VITSTrainer(TTSTrainer):
                     z_mask,
                     (z, z_p, m_p, logs_p, m_q, logs_q),
                 ) = net_g(x, x_lengths, spec, spec_lengths, speakers)
-                # mel = self.mel_stft.spec_to_mel(spec)
-                mel = spec_to_mel_torch(
-                    spec,
-                    self.filter_length,
-                    self.n_mel_channels,
-                    self.sampling_rate,
-                    self.mel_fmin,
-                    self.mel_fmax,
-                )
+                mel = self.mel_stft.spec_to_mel(spec)
+                # mel = spec_to_mel_torch(
+                #     spec,
+                #     self.filter_length,
+                #     self.n_mel_channels,
+                #     self.sampling_rate,
+                #     self.mel_fmin,
+                #     self.mel_fmax,
+                # )
                 # NOTE(zach): slight difference from the original VITS implementation due to padding differences in the spectrograms
                 y_mel = slice_segments(
                     mel,
@@ -441,17 +441,17 @@ class VITSTrainer(TTSTrainer):
                     self.segment_size // self.hop_length + 1
                     # mel, ids_slice, self.segment_size // self.hop_length
                 )
-                # y_hat_mel = self.mel_stft.mel_spectrogram(y_hat.squeeze(1))
-                y_hat_mel = mel_spectrogram_torch(
-                    y_hat.squeeze(1),
-                    self.filter_length,
-                    self.n_mel_channels,
-                    self.sampling_rate,
-                    self.hop_length,
-                    self.win_length,
-                    self.mel_fmin,
-                    self.mel_fmax,
-                )
+                y_hat_mel = self.mel_stft.mel_spectrogram(y_hat.squeeze(1))
+                # y_hat_mel = mel_spectrogram_torch(
+                #     y_hat.squeeze(1),
+                #     self.filter_length,
+                #     self.n_mel_channels,
+                #     self.sampling_rate,
+                #     self.hop_length,
+                #     self.win_length,
+                #     self.mel_fmin,
+                #     self.mel_fmax,
+                # )
                 y = slice_segments(y, ids_slice * self.hop_length, self.segment_size)
 
                 # Discriminator
@@ -581,10 +581,7 @@ class VITSTrainer(TTSTrainer):
 
         start_epoch = 0
         net_g, net_d, optim_g, optim_d, start_epoch = self.warm_start(
-            net_g,
-            net_d,
-            optim_g,
-            optim_d,
+            net_g, net_d, optim_g, optim_d,
         )
 
         scheduler_g = ExponentialLR(
