@@ -303,6 +303,7 @@ class VITSTrainer(TTSTrainer):
             state_dict = model.module.state_dict()
         else:
             state_dict = model.state_dict()
+        os.makedirs(self.checkpoint_path, exist_ok=True)
         torch.save(
             {
                 "model": model,
