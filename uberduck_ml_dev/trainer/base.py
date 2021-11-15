@@ -141,16 +141,21 @@ class Tacotron2Loss(nn.Module):
         mel_target, gate_target = target[0], target[1]
         mel_target.requires_grad = False
         gate_target.requires_grad = False
-        gate_target = gate_target.view(-1, 1)
+        # gate_target = gate_target.view(-1, 1)
         mel_out, mel_out_postnet, gate_out, _ = model_output
-        gate_out = gate_out.view(-1, 1)
-        mel_loss = nn.MSELoss()(mel_out, mel_target) + nn.MSELoss()(
-            mel_out_postnet, mel_target
-        )
-        gate_loss = nn.BCEWithLogitsLoss(pos_weight=self.pos_weight)(
+        # gate_out = gate_out.view(-1, 1)
+        mel_loss_batch = nn.MSELoss(reduction="none")(mel_out, mel_target).mean(
+            axis=[1, 2]
+        ) + nn.MSELoss(reduction="none")(mel_out_postnet, mel_target).mean(axis=[1, 2])
+
+        mel_loss = mel_loss_batch.mean()
+
+        gate_loss_batch = nn.BCEWithLogitsLoss(pos_weight=None, reduce=False)(
             gate_out, gate_target
-        )
-        return mel_loss, gate_loss
+        ).mean(axis=[1])
+        gate_loss = torch.mean(gate_loss_batch)
+
+        return mel_loss, gate_loss, mel_loss_batch, gate_loss_batch
 
 
 class MellotronTrainer(TTSTrainer):
@@ -179,6 +184,8 @@ class MellotronTrainer(TTSTrainer):
         loss,
         mel_loss,
         gate_loss,
+        mel_loss_batch,
+        gate_loss_batch,
         grad_norm,
         step_duration_seconds,
     ):
@@ -193,6 +200,27 @@ class MellotronTrainer(TTSTrainer):
             self.global_step,
             scalar=step_duration_seconds,
         )
+
+        batch_levels = X[5]
+        batch_levels_unique = torch.unique(batch_levels)
+        for l in batch_levels_unique:
+            mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
+            self.log(
+                "MelLoss/train/" + str(l),
+                self.global_step,
+                scalar=mlb,
+            )
+            glb = gate_loss_batch[torch.where(batch_levels == l)[0]].mean()
+            self.log(
+                "GateLoss/train/" + str(l),
+                self.global_step,
+                scalar=glb,
+            )
+            self.log(
+                "Loss/train/" + str(l),
+                self.global_step,
+                scalar=mlb + glb,
+            )
 
         if self.global_step % self.steps_per_sample == 0:
             _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
@@ -359,7 +387,9 @@ class MellotronTrainer(TTSTrainer):
                 else:
                     X, y = model.parse_batch(batch)
                 y_pred = model(X)
-                mel_loss, gate_loss = criterion(y_pred, y)
+                mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
+                    y_pred, y
+                )
                 if self.distributed_run:
                     reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
                     reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
@@ -543,12 +573,21 @@ class MellotronTrainer(TTSTrainer):
                 if self.fp16_run:
                     with autocast():
                         y_pred = model(X)
-                        mel_loss, gate_loss = criterion(y_pred, y)
+                        (
+                            mel_loss,
+                            gate_loss,
+                            mel_loss_batch,
+                            gate_loss_batch,
+                        ) = criterion(y_pred, y)
                         loss = mel_loss + gate_loss
+                        loss_batch = mel_loss_batch + gate_loss_batch
                 else:
                     y_pred = model(X)
-                    mel_loss, gate_loss = criterion(y_pred, y)
+                    mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
+                        y_pred, y
+                    )
                     loss = mel_loss + gate_loss
+                    loss_batch = mel_loss_batch + gate_loss_batch
 
                 if self.distributed_run:
                     reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
@@ -557,8 +596,11 @@ class MellotronTrainer(TTSTrainer):
                 else:
                     reduced_mel_loss = mel_loss.item()
                     reduced_gate_loss = gate_loss.item()
-                reduced_loss = reduced_mel_loss + reduced_gate_loss
+                    reduced_gate_loss_batch = gate_loss_batch  # .item()
+                    reduced_mel_loss_batch = mel_loss_batch  # .item()
 
+                reduced_loss = reduced_mel_loss + reduced_gate_loss
+                reduced_loss_batch = reduced_gate_loss_batch + reduced_mel_loss_batch
                 if self.fp16_run:
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
@@ -582,6 +624,8 @@ class MellotronTrainer(TTSTrainer):
                     reduced_loss,
                     reduced_mel_loss,
                     reduced_gate_loss,
+                    reduced_mel_loss_batch,
+                    reduced_gate_loss_batch,
                     grad_norm,
                     step_duration_seconds,
                 )
