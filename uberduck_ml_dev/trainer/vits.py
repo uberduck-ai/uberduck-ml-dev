@@ -114,15 +114,36 @@ class VITSTrainer(TTSTrainer):
         "segment_size",
         "training_audiopaths_and_text",
         "val_audiopaths_and_text",
+        "warm_start_name_g",
+        "warm_start_name_d",
     ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mel_stft = MelSTFT(device=self.device)
         self.log_interval = 10
         for param in self.REQUIRED_HPARAMS:
             if not hasattr(self, param):
                 raise Exception(f"VITSTrainer missing a required param: {param}")
+        self.mel_stft = MelSTFT(
+            device=self.device,
+            rank=self.rank,
+            padding=(self.filter_length - self.hop_length) // 2,
+        )
+
+    def init_distributed(self):
+        if not self.distributed_run:
+            return
+        if self.rank is None or self.world_size is None:
+            raise Exception(
+                "Rank and wrld size must be provided when distributed training"
+            )
+        dist.init_process_group(
+            "nccl",
+            init_method="tcp://localhost:54321",
+            rank=self.rank,
+            world_size=self.world_size,
+        )
+        torch.cuda.set_device(self.rank)
 
     def _log_training(self, scalars, images):
         print("log training placeholder...")
@@ -141,8 +162,40 @@ class VITSTrainer(TTSTrainer):
         print("log validation...")
         pass
 
-    def warm_start(self):
-        pass
+    def save_checkpoint(self, checkpoint_name, model, optimizer, learning_rate, epoch):
+        if self.rank != 0:
+            return
+        if hasattr(model, "module"):
+            state_dict = model.module.state_dict()
+        else:
+            state_dict = model.state_dict()
+        os.makedirs(self.checkpoint_path, exist_ok=True)
+        torch.save(
+            {
+                "model": model,
+                "global_step": self.global_step,
+                "optimizer": optimizer.state_dict(),
+                "learning_rate": learning_rate,
+                "epoch": epoch,
+            },
+            os.path.join(self.checkpoint_path, f"{checkpoint_name}.pt"),
+        )
+
+    def warm_start(self, net_g, net_d, optim_g, optim_d):
+        if not (self.warm_start_name_g and self.warm_start_name_d):
+            return net_g, net_d, optim_g, optim_d, 0
+        if self.warm_start_name_g:
+            checkpoint = torch.load(self.warm_start_name_g)
+            net_g.load_state_dict(checkpoint["model"])
+            optim_g.load_state_dict(checkpoint["optimizer"])
+        if self.warm_start_name_d:
+            checkpoint = torch.load(self.warm_start_name_d)
+            net_d.load_state_dict(checkpoint["model"])
+            optim_d.load_state_dict(checkpoint["optimizer"])
+        self.global_step = checkpoint["global_step"]
+        self.learning_rate = checkpoint["learning_rate"]
+        start_epoch = checkpoint["epoch"]
+        return net_g, net_d, optim_g, optim_d, start_epoch
 
     def _batch_to_device(self, *args):
         ret = []
@@ -186,14 +239,21 @@ class VITSTrainer(TTSTrainer):
                 )
             y_hat_lengths = mask.sum([1, 2]).long() * self.hparams.hop_length
             mel = self.mel_stft.spec_to_mel(spec)
-            print("y_hat: ", y_hat.shape)
             y_hat_mel = self.mel_stft.mel_spectrogram(y_hat.squeeze(1).float())
         self.log(
-            "Val/mel",
+            "Val/mel_gen",
             self.global_step,
             image=save_figure_to_numpy(plot_spectrogram(y_hat_mel[0].data.cpu())),
         )
-        self.log("Val/audio", self.global_step, audio=y_hat[0, :, : y_hat_lengths[0]])
+        self.log(
+            "Val/mel_gt",
+            self.global_step,
+            image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
+        )
+        self.log(
+            "Val/audio_gen", self.global_step, audio=y_hat[0, :, : y_hat_lengths[0]]
+        )
+        self.log("Val/audio_gt", self.global_step, audio=y[0, :, : y_lengths[0]])
         generator.train()
 
     def _train_and_evaluate(
@@ -206,7 +266,7 @@ class VITSTrainer(TTSTrainer):
         train_loader.batch_sampler.set_epoch(epoch)
         net_g.train()
         net_d.train()
-        # TODO (zach): remove.
+        # TODO (zach): remove when you want to.
         # self._evaluate(net_g, val_loader)
         for batch_idx, batch in enumerate(train_loader):
             print(f"global step: {self.global_step}")
@@ -232,12 +292,10 @@ class VITSTrainer(TTSTrainer):
                     (z, z_p, m_p, logs_p, m_q, logs_q),
                 ) = net_g(x, x_lengths, spec, spec_lengths, speakers)
                 mel = self.mel_stft.spec_to_mel(spec)
-                # NOTE(zach): slight difference from the original VITS implementation due to padding differences in the spectrograms
+                # NOTE(zach): slight difference from the original VITS
+                # implementation due to padding differences in the spectrograms
                 y_mel = slice_segments(
-                    mel,
-                    ids_slice,
-                    self.segment_size // self.hop_length + 1
-                    # mel, ids_slice, self.segment_size // self.hop_length
+                    mel, ids_slice, self.segment_size // self.hop_length
                 )
                 y_hat_mel = self.mel_stft.mel_spectrogram(y_hat.squeeze(1))
                 y = slice_segments(y, ids_slice * self.hop_length, self.segment_size)
@@ -252,7 +310,6 @@ class VITSTrainer(TTSTrainer):
             optim_d.zero_grad()
             scaler.scale(loss_disc_all).backward()
             scaler.unscale_(optim_d)
-            grad_norm_d = clip_grad_value_(net_d.parameters(), None)
             scaler.step(optim_d)
 
             with autocast(enabled=self.fp16_run):
@@ -269,38 +326,45 @@ class VITSTrainer(TTSTrainer):
             optim_g.zero_grad()
             scaler.scale(loss_gen_all).backward()
             scaler.unscale_(optim_g)
-            grad_norm_g = clip_grad_value_(net_g.parameters(), None)
             scaler.step(optim_g)
             scaler.update()
 
-            self._log_training(
-                scalars=dict(
-                    loss_g_total=loss_gen_all,
-                    loss_d_total=loss_disc_all,
-                    gradnorm_d=grad_norm_d,
-                    gradnorm_g=grad_norm_g,
-                    loss_g_fm=loss_fm,
-                    loss_g_dur=loss_dur,
-                    loss_g_mel=loss_mel,
-                    loss_g_kl=loss_kl,
-                ),
-                images=dict(
-                    slice_mel_org=save_figure_to_numpy(
-                        plot_spectrogram(y_mel[0].data.cpu())
+            if self.rank == 0 and self.global_step % self.log_interval == 0:
+                grad_norm_g = clip_grad_value_(net_g.parameters(), None)
+                grad_norm_d = clip_grad_value_(net_d.parameters(), None)
+                self._log_training(
+                    scalars=dict(
+                        loss_g_total=loss_gen_all,
+                        loss_d_total=loss_disc_all,
+                        gradnorm_d=grad_norm_d,
+                        gradnorm_g=grad_norm_g,
+                        loss_g_fm=loss_fm,
+                        loss_g_dur=loss_dur,
+                        loss_g_mel=loss_mel,
+                        loss_g_kl=loss_kl,
                     ),
-                    slice_mel_gen=save_figure_to_numpy(
-                        plot_spectrogram(y_hat_mel[0].data.cpu())
+                    images=dict(
+                        slice_mel_org=save_figure_to_numpy(
+                            plot_spectrogram(y_mel[0].data.cpu())
+                        ),
+                        slice_mel_gen=save_figure_to_numpy(
+                            plot_spectrogram(y_hat_mel[0].data.cpu())
+                        ),
+                        all_mel=save_figure_to_numpy(
+                            plot_spectrogram(mel[0].data.cpu())
+                        ),
+                        all_attn=save_figure_to_numpy(
+                            plot_attention(attn[0, 0].data.cpu())
+                        ),
                     ),
-                    all_mel=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
-                    all_attn=save_figure_to_numpy(
-                        plot_attention(attn[0, 0].data.cpu())
-                    ),
-                ),
-            )
+                )
             self.global_step += 1
-        self._evaluate(net_g, val_loader)
+        if self.rank == 0:
+            self._evaluate(net_g, val_loader)
 
     def train(self):
+        if self.distributed_run:
+            self.init_distributed()
         train_dataset = TextAudioSpeakerLoader(
             self.training_audiopaths_and_text,
             self.hparams,
@@ -324,6 +388,7 @@ class VITSTrainer(TTSTrainer):
             collate_fn=collate_fn,
             batch_sampler=train_sampler,
         )
+        val_dataset, val_loader = None, None
         if self.rank == 0:
             val_dataset = TextAudioSpeakerLoader(
                 self.val_audiopaths_and_text,
@@ -368,9 +433,12 @@ class VITSTrainer(TTSTrainer):
             net_d = DDP(net_d, device_ids=[self.rank])
 
         start_epoch = 0
-        if self.warm_start_name:
-            # TODO
-            pass
+        net_g, net_d, optim_g, optim_d, start_epoch = self.warm_start(
+            net_g,
+            net_d,
+            optim_g,
+            optim_d,
+        )
 
         scheduler_g = ExponentialLR(
             optim_g, gamma=self.lr_decay, last_epoch=start_epoch - 1
@@ -390,4 +458,17 @@ class VITSTrainer(TTSTrainer):
                 [train_loader, val_loader],
             )
             if epoch % self.epochs_per_checkpoint == 0:
-                self.save_checkpoint(f"vits_{epoch}")
+                self.save_checkpoint(
+                    f"vits_G_{self.global_step}",
+                    net_g,
+                    optim_g,
+                    self.learning_rate,
+                    epoch,
+                )
+                self.save_checkpoint(
+                    f"vits_D_{self.global_step}",
+                    net_d,
+                    optim_d,
+                    self.learning_rate,
+                    epoch,
+                )

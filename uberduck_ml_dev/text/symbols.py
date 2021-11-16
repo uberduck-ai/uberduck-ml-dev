@@ -46,7 +46,7 @@ import re
 
 symbol_to_id = {
     DEFAULT_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
-    IPA_SYMBOLS: {s: i for s, i in enumerate(SYMBOL_SETS[IPA_SYMBOLS])},
+    IPA_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[IPA_SYMBOLS])},
 }
 id_to_symbol = {
     DEFAULT_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
