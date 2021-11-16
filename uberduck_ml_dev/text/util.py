@@ -2,8 +2,9 @@
 
 __all__ = ['normalize_numbers', 'expand_abbreviations', 'expand_numbers', 'lowercase', 'collapse_whitespace',
            'convert_to_ascii', 'convert_to_arpabet', 'basic_cleaners', 'transliteration_cleaners', 'english_cleaners',
-           'g2p', 'clean_text', 'english_to_arpabet', 'text_to_sequence', 'sequence_to_text', 'CLEANERS',
-           'random_utterance', 'utterances']
+           'english_cleaners_phonemizer', 'batch_english_cleaners_phonemizer', 'g2p', 'batch_clean_text', 'clean_text',
+           'english_to_arpabet', 'cleaned_text_to_sequence', 'text_to_sequence', 'sequence_to_text', 'BATCH_CLEANERS',
+           'CLEANERS', 'random_utterance', 'utterances']
 
 # Cell
 """ from https://github.com/keithito/tacotron """
@@ -21,8 +22,10 @@ hyperparameter. Some cleaners are English-specific. You'll typically want to use
 
 
 import re
+from typing import List
 
 from g2p_en import G2p
+from phonemizer import phonemize
 from unidecode import unidecode
 
 from .symbols import curly_re, words_re
@@ -185,21 +188,73 @@ def english_cleaners(text):
     text = collapse_whitespace(text)
     return text
 
+
+def english_cleaners_phonemizer(text):
+    """Pipeline for English text to phonemization, including number and abbreviation expansion."""
+    text = convert_to_ascii(text)
+    text = lowercase(text)
+    text = expand_numbers(text)
+    text = expand_abbreviations(text)
+    text = phonemize(
+        text,
+        language="en-us",
+        backend="espeak",
+        strip=True,
+        preserve_punctuation=True,
+        with_stress=True,
+    )
+    text = collapse_whitespace(text)
+    return text
+
+
+def batch_english_cleaners_phonemizer(text: List[str]):
+    batch = []
+    for t in text:
+        t = convert_to_ascii(t)
+        t = lowercase(t)
+        t = expand_numbers(t)
+        t = expand_abbreviations(t)
+        batch.append(t)
+    batch = phonemize(
+        batch,
+        language="en-us",
+        backend="espeak",
+        strip=True,
+        preserve_punctuation=True,
+        with_stress=True,
+    )
+    batch = [collapse_whitespace(t) for t in batch]
+    return batch
+
 # Cell
 
 import random
 
 from .symbols import (
+    DEFAULT_SYMBOLS,
+    IPA_SYMBOLS,
     id_to_symbol,
     symbols_to_sequence,
     arpabet_to_sequence,
 )
 
+BATCH_CLEANERS = {
+    "english_cleaners_phonemizer": batch_english_cleaners_phonemizer,
+}
+
 CLEANERS = {
     "english_cleaners": english_cleaners,
+    "english_cleaners_phonemizer": english_cleaners_phonemizer,
     "basic_cleaners": basic_cleaners,
     "transliteration_cleaners": transliteration_cleaners,
 }
+
+
+def batch_clean_text(text: List[str], cleaner_names):
+    for name in cleaner_names:
+        cleaner = BATCH_CLEANERS[name]
+        text = cleaner(text)
+    return text
 
 
 def clean_text(text, cleaner_names):
@@ -213,7 +268,11 @@ def english_to_arpabet(english_text):
     arpabet_symbols = g2p(english_text)
 
 
-def text_to_sequence(text, cleaner_names, p_arpabet=0.0):
+def cleaned_text_to_sequence(cleaned_text, symbol_set):
+    return symbols_to_sequence(cleaned_text, symbol_set=symbol_set, ignore_symbols=[])
+
+
+def text_to_sequence(text, cleaner_names, p_arpabet=0.0, symbol_set=DEFAULT_SYMBOLS):
     """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
     in it. For example, "Turn left on {HH AW1 S S T AH0 N} Street."
@@ -253,12 +312,12 @@ def text_to_sequence(text, cleaner_names, p_arpabet=0.0):
     return sequence
 
 
-def sequence_to_text(sequence):
+def sequence_to_text(sequence, symbol_set=DEFAULT_SYMBOLS):
     """Converts a sequence of IDs back to a string"""
     result = ""
     for symbol_id in sequence:
-        if symbol_id in id_to_symbol:
-            s = id_to_symbol[symbol_id]
+        if symbol_id in id_to_symbol[symbol_set]:
+            s = id_to_symbol[symbol_set][symbol_id]
             # Enclose ARPAbet back in curly braces:
             if len(s) > 1 and s[0] == "@":
                 s = "{%s}" % s[1:]
