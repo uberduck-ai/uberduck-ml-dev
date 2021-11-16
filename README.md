@@ -1,4 +1,6 @@
-# 🦆 Uberduck TTS
+# 🦆 Uberduck TTS ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
+
+[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with audio machine learning, currently focused on voice cloning and neural text-to-speech. This repository includes development tools to get started with creating your own speech synthesis model.
 
 ## Development
 
