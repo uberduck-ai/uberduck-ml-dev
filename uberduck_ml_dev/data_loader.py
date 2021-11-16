@@ -256,6 +256,7 @@ class TextAudioSpeakerLoader(Dataset):
             sampling_rate=hparams.sampling_rate,
             mel_fmin=hparams.mel_fmin,
             mel_fmax=hparams.mel_fmax,
+            padding=(self.filter_length - self.hop_length) // 2,
         )
 
         self.cleaned_text = getattr(hparams, "cleaned_text", False)
@@ -310,7 +311,7 @@ class TextAudioSpeakerLoader(Dataset):
 
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
-        spec_filename = filename.replace(".wav", ".spec.pt")
+        spec_filename = filename.replace(".wav", ".uberduck.spec.pt")
         if os.path.exists(spec_filename):
             spec = torch.load(spec_filename)
         else:
@@ -339,8 +340,6 @@ class TextAudioSpeakerLoader(Dataset):
         return self.get_audio_text_speaker_pair(self.audiopaths_sid_text[index])
 
     def __len__(self):
-        print("debug: ", self.debug)
-        print("debug size: ", self.debug_dataset_size)
         if self.debug and self.debug_dataset_size:
             return min(self.debug_dataset_size, len(self.audiopaths_sid_text))
         else:
