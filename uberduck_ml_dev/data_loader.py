@@ -256,6 +256,7 @@ class TextAudioSpeakerLoader(Dataset):
             sampling_rate=hparams.sampling_rate,
             mel_fmin=hparams.mel_fmin,
             mel_fmax=hparams.mel_fmax,
+            padding=(self.filter_length - self.hop_length) // 2,
         )
 
         self.cleaned_text = getattr(hparams, "cleaned_text", False)
