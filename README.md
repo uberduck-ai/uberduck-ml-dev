@@ -1,6 +1,15 @@
 # 🦆 Uberduck TTS ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
+
+
+<h1>Table of Contents<span class="tocSkip"></span></h1>
+<div class="toc"><ul class="toc-item"><li><span><a href="#🦆-Uberduck-TTS---" data-toc-modified-id="🦆-Uberduck-TTS----1"><span class="toc-item-num">1&nbsp;&nbsp;</span>🦆 Uberduck TTS <img src="https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev" alt=""></a></span><ul class="toc-item"><li><span><a href="#Installation" data-toc-modified-id="Installation-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Installation</a></span></li><li><span><a href="#Development" data-toc-modified-id="Development-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Development</a></span><ul class="toc-item"><li><span><a href="#🚩-Testing" data-toc-modified-id="🚩-Testing-1.2.1"><span class="toc-item-num">1.2.1&nbsp;&nbsp;</span>🚩 Testing</a></span></li></ul></li><li><span><a href="#📦️-nbdev" data-toc-modified-id="📦️-nbdev-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>📦️ nbdev</a></span><ul class="toc-item"><li><span><a href="#🔧-Troubleshooting-Tips" data-toc-modified-id="🔧-Troubleshooting-Tips-1.3.1"><span class="toc-item-num">1.3.1&nbsp;&nbsp;</span>🔧 Troubleshooting Tips</a></span></li></ul></li><li><span><a href="#Overview" data-toc-modified-id="Overview-1.4"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Overview</a></span></li></ul></li></ul></div>
+
 [**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with audio machine learning, currently focused on voice cloning and neural text-to-speech. This repository includes development tools to get started with creating your own speech synthesis model.
+
+## Installation
+
+TODO
 
 ## Development
 
@@ -52,3 +61,16 @@ _If you are using an older version of this template, and want to upgrade to the 
 -  If you change the name of your repo, you have to make the appropriate changes in `settings.ini`
 -  After you make changes to `settings.ini`, run `nbdev_build_lib && nbdev_clean_nbs && nbdev_build_docs` to make sure all changes are propagated appropriately.
 
+
+This file will become your README and also the index of your documentation.
+
+## Overview
+
+An overview of the subpackages in this library:
+
+`models`: TTS model implementations. All models descend from `models.base.TTSModel`.
+
+`trainer`: A trainer has logic for training a model.
+
+`exec`: Contains entrypoint scripts for running training jobs. Executed via a command like
+`python -m uberduck_ml_dev.exec.train_tacotron2 --your-args here`

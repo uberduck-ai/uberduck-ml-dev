@@ -13,8 +13,29 @@ entries:
       title: Title
       url: vendor.tfcompat.hparam.html
     - output: web,pdf
-      title: New heading
-      url: exec.train_tacotron2.html
+      title: TextMelDataset
+      url: data_loader.html
+    - output: web,pdf
+      title: uberduck_ml_dev.exec.generate_filelist
+      url: exec.generate_filelist.html
+    - output: web,pdf
+      title: uberduck_ml_dev.exec.select_speakers
+      url: exec.select_speakers.html
+    - output: web,pdf
+      title: uberduck_ml_dev.exec.split_train_val
+      url: exec.split_train_val.html
+    - output: web,pdf
+      title: Main
+      url: exec.train_vits.html
+    - output: web,pdf
+      title: VITS Attentions
+      url: models.attentions.html
+    - output: web,pdf
+      title: 'VITS common '
+      url: models.common.html
+    - output: web,pdf
+      title: Debugging
+      url: trainer.vits.html
     output: web
     title: uberduck_ml_dev
   output: web
