@@ -150,9 +150,9 @@ class Tacotron2Loss(nn.Module):
 
         mel_loss = mel_loss_batch.mean()
 
-        gate_loss_batch = nn.BCEWithLogitsLoss(pos_weight=None, reduce=False)(
-            gate_out, gate_target
-        ).mean(axis=[1])
+        gate_loss_batch = nn.BCEWithLogitsLoss(
+            pos_weight=self.pos_weight, reduce=False
+        )(gate_out, gate_target).mean(axis=[1])
         gate_loss = torch.mean(gate_loss_batch)
 
         return mel_loss, gate_loss, mel_loss_batch, gate_loss_batch
