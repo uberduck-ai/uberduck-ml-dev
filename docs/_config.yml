@@ -64,3 +64,4 @@ plugins:
     
 remote_theme: fastai/nbdev-jekyll-theme
 baseurl: /uberduck_ml_dev/
+theme: jekyll-theme-cayman
