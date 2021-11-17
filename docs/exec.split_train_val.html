@@ -1,6 +1,6 @@
 ---
 
-title: Title
+title: uberduck_ml_dev.exec.split_train_val
 
 
 keywords: fastai
@@ -32,7 +32,14 @@ nb_path: "nbs/exec.split_train_val.ipynb"
 <div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <p><h1>Table of Contents<span class="tocSkip"></span></h1></p>
-<div class="toc"><ul class="toc-item"></ul></div>
+<div class="toc"><ul class="toc-item"><li><span><a href="#uberduck_ml_dev.exec.split_train_val" data-toc-modified-id="uberduck_ml_dev.exec.split_train_val-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>uberduck_ml_dev.exec.split_train_val</a></span></li></ul></div>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p><h1>Table of Contents<span class="tocSkip"></span></h1></p>
+<div class="toc"><ul class="toc-item"><li><span><a href="#uberduck_ml_dev.exec.split_train_val" data-toc-modified-id="uberduck_ml_dev.exec.split_train_val-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>uberduck_ml_dev.exec.split_train_val</a></span></li></ul></div>
 </div>
 </div>
 </div>
@@ -72,7 +79,7 @@ nb_path: "nbs/exec.split_train_val.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="run" class="doc_header"><code>run</code><a href="https://github.com/uberduck-ai/uberduck_ml_dev/tree/master/uberduck_ml_dev/exec/split_train_val.py#L22" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>run</code>(<strong><code>path</code></strong>, <strong><code>train_percent</code></strong>=<em><code>0.8</code></em>, <strong><code>val_percent</code></strong>=<em><code>0.2</code></em>, <strong><code>val_num</code></strong>=<em><code>None</code></em>, <strong><code>train_file</code></strong>=<em><code>'train.txt'</code></em>, <strong><code>val_file</code></strong>=<em><code>'val.txt'</code></em>)</p>
+<h4 id="run" class="doc_header"><code>run</code><a href="https://github.com/uberduck-ai/uberduck_ml_dev/tree/master/uberduck_ml_dev/exec/split_train_val.py#L22" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>run</code>(<strong><code>path</code></strong>, <strong><code>val_percent</code></strong>=<em><code>0.2</code></em>, <strong><code>val_num</code></strong>=<em><code>None</code></em>, <strong><code>train_file</code></strong>=<em><code>'train.txt'</code></em>, <strong><code>val_file</code></strong>=<em><code>'val.txt'</code></em>)</p>
 </blockquote>
 <p>Split file in t
 Default behavior only creates a training and validation set (not test set).</p>
@@ -102,8 +109,10 @@ Default behavior only creates a training and validation set (not test set).</p>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
 <span class="n">p</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;foo/bar/baz&quot;</span><span class="p">)</span>
 <span class="kn">import</span> <span class="nn">os</span>
+
 <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
 </pre></div>
 
@@ -141,7 +150,7 @@ Default behavior only creates a training and validation set (not test set).</p>
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="parse_args" class="doc_header"><code>parse_args</code><a href="https://github.com/uberduck-ai/uberduck_ml_dev/tree/master/uberduck_ml_dev/exec/split_train_val.py#L46" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>parse_args</code>(<strong><code>args</code></strong>)</p>
+<h4 id="parse_args" class="doc_header"><code>parse_args</code><a href="https://github.com/uberduck-ai/uberduck_ml_dev/tree/master/uberduck_ml_dev/exec/split_train_val.py#L44" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>parse_args</code>(<strong><code>args</code></strong>)</p>
 </blockquote>
 
 </div>

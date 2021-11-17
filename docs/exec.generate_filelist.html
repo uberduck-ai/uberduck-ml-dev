@@ -78,6 +78,100 @@ nb_path: "nbs/exec.generate_filelist.ipynb"
     {% raw %}
     
 <div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">CACHE_LOCATION</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">NamedTemporaryFile</span><span class="p">,</span> <span class="n">TemporaryFile</span>
+
+<span class="k">with</span> <span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">_generate_filelist</span><span class="p">(</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/Users/zwf/data/voice/dvc-managed/uberduck-multispeaker/&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span>
+        <span class="s2">&quot;standard-multispeaker&quot;</span><span class="p">,</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="k">with</span> <span class="n">TemporaryFile</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">_convert_to_multispeaker</span><span class="p">(</span>
+        <span class="n">f</span><span class="p">,</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/Users/zwf/data/voice/dvc-managed/uberduck-multispeaker/&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span>
+        <span class="s2">&quot;standard-multispeaker&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stderr output_text">
+<pre>  5%|▍         | 4/85 [00:00&lt;00:02, 35.22it/s]</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>/private/var/folders/9n/w8qrq4mx4cl_j036z8wg_9nh0000gp/T/tmp8xrrhl9s
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stderr output_text">
+<pre>100%|██████████| 85/85 [00:00&lt;00:00, 94.09it/s] 
+100%|██████████| 85/85 [00:00&lt;00:00, 96.20it/s] 
+</pre>
+</div>
+</div>
+
+</div>
+</div>
 
 </div>
     {% endraw %}
