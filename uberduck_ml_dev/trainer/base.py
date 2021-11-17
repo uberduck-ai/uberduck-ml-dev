@@ -430,24 +430,24 @@ class MellotronTrainer(TTSTrainer):
             model.train()
             try:
                 audio = self.sample(mel[0])
-                self.log("SampleInference", self.global_step, audio=audio)
+                self.log(f"SampleInference{speaker_id}", self.global_step, audio=audio)
             except Exception as e:
                 print(f"Exception raised while doing sample inference: {e}")
                 print("Mel shape: ", mel[0].shape)
             self.log(
-                "Attention/sample_inference",
+                f"Attention/sample_inference{speaker_id}",
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_attention(attn[0].data.cpu().transpose(0, 1))
                 ),
             )
             self.log(
-                "MelPredicted/sample_inference",
+                f"MelPredicted/sample_inference{speaker_id}",
                 self.global_step,
                 image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
             )
             self.log(
-                "Gate/sample_inference",
+                f"Gate/sample_inference{speaker_id}",
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_gate_outputs(gate_outputs=gate[0].data.cpu())
