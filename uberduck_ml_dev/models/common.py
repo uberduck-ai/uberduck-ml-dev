@@ -177,18 +177,19 @@ class Attention(nn.Module):
         return attention_context, attention_weights
 
 # Cell
-class STFT(torch.nn.Module):
+class STFT:
     """adapted from Prem Seetharaman's https://github.com/pseeth/pytorch-stft"""
 
     def __init__(
         self,
-        filter_length=800,
-        hop_length=200,
-        win_length=800,
+        filter_length=1024,
+        hop_length=256,
+        win_length=1024,
         window="hann",
+        padding=None,
         device="cpu",
+        rank=None,
     ):
-        super().__init__()
         self.filter_length = filter_length
         self.hop_length = hop_length
         self.win_length = win_length
@@ -197,16 +198,27 @@ class STFT(torch.nn.Module):
         scale = self.filter_length / self.hop_length
         fourier_basis = np.fft.fft(np.eye(self.filter_length))
 
+        self.padding = padding or (filter_length // 2)
+
         cutoff = int((self.filter_length / 2 + 1))
         fourier_basis = np.vstack(
             [np.real(fourier_basis[:cutoff, :]), np.imag(fourier_basis[:cutoff, :])]
         )
 
-        tensor_cls = torch.cuda.FloatTensor if device == "cuda" else torch.FloatTensor
-        forward_basis = tensor_cls(fourier_basis[:, None, :])
-        inverse_basis = tensor_cls(
-            np.linalg.pinv(scale * fourier_basis).T[:, None, :].astype(np.float32)
-        )
+        if device == "cuda":
+            dev = torch.device(f"cuda:{rank}")
+            forward_basis = torch.cuda.FloatTensor(
+                fourier_basis[:, None, :], device=dev
+            )
+            inverse_basis = torch.cuda.FloatTensor(
+                np.linalg.pinv(scale * fourier_basis).T[:, None, :].astype(np.float32),
+                device=dev,
+            )
+        else:
+            forward_basis = torch.FloatTensor(fourier_basis[:, None, :])
+            inverse_basis = torch.FloatTensor(
+                np.linalg.pinv(scale * fourier_basis).T[:, None, :].astype(np.float32)
+            )
 
         if window is not None:
             assert filter_length >= win_length
@@ -216,14 +228,15 @@ class STFT(torch.nn.Module):
             fft_window = torch.from_numpy(fft_window).float()
 
             if device == "cuda":
-                fft_window = fft_window.cuda()
+                fft_window = fft_window.cuda(rank)
 
             # window the bases
             forward_basis *= fft_window
             inverse_basis *= fft_window
+            self.fft_window = fft_window
 
-        self.register_buffer("forward_basis", forward_basis.float())
-        self.register_buffer("inverse_basis", inverse_basis.float())
+        self.forward_basis = forward_basis.float()
+        self.inverse_basis = inverse_basis.float()
 
     def transform(self, input_data):
         num_batches = input_data.size(0)
@@ -236,10 +249,8 @@ class STFT(torch.nn.Module):
         input_data = F.pad(
             input_data.unsqueeze(1),
             (
-                # (self.filter_length - self.hop_length) // 2,
-                # (self.filter_length - self.hop_length) // 2,
-                (self.filter_length) // 2,
-                (self.filter_length) // 2,
+                self.padding,
+                self.padding,
                 0,
                 0,
             ),
@@ -313,7 +324,7 @@ class STFT(torch.nn.Module):
 # Cell
 
 
-class MelSTFT(torch.nn.Module):
+class MelSTFT:
     def __init__(
         self,
         filter_length=1024,
@@ -324,18 +335,28 @@ class MelSTFT(torch.nn.Module):
         mel_fmin=0.0,
         mel_fmax=8000.0,
         device="cpu",
+        padding=None,
+        rank=None,
     ):
-        super().__init__()
         self.n_mel_channels = n_mel_channels
         self.sampling_rate = sampling_rate
-        self.stft_fn = STFT(filter_length, hop_length, win_length, device=device)
+        if padding is None:
+            padding = filter_length // 2
+        self.stft_fn = STFT(
+            filter_length,
+            hop_length,
+            win_length,
+            device=device,
+            rank=rank,
+            padding=padding,
+        )
         mel_basis = librosa_mel(
             sampling_rate, filter_length, n_mel_channels, mel_fmin, mel_fmax
         )
         mel_basis = torch.from_numpy(mel_basis).float()
         if device == "cuda":
             mel_basis = mel_basis.cuda()
-        self.register_buffer("mel_basis", mel_basis)
+        self.mel_basis = mel_basis
 
     def spectral_normalize(self, magnitudes):
         output = dynamic_range_compression(magnitudes)
@@ -351,8 +372,8 @@ class MelSTFT(torch.nn.Module):
         return mel_output
 
     def spectrogram(self, y):
-        assert torch.min(y.data) >= -1
-        assert torch.max(y.data) <= 1
+        assert y.min() >= -1
+        assert y.max() <= 1
         magnitudes, phases = self.stft_fn.transform(y)
         return magnitudes.data
 
@@ -366,8 +387,8 @@ class MelSTFT(torch.nn.Module):
         -------
         mel_output: torch.FloatTensor of shape (B, n_mel_channels, T)
         """
-        assert torch.min(y.data) >= -1
-        assert torch.max(y.data) <= 1
+        assert y.min() >= -1
+        assert y.max() <= 1
 
         magnitudes, phases = self.stft_fn.transform(y)
         magnitudes = magnitudes.data
