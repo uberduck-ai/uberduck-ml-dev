@@ -59,6 +59,6 @@ except:
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
     if args.num_val > 1:
-        run(args.input_path, val_num=int(num_val))
+        run(args.input_path, val_num=int(args.num_val))
     else:
-        run(args.input_path, val_percent=args.val_pct)
+        run(args.input_path, val_percent=args.num_val)
