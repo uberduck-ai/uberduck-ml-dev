@@ -62,8 +62,6 @@ _If you are using an older version of this template, and want to upgrade to the 
 -  After you make changes to `settings.ini`, run `nbdev_build_lib && nbdev_clean_nbs && nbdev_build_docs` to make sure all changes are propagated appropriately.
 
 
-This file will become your README and also the index of your documentation.
-
 ## Overview
 
 An overview of the subpackages in this library:
