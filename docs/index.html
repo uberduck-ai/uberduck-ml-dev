@@ -1,13 +1,13 @@
 ---
 
-title: Project name here
+title: 🦆 Uberduck TTS ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
 
 keywords: fastai
 sidebar: home_sidebar
 
-summary: "Summary description here."
-description: "Summary description here."
+
+
 nb_path: "nbs/index.ipynb"
 ---
 <!--
@@ -32,14 +32,41 @@ nb_path: "nbs/index.ipynb"
 <div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <p><h1>Table of Contents<span class="tocSkip"></span></h1></p>
-<div class="toc"><ul class="toc-item"><li><span><a href="#Project-name-here" data-toc-modified-id="Project-name-here-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Project name here</a></span><ul class="toc-item"><li><span><a href="#Install" data-toc-modified-id="Install-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Install</a></span></li><li><span><a href="#How-to-use" data-toc-modified-id="How-to-use-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>How to use</a></span></li><li><span><a href="#Development" data-toc-modified-id="Development-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>Development</a></span></li></ul></li></ul></div>
+<div class="toc"><ul class="toc-item"><li><span><a href="#🦆-Uberduck-TTS---" data-toc-modified-id="🦆-Uberduck-TTS----1"><span class="toc-item-num">1&nbsp;&nbsp;</span>🦆 Uberduck TTS <img src="https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev" alt=""></a></span><ul class="toc-item"><li><span><a href="#Installation" data-toc-modified-id="Installation-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Installation</a></span></li><li><span><a href="#Development" data-toc-modified-id="Development-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Development</a></span><ul class="toc-item"><li><span><a href="#🚩-Testing" data-toc-modified-id="🚩-Testing-1.2.1"><span class="toc-item-num">1.2.1&nbsp;&nbsp;</span>🚩 Testing</a></span></li></ul></li><li><span><a href="#📦️-nbdev" data-toc-modified-id="📦️-nbdev-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>📦️ nbdev</a></span><ul class="toc-item"><li><span><a href="#🔧-Troubleshooting-Tips" data-toc-modified-id="🔧-Troubleshooting-Tips-1.3.1"><span class="toc-item-num">1.3.1&nbsp;&nbsp;</span>🔧 Troubleshooting Tips</a></span></li></ul></li><li><span><a href="#Overview" data-toc-modified-id="Overview-1.4"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Overview</a></span></li></ul></li></ul></div>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p><h1>Table of Contents<span class="tocSkip"></span></h1></p>
-<div class="toc"><ul class="toc-item"><li><span><a href="#Project-name-here" data-toc-modified-id="Project-name-here-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Project name here</a></span><ul class="toc-item"><li><span><a href="#Install" data-toc-modified-id="Install-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Install</a></span></li><li><span><a href="#How-to-use" data-toc-modified-id="How-to-use-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>How to use</a></span></li><li><span><a href="#Development" data-toc-modified-id="Development-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>Development</a></span></li></ul></li></ul></div>
+<p><a href="https://uberduck.ai/"><strong>Uberduck</strong></a> is a tool for fun and creativity with audio machine learning, currently focused on voice cloning and neural text-to-speech. This repository includes development tools to get started with creating your own speech synthesis model.</p>
+<h2 id="Installation">Installation<a class="anchor-link" href="#Installation"> </a></h2><p>TODO</p>
+<h2 id="Development">Development<a class="anchor-link" href="#Development"> </a></h2><p>To start contributing, install the required development dependencies in a virtual environment:</p>
+<div class="highlight"><pre><span></span>pip install nbdev nbqa pre-commit
+</pre></div>
+<p>Then install required Git hooks:</p>
+<div class="highlight"><pre><span></span>nbdev_install_git_hooks
+pre-commit install
+</pre></div>
+<p>All development takes place in Jupyter notebooks in <code>$REPO_ROOT/nbs</code>, which are compiled to library code in <code>$REPO_ROOT/uberduck_ml_dev</code>. To make changes, edit edit the one of the IPython notebooks in <code>$REPO_ROOT/nbs/</code> after starting a jupyter server with <code>jupyter notebook</code>. Once you're satisfied with the changes, build them:</p>
+<div class="highlight"><pre><span></span>./build_lib
+</pre></div>
+<h3 id="&#128681;-Testing">&#128681; Testing<a class="anchor-link" href="#&#128681;-Testing"> </a></h3><p>Any IPython notebook cell which is not exported is a test. Run all tests:</p>
+<div class="highlight"><pre><span></span>nbdev_test_nbs
+</pre></div>
+<p>Test a single notebook:</p>
+<div class="highlight"><pre><span></span>nbdev_test_nbs --fname nbs/text.util.ipynb
+</pre></div>
+<p>(can optionally add <code>--verbose</code> for more output)</p>
+<h2 id="&#128230;&#65039;-nbdev">&#128230;&#65039; nbdev<a class="anchor-link" href="#&#128230;&#65039;-nbdev"> </a></h2><p>This project uses <a href="https://nbdev.fast.ai/">nbdev</a>.</p>
+<p><em>If you are using an older version of this template, and want to upgrade to the theme-based version, see <a href="https://gist.github.com/hamelsmu/977e82a23dcd8dcff9058079cb4a8f18">this helper script</a> (more explanation of what this means is contained in the link to the script)</em>.</p>
+<h3 id="&#128295;-Troubleshooting-Tips">&#128295; Troubleshooting Tips<a class="anchor-link" href="#&#128295;-Troubleshooting-Tips"> </a></h3><ul>
+<li>Make sure you are using the latest version of nbdev with <code>pip install -U nbdev</code></li>
+<li>If you are using an older version of this template, see the instructions above on how to upgrade your template. </li>
+<li>It is important for you to spell the name of your user and repo correctly in <code>settings.ini</code> or the website will not have the correct address from which to source assets like CSS for your site.  When in doubt, you can open your browser's developer console and see if there are any errors related to fetching assets for your website due to an incorrect URL generated by misspelled values from <code>settings.ini</code>.</li>
+<li>If you change the name of your repo, you have to make the appropriate changes in <code>settings.ini</code></li>
+<li>After you make changes to <code>settings.ini</code>, run <code>nbdev_build_lib &amp;&amp; nbdev_clean_nbs &amp;&amp; nbdev_build_docs</code> to make sure all changes are propagated appropriately.</li>
+</ul>
+
 </div>
 </div>
 </div>
@@ -52,66 +79,7 @@ nb_path: "nbs/index.ipynb"
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Install">Install<a class="anchor-link" href="#Install"> </a></h2>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p><code>pip install your_project_name</code></p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="How-to-use">How to use<a class="anchor-link" href="#How-to-use"> </a></h2>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Fill me in please! Don't forget code examples:</p>
-
-</div>
-</div>
-</div>
-    {% raw %}
-    
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="mi">1</span><span class="o">+</span><span class="mi">1</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-<div class="output_area">
-
-
-
-<div class="output_text output_subarea output_execute_result">
-<pre>2</pre>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div>
-    {% endraw %}
-
-<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Development">Development<a class="anchor-link" href="#Development"> </a></h2><p>An overview of the subpackages in this library:</p>
+<h2 id="Overview">Overview<a class="anchor-link" href="#Overview"> </a></h2><p>An overview of the subpackages in this library:</p>
 <p><code>models</code>: TTS model implementations. All models descend from <code>models.base.TTSModel</code>.</p>
 <p><code>trainer</code>: A trainer has logic for training a model.</p>
 <p><code>exec</code>: Contains entrypoint scripts for running training jobs. Executed via a command like
