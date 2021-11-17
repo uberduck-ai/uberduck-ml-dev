@@ -563,6 +563,7 @@ class MellotronTrainer(TTSTrainer):
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
+                print(f"Step: {self.global_step}")
                 start_time = time.perf_counter()
                 self.global_step += 1
                 model.zero_grad()
