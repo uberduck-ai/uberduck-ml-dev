@@ -428,6 +428,7 @@ class VITSTrainer(TTSTrainer):
         optim_d = torch.optim.AdamW(
             net_d.parameters(), self.learning_rate, betas=self.betas, eps=self.eps
         )
+        start_epoch = 0
         net_g, net_d, optim_g, optim_d, start_epoch = self.warm_start(
             net_g,
             net_d,
@@ -439,7 +440,6 @@ class VITSTrainer(TTSTrainer):
             net_g = DDP(net_g, device_ids=[self.rank])
             net_d = DDP(net_d, device_ids=[self.rank])
 
-        start_epoch = 0
         scheduler_g = ExponentialLR(
             optim_g, gamma=self.lr_decay, last_epoch=start_epoch - 1
         )
