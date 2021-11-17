@@ -46,7 +46,7 @@ def parse_args(args):
     parser.add_argument(
         "-i", "--in", dest="input_path", help="Path to input file list", required=True
     )
-    parser.add_argument("-v", "--val-pct", dest="val_pct", type=float, default=0.1)
+    parser.add_argument("-n", "--num_val", dest="num_val", type=float, default=0.1)
     args = parser.parse_args(args)
     return args
 
@@ -58,4 +58,7 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    run(args.input_path, val_percent=args.val_pct)
+    if args.num_val > 1:
+        run(args.input_path, val_num=int(num_val))
+    else:
+        run(args.input_path, val_percent=args.val_pct)
