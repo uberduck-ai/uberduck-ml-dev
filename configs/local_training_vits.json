@@ -26,6 +26,7 @@
     "mel_fmin": 0,
     "n_mel_channels": 80,
     "n_speakers": 109,
+    "oversample_weights": null,
     "sample_inference_speaker_ids": null,
     "sampling_rate": 22050,
     "seed": 123,
