@@ -16,7 +16,6 @@ def _gather(filelist, output):
     with open(filelist, "r") as f:
         lines = f.readlines()
     paths = []
-    archive_lines
     for line in lines:
         path, *_rest = line.split("|")
 
@@ -28,7 +27,7 @@ def _gather(filelist, output):
         p, *_rest = line.split("|")
         relpath = os.path.relpath(p, common_prefix)
         archive_paths.append(relpath)
-        archive_lines.append(f"{relpath}|{''.join(rest)}")
+        archive_lines.append(f"{relpath}|{''.join(_rest)}")
     _, filelist_archive = os.path.split(filelist)
     with NamedTemporaryFile("w") as tempfile:
         for line in archive_lines:
