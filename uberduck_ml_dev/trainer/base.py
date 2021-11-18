@@ -141,9 +141,7 @@ class Tacotron2Loss(nn.Module):
         mel_target, gate_target = target[0], target[1]
         mel_target.requires_grad = False
         gate_target.requires_grad = False
-        # gate_target = gate_target.view(-1, 1)
         mel_out, mel_out_postnet, gate_out, _ = model_output
-        # gate_out = gate_out.view(-1, 1)
         mel_loss_batch = nn.MSELoss(reduction="none")(mel_out, mel_target).mean(
             axis=[1, 2]
         ) + nn.MSELoss(reduction="none")(mel_out_postnet, mel_target).mean(axis=[1, 2])
@@ -206,18 +204,18 @@ class MellotronTrainer(TTSTrainer):
         for l in batch_levels_unique:
             mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
             self.log(
-                "MelLoss/train/" + str(l),
+                f"MelLoss/train/speaker{l.item()}",
                 self.global_step,
                 scalar=mlb,
             )
             glb = gate_loss_batch[torch.where(batch_levels == l)[0]].mean()
             self.log(
-                "GateLoss/train/" + str(l),
+                f"GateLoss/train/speaker{l.item()}",
                 self.global_step,
                 scalar=glb,
             )
             self.log(
-                "Loss/train/" + str(l),
+                f"Loss/train/speaker{l.item()}",
                 self.global_step,
                 scalar=mlb + glb,
             )
@@ -277,11 +275,43 @@ class MellotronTrainer(TTSTrainer):
 
             self.sample_inference(model)
 
-    def log_validation(self, X, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss):
+    def log_validation(
+        self,
+        X,
+        y_pred,
+        y,
+        mean_loss,
+        mean_mel_loss,
+        mean_gate_loss,
+        mel_loss_val,
+        gate_loss_val,
+        speakers_val,
+    ):
         print(f"Average loss: {mean_loss}")
         self.log("Loss/val", self.global_step, scalar=mean_loss)
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
         self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
+
+        val_levels = speakers_val
+        val_levels_unique = torch.unique(val_levels)
+        for l in val_levels_unique:
+            mlv = mel_loss_val[torch.where(val_levels == l)[0]].mean()
+            self.log(
+                f"MelLoss/val/speaker{l.item()}",
+                self.global_step,
+                scalar=mlv,
+            )
+            glv = gate_loss_val[torch.where(val_levels == l)[0]].mean()
+            self.log(
+                f"GateLoss/val/speaker{l.item()}",
+                self.global_step,
+                scalar=glv,
+            )
+            self.log(
+                f"Loss/val/speaker{l.item()}",
+                self.global_step,
+                scalar=mlv + glv,
+            )
         # Generate the sample from a random item from the last y_pred batch.
         mel_target, gate_target = y
         _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
@@ -369,9 +399,18 @@ class MellotronTrainer(TTSTrainer):
         collate_fn = kwargs["collate_fn"]
         criterion = kwargs["criterion"]
         sampler = DistributedSampler(val_set) if self.distributed_run else None
-        total_loss, total_mel_loss, total_gate_loss = 0, 0, 0
+        (
+            total_loss,
+            total_mel_loss,
+            total_gate_loss,
+            total_mel_loss_val,
+            total_gate_loss_val,
+        ) = (0, 0, 0, 0, 0)
         total_steps = 0
         model.eval()
+        speakers_val = []
+        total_mel_loss_val = []
+        total_gate_loss_val = []
         with torch.no_grad():
             val_loader = DataLoader(
                 val_set,
@@ -384,8 +423,10 @@ class MellotronTrainer(TTSTrainer):
                 total_steps += 1
                 if self.distributed_run:
                     X, y = model.module.parse_batch(batch)
+                    speakers_val.append(X[5])
                 else:
                     X, y = model.parse_batch(batch)
+                    speakers_val.append(X[5])
                 y_pred = model(X)
                 mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
                     y_pred, y
@@ -397,6 +438,11 @@ class MellotronTrainer(TTSTrainer):
                 else:
                     reduced_mel_loss = mel_loss.item()
                     reduced_gate_loss = gate_loss.item()
+                    reduced_mel_loss_val = mel_loss_batch.detach()
+                    reduced_gate_loss_val = gate_loss_batch.detach()
+
+                total_mel_loss_val.append(reduced_mel_loss_val)
+                total_gate_loss_val.append(reduced_gate_loss_val)
                 reduced_val_loss = reduced_mel_loss + reduced_gate_loss
                 total_mel_loss += reduced_mel_loss
                 total_gate_loss += reduced_gate_loss
@@ -405,7 +451,20 @@ class MellotronTrainer(TTSTrainer):
             mean_mel_loss = total_mel_loss / total_steps
             mean_gate_loss = total_gate_loss / total_steps
             mean_loss = total_loss / total_steps
-            self.log_validation(X, y_pred, y, mean_loss, mean_mel_loss, mean_gate_loss)
+            total_mel_loss_val = torch.hstack(total_mel_loss_val)
+            total_gate_loss_val = torch.hstack(total_gate_loss_val)
+            speakers_val = torch.hstack(speakers_val)
+            self.log_validation(
+                X,
+                y_pred,
+                y,
+                mean_loss,
+                mean_mel_loss,
+                mean_gate_loss,
+                total_mel_loss_val,
+                total_gate_loss_val,
+                speakers_val,
+            )
         model.train()
 
     def sample_inference(self, model):
@@ -596,8 +655,8 @@ class MellotronTrainer(TTSTrainer):
                 else:
                     reduced_mel_loss = mel_loss.item()
                     reduced_gate_loss = gate_loss.item()
-                    reduced_gate_loss_batch = gate_loss_batch  # .item()
-                    reduced_mel_loss_batch = mel_loss_batch  # .item()
+                    reduced_gate_loss_batch = gate_loss_batch.detach()
+                    reduced_mel_loss_batch = mel_loss_batch.detach()
 
                 reduced_loss = reduced_mel_loss + reduced_gate_loss
                 reduced_loss_batch = reduced_gate_loss_batch + reduced_mel_loss_batch
