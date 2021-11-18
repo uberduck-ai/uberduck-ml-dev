@@ -21,7 +21,7 @@ def _gather(filelist, output):
         path, *_rest = line.split("|")
 
     paths = [l.split("|")[0] for l in lines]
-    common_prefix = os.path(paths)
+    common_prefix = os.path.commonpath(paths)
     archive_paths = []
     archive_lines = []
     for line in lines:
