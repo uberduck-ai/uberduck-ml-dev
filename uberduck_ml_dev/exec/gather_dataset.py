@@ -6,6 +6,7 @@ __all__ = []
 
 import argparse
 import os
+from tempfile import NamedTemporaryFile
 from typing import List
 import sys
 from zipfile import ZipFile
@@ -14,17 +15,29 @@ from zipfile import ZipFile
 def _gather(filelist, output):
     with open(filelist, "r") as f:
         lines = f.readlines()
+    paths = []
+    archive_lines
+    for line in lines:
+        path, *_rest = line.split("|")
+
     paths = [l.split("|")[0] for l in lines]
     common_prefix = os.path(paths)
     archive_paths = []
-    for p in paths:
+    archive_lines = []
+    for line in lines:
+        p, *_rest = line.split("|")
         relpath = os.path.relpath(p, common_prefix)
         archive_paths.append(relpath)
+        archive_lines.append(f"{relpath}|{''.join(rest)}")
     _, filelist_archive = os.path.split(filelist)
-    with ZipFile(output, "w") as zf:
-        zf.write(filelist, filelist_archive)
-        for path, archive_path in zip(paths, archive_paths):
-            zf.write(path, archive_path)
+    with NamedTemporaryFile("w") as tempfile:
+        for line in archive_lines:
+            tempfile.write(line)
+        tempfile.flush()
+        with ZipFile(output, "w") as zf:
+            zf.write(tempfile.name, filelist_archive)
+            for path, archive_path in zip(paths, archive_paths):
+                zf.write(path, archive_path)
 
 
 def _parse_args(args: List[str]):
@@ -46,4 +59,4 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = _parse_args(sys.argv[1:])
-    _generate_filelist(args.input, args.format, args.output)
+    _gather(args.input, args.output)
