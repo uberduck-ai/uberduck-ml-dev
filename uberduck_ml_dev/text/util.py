@@ -233,6 +233,7 @@ import random
 from .symbols import (
     DEFAULT_SYMBOLS,
     IPA_SYMBOLS,
+    NVIDIA_TACO2_SYMBOLS,
     id_to_symbol,
     symbols_to_sequence,
     arpabet_to_sequence,
@@ -300,12 +301,12 @@ def text_to_sequence(text, cleaner_names, p_arpabet=0.0, symbol_set=DEFAULT_SYMB
                     cleaned_words.append(nw)
             for word in cleaned_words:
                 if word.startswith("{"):
-                    sequence += arpabet_to_sequence(word)
+                    sequence += arpabet_to_sequence(word, symbol_set)
                 else:
-                    sequence += symbols_to_sequence(word)
+                    sequence += symbols_to_sequence(word, symbol_set)
             break
         cleaned = clean_text(m.group(1), cleaner_names)
-        sequence += text_to_sequence(cleaned, cleaner_names, p_arpabet)
+        sequence += text_to_sequence(cleaned, cleaner_names, p_arpabet, symbol_set)
         sequence += arpabet_to_sequence(m.group(2))
         text = m.group(3)
 
