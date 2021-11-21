@@ -8,6 +8,13 @@ from torch import nn
 
 
 class TTSModel(nn.Module):
+    def __init__(self, hparams):
+
+        super().__init__()
+        self.symbol_set = hparams.symbol_set
+        # symbols = __import__('uberduck_ml_dev.text.' + hparams.symbols)
+        # symbols =
+
     def infer(self):
         raise NotImplemented
 

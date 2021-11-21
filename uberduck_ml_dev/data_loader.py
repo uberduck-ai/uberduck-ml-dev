@@ -17,7 +17,11 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from .models.common import STFT, MelSTFT
-from .text.symbols import DEFAULT_SYMBOLS, IPA_SYMBOLS
+from .text.symbols import (
+    DEFAULT_SYMBOLS,
+    IPA_SYMBOLS,
+    NVIDIA_TACO2_SYMBOLS,
+)
 from .text.util import cleaned_text_to_sequence, text_to_sequence
 from .utils.audio import compute_yin, load_wav_to_torch
 from .utils.utils import load_filepaths_and_text, intersperse
@@ -56,6 +60,7 @@ class TextMelDataset(Dataset):
         filter_length: int,
         hop_length: int,
         win_length: int,
+        symbol_set: str,
         max_wav_value: float = 32768.0,
         include_f0: bool = False,
         pos_weight: float = 10,
@@ -98,6 +103,7 @@ class TextMelDataset(Dataset):
         self._speaker_id_map = _orig_to_dense_speaker_id(speaker_ids)
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
+        self.symbol_set = symbol_set
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -120,7 +126,10 @@ class TextMelDataset(Dataset):
         sample_rate, wav_data = read(path)
         text_sequence = torch.LongTensor(
             text_to_sequence(
-                transcription, self.text_cleaners, p_arpabet=self.p_arpabet
+                transcription,
+                self.text_cleaners,
+                p_arpabet=self.p_arpabet,
+                symbol_set=self.symbol_set,
             )
         )
         audio = torch.FloatTensor(wav_data)
