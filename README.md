@@ -9,7 +9,11 @@
 
 ## Installation
 
-TODO
+```
+conda create -n 'uberduck-ml-dev'
+source activate uberduck-ml-dev
+pip install git+git://github.com/uberduck-ai/uberduck-ml-dev 
+```
 
 ## Development
 
