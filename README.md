@@ -36,6 +36,11 @@ All development takes place in Jupyter notebooks in `$REPO_ROOT/nbs`, which are 
 ./build_lib
 ```
 
+Then install the library
+```bash
+python setup.py develop
+```
+
 ### 🚩 Testing
 
 Any IPython notebook cell which is not exported is a test. Run all tests:
