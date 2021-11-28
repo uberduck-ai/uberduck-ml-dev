@@ -22,7 +22,7 @@ from ..utils.plot import (
     plot_spectrogram,
 )
 from ..text.util import text_to_sequence, random_utterance
-from .tacotron2 import Tacotron2Trainer
+from .tacotron2 import Tacotron2Trainer, Tacotron2Loss
 from ..models.mellotron import Mellotron
 from ..data_loader import TextMelDataset, TextMelCollate
 
