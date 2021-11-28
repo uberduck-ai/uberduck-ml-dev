@@ -66,6 +66,7 @@ from ..utils.plot import (
 from ..text.util import text_to_sequence, random_utterance
 from .base import TTSTrainer
 from ..data_loader import TextMelDataset, TextMelCollate
+import pdb
 
 
 class Tacotron2Trainer(TTSTrainer):
@@ -186,6 +187,56 @@ class Tacotron2Trainer(TTSTrainer):
             )
 
             self.sample_inference(model)
+
+    def sample_inference(self, model):
+        if self.rank is not None and self.rank != 0:
+            return
+        # Generate an audio sample
+        with torch.no_grad():
+            utterance = torch.LongTensor(
+                text_to_sequence(
+                    random_utterance(),
+                    self.text_cleaners,
+                    p_arpabet=self.p_arpabet,
+                    symbol_set=self.symbol_set,
+                )
+            )[None].cuda()
+            speaker_id = (
+                choice(self.sample_inference_speaker_ids)
+                if self.sample_inference_speaker_ids
+                else randint(0, self.n_speakers - 1)
+            )
+            input_ = [utterance, torch.LongTensor([speaker_id]).cuda()]
+
+            # 200 can be changed
+            model.eval()
+            _, mel, gate, attn = model.inference(input_)
+            model.train()
+            try:
+                audio = self.sample(mel[0])
+                self.log("SampleInference", self.global_step, audio=audio)
+            except Exception as e:
+                print(f"Exception raised while doing sample inference: {e}")
+                print("Mel shape: ", mel[0].shape)
+            self.log(
+                "Attention/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_attention(attn[0].data.cpu().transpose(0, 1))
+                ),
+            )
+            self.log(
+                "MelPredicted/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
+            )
+            self.log(
+                "Gate/sample_inference",
+                self.global_step,
+                image=save_figure_to_numpy(
+                    plot_gate_outputs(gate_outputs=gate[0].data.cpu())
+                ),
+            )
 
     def log_validation(
         self,
