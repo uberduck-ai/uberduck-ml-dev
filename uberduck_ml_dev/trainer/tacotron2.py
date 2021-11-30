@@ -470,6 +470,81 @@ class Tacotron2Trainer(TTSTrainer):
                 criterion=criterion,
             )
 
+    def validate(self, **kwargs):
+        print("start validate", time.perf_counter())
+        model = kwargs["model"]
+        val_set = kwargs["val_set"]
+        collate_fn = kwargs["collate_fn"]
+        criterion = kwargs["criterion"]
+        sampler = DistributedSampler(val_set) if self.distributed_run else None
+        (
+            total_loss,
+            total_mel_loss,
+            total_gate_loss,
+            total_mel_loss_val,
+            total_gate_loss_val,
+        ) = (0, 0, 0, 0, 0)
+        total_steps = 0
+        model.eval()
+        speakers_val = []
+        total_mel_loss_val = []
+        total_gate_loss_val = []
+        with torch.no_grad():
+            val_loader = DataLoader(
+                val_set,
+                sampler=sampler,
+                shuffle=False,
+                batch_size=self.batch_size,
+                collate_fn=collate_fn,
+            )
+            for batch in val_loader:
+                total_steps += 1
+                if self.distributed_run:
+                    X, y = model.module.parse_batch(batch)
+                    speakers_val.append(X[5])
+                else:
+                    X, y = model.parse_batch(batch)
+                    speakers_val.append(X[5])
+                y_pred = model(X)
+                mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
+                    y_pred, y
+                )
+                if self.distributed_run:
+                    reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
+                    reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
+                    reduced_val_loss = reduced_mel_loss + reduced_gate_loss
+                else:
+                    reduced_mel_loss = mel_loss.item()
+                    reduced_gate_loss = gate_loss.item()
+                    reduced_mel_loss_val = mel_loss_batch.detach()
+                    reduced_gate_loss_val = gate_loss_batch.detach()
+
+                total_mel_loss_val.append(reduced_mel_loss_val)
+                total_gate_loss_val.append(reduced_gate_loss_val)
+                reduced_val_loss = reduced_mel_loss + reduced_gate_loss
+                total_mel_loss += reduced_mel_loss
+                total_gate_loss += reduced_gate_loss
+                total_loss += reduced_val_loss
+
+            mean_mel_loss = total_mel_loss / total_steps
+            mean_gate_loss = total_gate_loss / total_steps
+            mean_loss = total_loss / total_steps
+            total_mel_loss_val = torch.hstack(total_mel_loss_val)
+            total_gate_loss_val = torch.hstack(total_gate_loss_val)
+            speakers_val = torch.hstack(speakers_val)
+            self.log_validation(
+                X,
+                y_pred,
+                y,
+                mean_loss,
+                mean_mel_loss,
+                mean_gate_loss,
+                total_mel_loss_val,
+                total_gate_loss_val,
+                speakers_val,
+            )
+        model.train()
+
     @property
     def val_dataset_args(self):
         val_args = [a for a in self.training_dataset_args]
