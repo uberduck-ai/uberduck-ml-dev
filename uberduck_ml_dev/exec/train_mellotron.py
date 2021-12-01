@@ -11,7 +11,7 @@ import sys
 import torch
 from torch import multiprocessing as mp
 
-from ..trainer.base import MellotronTrainer
+from ..trainer.mellotron import MellotronTrainer
 from ..vendor.tfcompat.hparam import HParams
 from ..models.mellotron import DEFAULTS as MELLOTRON_DEFAULTS
 from .utils import parse_args

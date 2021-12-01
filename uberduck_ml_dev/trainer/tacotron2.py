@@ -49,6 +49,7 @@ class Tacotron2Loss(nn.Module):
 import os
 from pathlib import Path
 from pprint import pprint
+from random import choice
 
 import torch
 from torch.cuda.amp import autocast, GradScaler
@@ -328,7 +329,7 @@ class Tacotron2Trainer(TTSTrainer):
             ),
         )
 
-    def initialize_loader(self):
+    def initialize_loader(self, include_f0: bool = False, n_frames_per_step: int = 1):
         train_set = TextMelDataset(
             *self.training_dataset_args,
             debug=self.debug,
@@ -337,7 +338,9 @@ class Tacotron2Trainer(TTSTrainer):
         val_set = TextMelDataset(
             *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
         )
-        collate_fn = TextMelCollate()
+        collate_fn = TextMelCollate(
+            n_frames_per_step=n_frames_per_step, include_f0=include_f0
+        )
         sampler = None
         if self.distributed_run:
             self.init_distributed()
