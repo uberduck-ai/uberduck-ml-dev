@@ -14,12 +14,13 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 import time
 from torch.utils.data import DataLoader
-
+from random import choice
 from ..models.common import MelSTFT
 from ..utils.plot import (
     plot_attention,
     plot_gate_outputs,
     plot_spectrogram,
+    save_figure_to_numpy,
 )
 from ..text.util import text_to_sequence, random_utterance
 from .tacotron2 import Tacotron2Trainer, Tacotron2Loss
@@ -69,7 +70,10 @@ class MellotronTrainer(Tacotron2Trainer):
         self.batch_size = bs
         model.set_current_frames_per_step(fps)
         self.n_frames_per_step_current = fps
-        _, _, train_loader, sampler, collate_fn = self.initialize_loader()
+        _, _, train_loader, sampler, collate_fn = self.initialize_loader(
+            n_frames_per_step_current=self.n_frames_per_step_current,
+            include_f0=self.include_f0,
+        )
         return train_loader, sampler, collate_fn
 
     def validate(self, **kwargs):
@@ -195,20 +199,21 @@ class MellotronTrainer(Tacotron2Trainer):
     @property
     def training_dataset_args(self):
         return [
-            self.training_audiopaths_and_text,
-            self.text_cleaners,
-            self.p_arpabet,
+            *super().training_dataset_args,
+            # self.training_audiopaths_and_text,
+            # self.text_cleaners,
+            # self.p_arpabet,
             # audio params
-            self.n_mel_channels,
-            self.sampling_rate,
-            self.mel_fmin,
-            self.mel_fmax,
-            self.filter_length,
-            self.hop_length,
-            self.win_length,
-            self.max_wav_value,
+            # self.n_mel_channels,
+            # self.sampling_rate,
+            # self.mel_fmin,
+            # self.mel_fmax,
+            # self.filter_length,
+            # self.hop_length,
+            # self.win_length,
+            # self.max_wav_value,
             self.include_f0,
-            self.pos_weight,
+            # self.pos_weight,
         ]
 
     #     def warm_start(self, model, optimizer, start_epoch=0):
@@ -239,7 +244,9 @@ class MellotronTrainer(Tacotron2Trainer):
 
     def train(self):
         print("start train", time.perf_counter())
-        train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
+        train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader(
+            include_f0=self.include_f0
+        )
         criterion = Tacotron2Loss(
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
