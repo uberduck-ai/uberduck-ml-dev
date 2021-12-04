@@ -20,8 +20,6 @@ from ..utils.utils import to_gpu, get_mask_from_lengths
 from .tacotron2 import Tacotron2
 
 DEFAULTS = HParams(
-    # n_symbols=184,
-    # n_symbols=len(symbols),
     symbols_embedding_dim=512,
     mask_padding=True,
     fp16_run=False,
