@@ -235,6 +235,7 @@ class Encoder(nn.Module):
         return outputs
 
 # Cell
+import pdb
 
 
 class Decoder(nn.Module):
@@ -546,11 +547,15 @@ class Decoder(nn.Module):
                         ),
                     )
                 decoder_input = torch.cat(to_concat, dim=1)
+            #                 if torch.cuda.is_available():
+            #                     decoder_input = decoder_input.cuda()
             # NOTE(zach): When training with fp16_run == True, decoder_rnn seems to run into
             # issues with NaNs in gradient, maybe due to vanishing gradients.
             # Disable half-precision for this call to work around the issue.
+            # pdb.set_trace()
             with autocast(enabled=False):
                 mel_output, gate_output, attention_weights = self.decode(decoder_input)
+
             mel_outputs = torch.cat(
                 [
                     mel_outputs,
@@ -614,7 +619,7 @@ class Decoder(nn.Module):
             mel_output = mel_output[
                 :, 0 : self.n_mel_channels * self.n_frames_per_step_current
             ].unsqueeze(1)
-
+            # pdb.set_trace()
             mel_outputs = torch.cat([mel_outputs, mel_output], dim=1)
             gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
             alignments += [alignment]
@@ -877,3 +882,6 @@ class Mellotron(Tacotron2):
         return self.parse_output(
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
         )
+
+# Cell
+from ..text.util import text_to_sequence
