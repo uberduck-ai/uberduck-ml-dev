@@ -14,7 +14,7 @@ from torch import multiprocessing as mp
 from ..trainer.mellotron import MellotronTrainer
 from ..vendor.tfcompat.hparam import HParams
 from ..models.mellotron import DEFAULTS as MELLOTRON_DEFAULTS
-from ..utils.exec import parse_args
+from ..utils.argparse import parse_args
 
 # Cell
 def run(rank, device_count, hparams):
