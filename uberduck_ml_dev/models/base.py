@@ -5,6 +5,7 @@ __all__ = ['TTSModel']
 # Cell
 import torch
 from torch import nn
+from ..text.symbols import SYMBOL_SETS
 
 
 class TTSModel(nn.Module):
@@ -12,7 +13,7 @@ class TTSModel(nn.Module):
 
         super().__init__()
         self.symbol_set = hparams.symbol_set
-        self.n_symbols = len(self.symbol_set)
+        self.n_symbols = len(SYMBOL_SETS[self.symbol_set])
         # symbols = __import__('uberduck_ml_dev.text.' + hparams.symbols)
 
     def infer(self):
