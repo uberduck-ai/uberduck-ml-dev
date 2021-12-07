@@ -6,7 +6,7 @@ __all__ = ['run']
 from ..trainer.tacotron2 import Tacotron2Trainer
 from ..vendor.tfcompat.hparam import HParams
 from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
-from .utils import parse_args
+from ..utils.exec import parse_args
 import sys
 import json
 

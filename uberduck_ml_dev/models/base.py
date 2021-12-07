@@ -12,8 +12,8 @@ class TTSModel(nn.Module):
 
         super().__init__()
         self.symbol_set = hparams.symbol_set
+        self.n_symbols = len(self.symbol_set)
         # symbols = __import__('uberduck_ml_dev.text.' + hparams.symbols)
-        # symbols =
 
     def infer(self):
         raise NotImplemented

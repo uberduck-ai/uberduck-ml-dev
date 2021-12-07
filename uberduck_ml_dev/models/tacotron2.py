@@ -633,8 +633,8 @@ class Tacotron2(TTSModel):
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step_initial = hparams.n_frames_per_step_initial
         self.n_frames_per_step_current = hparams.n_frames_per_step_initial
-        self.embedding = nn.Embedding(hparams.n_symbols, hparams.symbols_embedding_dim)
-        std = np.sqrt(2.0 / (hparams.n_symbols + hparams.symbols_embedding_dim))
+        self.embedding = nn.Embedding(self.n_symbols, hparams.symbols_embedding_dim)
+        std = np.sqrt(2.0 / (self.n_symbols + hparams.symbols_embedding_dim))
         val = np.sqrt(3.0) * std  # uniform bounds for std
         self.embedding.weight.data.uniform_(-val, val)
         self.encoder = Encoder(hparams)
