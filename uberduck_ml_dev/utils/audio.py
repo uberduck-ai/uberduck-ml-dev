@@ -40,13 +40,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # Cell
 from ..models.common import MelSTFT
 
+
 def mel_to_audio(mel, algorithm="griffin-lim", **kwargs):
-        if algorithm == "griffin-lim":
-            mel_stft = MelSTFT()
-            audio = mel_stft.griffin_lim(mel)
-        else:
-            raise NotImplemented
-        return audio
+    if algorithm == "griffin-lim":
+        mel_stft = MelSTFT()
+        audio = mel_stft.griffin_lim(mel)
+    else:
+        raise NotImplemented
+    return audio
 
 # Cell
 # adapted from https://github.com/patriceguyot/Yin
