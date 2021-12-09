@@ -17,11 +17,15 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from .models.common import STFT, MelSTFT
+<<<<<<< HEAD
 from .text.symbols import (
     DEFAULT_SYMBOLS,
     IPA_SYMBOLS,
     NVIDIA_TACO2_SYMBOLS,
 )
+=======
+from .text.symbols import DEFAULT_SYMBOLS, IPA_SYMBOLS, GRAD_TTS_SYMBOLS
+>>>>>>> WIP commit pre rebase
 from .text.util import cleaned_text_to_sequence, text_to_sequence
 from .utils.audio import compute_yin, load_wav_to_torch
 from .utils.utils import load_filepaths_and_text, intersperse
@@ -70,6 +74,8 @@ class TextMelDataset(Dataset):
         debug: bool = False,
         debug_dataset_size: int = None,
         oversample_weights=None,
+        add_blank=False,
+        blank_token=0,
     ):
         super().__init__()
         path = audiopaths_and_text
@@ -104,6 +110,8 @@ class TextMelDataset(Dataset):
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
         self.symbol_set = symbol_set
+        self.add_blank = add_blank
+        self.blank_token = blank_token
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -138,6 +146,12 @@ class TextMelDataset(Dataset):
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
         if not self.include_f0:
+            #             print(text_sequence)
+            if self.add_blank:
+                text_sequence = torch.Tensor(
+                    intersperse(text_sequence.numpy(), self.blank_token)
+                )  # add a blank token, whose id number is len(symbols)
+                print(text_sequence)
             return (text_sequence, melspec, speaker_id)
         f0 = self._get_f0(audio.data.cpu().numpy())
         f0 = torch.from_numpy(f0)[None]
@@ -149,7 +163,8 @@ class TextMelDataset(Dataset):
         """Return data for a single audio file + transcription."""
         try:
             data = self._get_data(self.audiopaths_and_text[idx])
-        except Exception:
+        except Exception as e:
+            print(e)
             print(f"Error while getting data: {self.audiopaths_and_text[idx]}")
             raise
         return data
@@ -158,6 +173,13 @@ class TextMelDataset(Dataset):
         if self.debug and self.debug_dataset_size:
             return min(self.debug_dataset_size, len(self.audiopaths_and_text))
         return len(self.audiopaths_and_text)
+
+    def sample_test_batch(self, size):
+        idx = np.random.choice(range(len(self)), size=size, replace=False)
+        test_batch = []
+        for index in idx:
+            test_batch.append(self.__getitem__(index))
+        return test_batch
 
 # Cell
 
@@ -554,7 +576,7 @@ class DistributedBucketSampler(DistributedSampler):
         if hi is None:
             hi = len(self.boundaries) - 1
 
-        if hi > lo:
+                    if hi > lo:
             mid = (hi + lo) // 2
             if self.boundaries[mid] < x and x <= self.boundaries[mid + 1]:
                 return mid
