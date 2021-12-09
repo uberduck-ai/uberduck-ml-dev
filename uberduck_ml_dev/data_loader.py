@@ -17,15 +17,12 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from .models.common import STFT, MelSTFT
-<<<<<<< HEAD
 from .text.symbols import (
     DEFAULT_SYMBOLS,
     IPA_SYMBOLS,
     NVIDIA_TACO2_SYMBOLS,
+    GRAD_TTS_SYMBOLS,
 )
-=======
-from .text.symbols import DEFAULT_SYMBOLS, IPA_SYMBOLS, GRAD_TTS_SYMBOLS
->>>>>>> WIP commit pre rebase
 from .text.util import cleaned_text_to_sequence, text_to_sequence
 from .utils.audio import compute_yin, load_wav_to_torch
 from .utils.utils import load_filepaths_and_text, intersperse
@@ -110,8 +107,6 @@ class TextMelDataset(Dataset):
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
         self.symbol_set = symbol_set
-        self.add_blank = add_blank
-        self.blank_token = blank_token
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -576,7 +571,7 @@ class DistributedBucketSampler(DistributedSampler):
         if hi is None:
             hi = len(self.boundaries) - 1
 
-                    if hi > lo:
+        if hi > lo:
             mid = (hi + lo) // 2
             if self.boundaries[mid] < x and x <= self.boundaries[mid + 1]:
                 return mid
