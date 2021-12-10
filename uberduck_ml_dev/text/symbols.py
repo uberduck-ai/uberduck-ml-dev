@@ -50,7 +50,7 @@ grad_tts_symbols = list(_pad + "-" + "!'(),.:;? " + _letters) + _arpabet
 DEFAULT_SYMBOLS = "default"
 IPA_SYMBOLS = "ipa"
 NVIDIA_TACO2_SYMBOLS = "nvidia_taco2"
-GRAD_TTS_SYMBOLS = "grad_tts"
+GRAD_TTS_SYMBOLS = "gradtts"
 
 SYMBOL_SETS = {
     DEFAULT_SYMBOLS: symbols,

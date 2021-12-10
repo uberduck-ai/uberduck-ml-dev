@@ -1,0 +1,8 @@
+{
+    "training_audiopaths_and_text": "/home/w_uberduck_ai/uberduck-rappers/lachow_train.txt",
+    "test_audiopaths_and_text": "/home/w_uberduck_ai/uberduck-rappers/lachow_val.txt",
+    "batch_size": 16,
+    "checkpoint": "/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/grad-tts.pt",
+    "log_dir": "lachow_warmstart_mldev",
+    "log_interval": 10
+}
