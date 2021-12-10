@@ -44,7 +44,7 @@ from ..text.symbols import SYMBOL_SETS
 # Cell
 from tqdm import tqdm
 from ..text.util import text_to_sequence, random_utterance
-from ..models.grad_tts import (
+from ..models.gradtts import (
     GradTTS,
 )
 from ..utils.utils import intersperse
