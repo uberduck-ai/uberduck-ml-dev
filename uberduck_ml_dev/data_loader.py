@@ -86,7 +86,7 @@ class TextMelDataset(Dataset):
         )
         self.text_cleaners = text_cleaners
         self.p_arpabet = p_arpabet
-        print(padding)
+
         self.stft = MelSTFT(
             filter_length=filter_length,
             hop_length=hop_length,
