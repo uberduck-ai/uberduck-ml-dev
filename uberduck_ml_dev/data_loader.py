@@ -25,7 +25,11 @@ from .text.symbols import (
 )
 from .text.util import cleaned_text_to_sequence, text_to_sequence
 from .utils.audio import compute_yin, load_wav_to_torch
-from .utils.utils import load_filepaths_and_text, intersperse
+from .utils.utils import (
+    load_filepaths_and_text,
+    intersperse,
+    mel_spectrogram,
+)
 
 # Cell
 from collections import defaultdict
@@ -60,6 +64,7 @@ class TextMelDataset(Dataset):
         mel_fmax: float,
         filter_length: int,
         hop_length: int,
+        padding: int,
         win_length: int,
         symbol_set: str,
         max_wav_value: float = 32768.0,
@@ -71,8 +76,8 @@ class TextMelDataset(Dataset):
         debug: bool = False,
         debug_dataset_size: int = None,
         oversample_weights=None,
-        add_blank=False,
-        blank_token=0,
+        intersperse_text=False,
+        intersperse_token=0,
     ):
         super().__init__()
         path = audiopaths_and_text
@@ -82,6 +87,7 @@ class TextMelDataset(Dataset):
         )
         self.text_cleaners = text_cleaners
         self.p_arpabet = p_arpabet
+        print(padding)
         self.stft = MelSTFT(
             filter_length=filter_length,
             hop_length=hop_length,
@@ -90,6 +96,7 @@ class TextMelDataset(Dataset):
             sampling_rate=sample_rate,
             mel_fmin=mel_fmin,
             mel_fmax=mel_fmax,
+            padding=padding,
         )
         self.max_wav_value = max_wav_value
         self.sample_rate = sample_rate
@@ -107,6 +114,8 @@ class TextMelDataset(Dataset):
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
         self.symbol_set = symbol_set
+        self.intersperse_text = intersperse_text
+        self.intersperse_token = intersperse_token
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -135,18 +144,19 @@ class TextMelDataset(Dataset):
                 symbol_set=self.symbol_set,
             )
         )
+        if self.intersperse_text:
+            text_sequence = torch.LongTensor(
+                intersperse(text_sequence.numpy(), self.intersperse_token)
+            )  # add a blank token, whose id number is len(symbols)
+
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
+        #         print(f"mel size: {melspec.size()}")
+        #         print(f"sequence size: {text_sequence.size()}")
         if not self.include_f0:
-            #             print(text_sequence)
-            if self.add_blank:
-                text_sequence = torch.Tensor(
-                    intersperse(text_sequence.numpy(), self.blank_token)
-                )  # add a blank token, whose id number is len(symbols)
-                print(text_sequence)
             return (text_sequence, melspec, speaker_id)
         f0 = self._get_f0(audio.data.cpu().numpy())
         f0 = torch.from_numpy(f0)[None]

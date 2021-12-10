@@ -68,6 +68,7 @@ symbol_to_id = {
     NVIDIA_TACO2_SYMBOLS: {
         s: i for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
     },
+    GRAD_TTS_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
 }
 id_to_symbol = {
     DEFAULT_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
@@ -75,6 +76,7 @@ id_to_symbol = {
     NVIDIA_TACO2_SYMBOLS: {
         i: s for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
     },
+    GRAD_TTS_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
 }
 
 curly_re = re.compile(r"(.*?)\{(.+?)\}(.*)")
