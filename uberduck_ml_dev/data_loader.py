@@ -28,7 +28,6 @@ from .utils.audio import compute_yin, load_wav_to_torch
 from .utils.utils import (
     load_filepaths_and_text,
     intersperse,
-    mel_spectrogram,
 )
 
 # Cell
