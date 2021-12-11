@@ -21,6 +21,7 @@ from ..utils.plot import (
     plot_spectrogram,
 )
 from ..text.util import text_to_sequence, random_utterance
+from ..vocoders.hifigan import HiFiGan
 
 
 class TTSTrainer:
@@ -106,6 +107,16 @@ class TTSTrainer:
         if algorithm == "griffin-lim":
             mel_stft = MelSTFT()
             audio = mel_stft.griffin_lim(mel)
+        elif algorithm == "hifigan":
+            assert kwargs["hifigan_config"], "hifigan_config must be set"
+            assert kwargs["hifigan_checkpoint"], "hifigan_checkpoint must be set"
+            cuda_enabled = kwargs["cuda_enabled"] ? kwargs["cuda_enabled"] : False
+            hifigan = HiFiGan(
+                config=kwargs["hifigan_config"],
+                checkpoint=kwargs["hifigan_checkpoint"],
+                cuda_enabled=cuda_enabled,
+            )
+            audio = hifigan.infer(mel)
         else:
             raise NotImplemented
         return audio
