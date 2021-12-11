@@ -62,6 +62,7 @@ class GradTTSTrainer(TTSTrainer):
             if not hasattr(self, param):
                 raise Exception(f"GradTTSTrainer missing a required param: {param}")
         self.sampling_rate = self.hparams.sampling_rate
+        self.checkpoint_path = self.hparams.log_dir
 
     def sample_inference(self, model, timesteps=10, spk=None):
         with torch.no_grad():
