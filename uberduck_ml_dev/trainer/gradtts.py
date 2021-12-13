@@ -88,7 +88,12 @@ class GradTTSTrainer(TTSTrainer):
                 length_scale=0.91,
             )
             audio = self.sample(
-                y_dec.cpu()[0],
+                y_dec,
+                algorithm="hifigan",
+                hifigan_config="/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/hifigan-config.json",
+                hifigan_checkpoint="/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/gen_02640000_studio",
+                max_wav_value=32768,
+                cudnn_enabled=self.hparams.cudnn_enabled,
             )
             return audio
 
@@ -205,17 +210,10 @@ class GradTTSTrainer(TTSTrainer):
                 prior_losses.append(prior_loss.item())
                 diff_losses.append(diff_loss.item())
 
-                #                 if batch_idx % 5 == 0:
-                #                     msg = f"Epoch: {epoch}, iter: {iteration} | dur_loss: {dur_loss.item():.5f}, prior_loss: {prior_loss.item():.5f}, diff_loss: {diff_loss.item():.5f}"
-                #                     print(msg)
-
                 iteration += 1
 
             log_msg = f"Epoch {epoch}, iter: {iteration}: dur_loss: {np.mean(dur_losses):.4f} | prior_loss: {np.mean(prior_losses):.4f} | diff_loss: {np.mean(diff_losses):.4f} | time: {time.time()-last_time:.2f}s"
             last_time = time.time()
-            #             log_msg += "| prior_loss: %.5f " % np.mean(prior_losses)
-            #             log_msg += "| diffusion_loss: %.5f" % np.mean(diff_losses)
-            #             log_msg += "| time: %.5f" % time.time() - last_time
             with open(f"{self.hparams.log_dir}/train.log", "a") as f:
                 f.write(log_msg + "\n")
                 print(log_msg)
@@ -250,4 +248,6 @@ class GradTTSTrainer(TTSTrainer):
                         )
 
             if epoch % self.save_every == 0:
-                self.save_checkpoint(checkpoint_name=f"grad_{epoch}.pt")
+                torch.save(
+                    model.state_dict(), f=f"{self.hparams.log_dir}/grad_{epoch}.pt"
+                )

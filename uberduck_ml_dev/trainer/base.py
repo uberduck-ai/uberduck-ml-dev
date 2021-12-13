@@ -12,6 +12,7 @@ from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 import time
 
 from ..models.common import MelSTFT
@@ -110,13 +111,20 @@ class TTSTrainer:
         elif algorithm == "hifigan":
             assert kwargs["hifigan_config"], "hifigan_config must be set"
             assert kwargs["hifigan_checkpoint"], "hifigan_checkpoint must be set"
-            cuda_enabled = kwargs["cuda_enabled"] ? kwargs["cuda_enabled"] : False
+            cudnn_enabled = (
+                kwargs["cudnn_enabled"] if kwargs["cudnn_enabled"] else False
+            )
+            max_wav_value = (
+                kwargs["max_wav_value"] if kwargs["max_wav_value"] else 32768.0
+            )
+
             hifigan = HiFiGan(
                 config=kwargs["hifigan_config"],
                 checkpoint=kwargs["hifigan_checkpoint"],
-                cuda_enabled=cuda_enabled,
+                cudnn_enabled=cudnn_enabled,
             )
             audio = hifigan.infer(mel)
+            audio = audio / np.max(audio)
         else:
             raise NotImplemented
         return audio
