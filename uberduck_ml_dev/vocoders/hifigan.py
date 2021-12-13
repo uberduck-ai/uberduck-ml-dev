@@ -47,9 +47,13 @@ class HiFiGan:
             h = AttrDict(json.load(f))
         return h
 
+    @torch.no_grad()
     def infer(self, mel, max_wav_value=32768):
         _ = self.vocoder.eval()
-        self.vocoder.remove_weight_norm()
+        try:
+            self.vocoder.remove_weight_norm()
+        except Exception as e:
+            print("weight norm already removed")
 
         audio = (
             self.vocoder.forward(mel).cpu().squeeze().clamp(-1, 1).numpy()
