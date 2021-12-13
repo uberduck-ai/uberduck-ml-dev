@@ -18,6 +18,8 @@ import torch.nn.functional as F
 from .base import TTSModel
 from ..vendor.tfcompat.hparam import HParams
 from ..text.symbols import SYMBOL_SETS
+from ..text.util import text_to_sequence
+from ..utils.utils import intersperse
 
 # Cell
 
@@ -977,17 +979,36 @@ class GradTTS(TTSModel):
     @torch.no_grad()
     def infer(
         self,
-        x,
-        x_lengths,
+        text,
         n_timesteps,
+        cleaner_names=["english_cleaners"],
         temperature=1.0,
         stoc=False,
         spk=None,
         length_scale=1.0,
+        intersperse_text=True,
+        intersperse_token=148,
     ):
-        return self.infer(
-            x, x_lengths, n_timesteps, temperature, stoc, spk, length_scale
+        seq = text_to_sequence(
+            text, cleaner_names=cleaner_names, p_arpabet=1.0, symbol_set="gradtts"
         )
+        if intersperse_text:
+            x = torch.LongTensor(intersperse(seq, intersperse_token)).cuda()[None]
+        else:
+            x = torch.LongTensor(seq).cuda()[None]
+
+        x_lengths = torch.LongTensor([x.shape[-1]]).cuda()
+
+        y_enc, y_dec, attn = self.forward(
+            x,
+            x_lengths,
+            n_timesteps=n_timesteps,
+            temperature=temperature,
+            stoc=stoc,
+            spk=spk,
+            length_scale=length_scale,
+        )
+        return y_enc, y_dec, attn
 
     def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
         """
