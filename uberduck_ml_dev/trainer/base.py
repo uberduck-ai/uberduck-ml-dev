@@ -114,10 +114,6 @@ class TTSTrainer:
             cudnn_enabled = (
                 kwargs["cudnn_enabled"] if kwargs["cudnn_enabled"] else False
             )
-            max_wav_value = (
-                kwargs["max_wav_value"] if kwargs["max_wav_value"] else 32768.0
-            )
-
             hifigan = HiFiGan(
                 config=kwargs["hifigan_config"],
                 checkpoint=kwargs["hifigan_checkpoint"],

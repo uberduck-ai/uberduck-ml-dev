@@ -92,7 +92,6 @@ class GradTTSTrainer(TTSTrainer):
                 algorithm="hifigan",
                 hifigan_config="/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/hifigan-config.json",
                 hifigan_checkpoint="/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/gen_02640000_studio",
-                max_wav_value=32768,
                 cudnn_enabled=self.hparams.cudnn_enabled,
             )
             return audio
@@ -115,9 +114,7 @@ class GradTTSTrainer(TTSTrainer):
             self.hparams.win_length,
             intersperse_text=self.hparams.intersperse_text,
             intersperse_token=(len(SYMBOL_SETS[self.hparams.symbol_set])),
-            symbol_set=self.hparams.symbol_set
-            #             debug=self.debug,
-            #             debug_dataset_size=self.debug_dataset_size,
+            symbol_set=self.hparams.symbol_set,
         )
         collate_fn = TextMelCollate()
 
@@ -145,8 +142,6 @@ class GradTTSTrainer(TTSTrainer):
             intersperse_text=self.hparams.intersperse_text,
             intersperse_token=(len(SYMBOL_SETS[self.hparams.symbol_set])),
             symbol_set=self.hparams.symbol_set,
-            #             debug=self.debug,
-            #             debug_dataset_size=self.debug_dataset_size,
         )
 
         model = GradTTS(self.hparams)

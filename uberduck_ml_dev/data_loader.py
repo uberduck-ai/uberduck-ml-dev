@@ -153,8 +153,6 @@ class TextMelDataset(Dataset):
         audio_norm = audio_norm.unsqueeze(0)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
-        #         print(f"mel size: {melspec.size()}")
-        #         print(f"sequence size: {text_sequence.size()}")
         if not self.include_f0:
             return (text_sequence, melspec, speaker_id)
         f0 = self._get_f0(audio.data.cpu().numpy())
@@ -168,8 +166,8 @@ class TextMelDataset(Dataset):
         try:
             data = self._get_data(self.audiopaths_and_text[idx])
         except Exception as e:
-            print(e)
             print(f"Error while getting data: {self.audiopaths_and_text[idx]}")
+            print(e)
             raise
         return data
 
