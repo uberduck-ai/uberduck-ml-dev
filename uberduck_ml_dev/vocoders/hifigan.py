@@ -8,6 +8,12 @@ __all__ = ['HiFiGan', 'ResBlock1', 'ResBlock2', 'Generator', 'DiscriminatorP', '
 
 """ from https://github.com/jik876/hifi-gan """
 
+import argparse
+import json
+import datetime as dt
+import numpy as np
+from scipy.io.wavfile import write
+
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -18,9 +24,10 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
 
 class HiFiGan:
-    def __init__(self, config, checkpoint, cuda_enabled=False):
+    def __init__(self, config, checkpoint, cudnn_enabled=False):
         self.config = config
         self.checkpoint = checkpoint
+        self.cudnn_enabled = cudnn_enabled
         self.vocoder = self.load_checkpoint()
 
     def load_checkpoint(self):
@@ -31,10 +38,8 @@ class HiFiGan:
                 "generator"
             ]
         )
-        if cuda_enabled:
+        if self.cudnn_enabled:
             vocoder = vocoder.cuda()
-        _ = vocoder.eval()
-        vocoder.remove_weight_norm()
         return vocoder
 
     def load_config(self):
@@ -42,9 +47,13 @@ class HiFiGan:
             h = AttrDict(json.load(f))
         return h
 
-    def infer(self, mel):
+    def infer(self, mel, max_wav_value=32768):
+        _ = self.vocoder.eval()
+        self.vocoder.remove_weight_norm()
+
         audio = (
-            self.vocoder.forward(mel).cpu().squeeze().clamp(-1, 1).numpy() * 32768
+            self.vocoder.forward(mel).cpu().squeeze().clamp(-1, 1).numpy()
+            * max_wav_value
         ).astype(np.int16)
         return audio
 
@@ -243,7 +252,6 @@ class Generator(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        print("Removing weight norm...")
         for l in self.ups:
             remove_weight_norm(l)
         for l in self.resblocks:
