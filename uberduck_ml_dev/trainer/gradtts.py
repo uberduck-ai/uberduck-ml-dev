@@ -174,7 +174,6 @@ class GradTTSTrainer(TTSTrainer):
                 0,
                 image=plot_tensor(mel.squeeze()),
             )
-
         iteration = 0
         last_time = time.time()
         for epoch in range(1, self.hparams.n_epochs + 1):
