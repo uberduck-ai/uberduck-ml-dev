@@ -2,6 +2,8 @@ experiments/outputs/*
 experiments/outputs_processed/*
 experiments/logs/*
 src/vendor_tools/*
+docker/secrets/*
+
 *.bak
 .gitattributes
 .last_checked
