@@ -9,7 +9,11 @@
 
 ## Installation
 
-TODO
+```
+conda create -n 'uberduck-ml-dev' python=3.8
+source activate uberduck-ml-dev
+pip install git+git://github.com/uberduck-ai/uberduck-ml-dev 
+```
 
 ## Development
 
@@ -30,6 +34,11 @@ All development takes place in Jupyter notebooks in `$REPO_ROOT/nbs`, which are 
 
 ```bash
 ./build_lib
+```
+
+Then install the library
+```bash
+python setup.py develop
 ```
 
 ### 🚩 Testing

@@ -61,7 +61,7 @@ if cfg.get("pip_requirements"):
     requirements += cfg.get("pip_requirements", "").split()
 dev_requirements = (cfg.get("dev_requirements") or "").split()
 
-long_description = open("README.md").read()
+long_description = open("README.md", encoding='utf-8').read()
 # ![png](docs/images/output_13_0.png)
 for ext in ["png", "svg"]:
     long_description = re.sub(
