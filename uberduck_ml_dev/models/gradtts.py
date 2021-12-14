@@ -1172,13 +1172,15 @@ class GradTTS(TTSModel):
         )
         return y_enc, y_dec, attn
 
-    def infer_editts(
+    def infer_editts_edit_content(
         self,
-        text1: str,
-        text2: str,
-        n_timesteps: int,
-        symbol_set: str,
-        intersperse_token: int = 148,
+        text1,
+        text2,
+        n_timesteps,
+        symbol_set,
+        mel1=None,
+        mel2=None,
+        intersperse_token=148,
     ):
         """
         EdiTTS
@@ -1199,7 +1201,7 @@ class GradTTS(TTSModel):
         y_dec_cat: Mel spectrogram of source of text2 substituted in to text1 via mel concatenation
 
         Usage:
-        y_dec1, y_dec2, y_dec_edit, y_dec_cat = model.infer_editts("This is a | blue | pencil.",
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = model.infer_editts_edit_content("This is a | blue | pencil.",
                                                                     "This is a | red | pen.",
                                                                     n_timesteps=10,
                                                                     symbol_set="gradtts")
@@ -1229,6 +1231,8 @@ class GradTTS(TTSModel):
             x_lengths2,
             emphases1,
             emphases2,
+            mel1,
+            mel2,
             n_timesteps=n_timesteps,
             temperature=1.5,
             stoc=False,
@@ -1441,6 +1445,8 @@ class GradTTS(TTSModel):
         emphases1,
         emphases2,
         n_timesteps,
+        mel1=None,
+        mel2=None,
         temperature=1.0,
         stoc=False,
         length_scale=1.0,
@@ -1453,6 +1459,27 @@ class GradTTS(TTSModel):
         def _process_input(x, x_lengths):
             x, x_lengths = self.relocate_input([x, x_lengths])
 
+            mu_x, logw, x_mask = self.encoder(x, x_lengths)
+            w = torch.exp(logw) * x_mask
+            w_ceil = torch.ceil(w) * length_scale
+            y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+            y_max_length = int(y_lengths.max())
+            y_max_length_ = fix_len_compatibility(y_max_length)
+
+            y_mask = (
+                sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
+            )
+            attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+            attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+
+            mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
+            mu_y = mu_y.transpose(1, 2)  # [1, n_mels, T]
+            return mu_y, attn, y_mask, y_max_length, y_lengths
+
+        def _process_audio_input(x, x_lengths, mel):
+            x, x_lengths = self.relocate_input([x, x_lengths])
+
+            # Need to get encoded text, durations, and masks
             mu_x, logw, x_mask = self.encoder(x, x_lengths)
             w = torch.exp(logw) * x_mask
             w_ceil = torch.ceil(w) * length_scale
@@ -1493,12 +1520,23 @@ class GradTTS(TTSModel):
         assert emphases1 is not None and emphases2 is not None
         assert len(emphases1) == 1 and len(emphases2) == 1
 
-        mu_y1, attn1, y1_mask, y1_max_length, y1_lengths = _process_input(
-            x1, x1_lengths
-        )  # mu_y1: [1, n_mels, T]
-        mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_input(
-            x2, x2_lengths
-        )  # mu_y2: [1, n_mels, T]
+        if mel1:
+            mu_y1, attn1, y1_mask, y1_max_length, y1_lengths = _process_audio_input(
+                x1, x1_lengths, mel1
+            )
+        else:
+            mu_y1, attn1, y1_mask, y1_max_length, y1_lengths = _process_input(
+                x1, x1_lengths
+            )  # mu_y1: [1, n_mels, T]
+
+        if mel2:
+            mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_audio_input(
+                x2, x2_lengths, mel2
+            )  # mu_y2: [1, n_mels, T]
+        else:
+            mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_input(
+                x2, x2_lengths
+            )  # mu_y2: [1, n_mels, T]
 
         attn1 = attn1.squeeze()  # [N, T]
         attn2 = attn2.squeeze()  # [N, T]
