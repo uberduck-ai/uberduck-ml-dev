@@ -2,8 +2,9 @@
 
 __all__ = ['BaseModule', 'Mish', 'Upsample', 'Downsample', 'Rezero', 'Block', 'ResnetBlock', 'LinearAttention',
            'Residual', 'SinusoidalPosEmb', 'GradLogPEstimator2d', 'get_noise', 'Diffusion', 'sequence_mask',
-           'fix_len_compatibility', 'convert_pad_shape', 'generate_path', 'duration_loss', 'LayerNorm', 'ConvReluNorm',
-           'DurationPredictor', 'MultiHeadAttention', 'FFN', 'Encoder', 'TextEncoder', 'GradTTS', 'DEFAULTS']
+           'fix_len_compatibility', 'fix_len_compatibility_text_edit', 'convert_pad_shape', 'generate_path',
+           'duration_loss', 'LayerNorm', 'ConvReluNorm', 'DurationPredictor', 'MultiHeadAttention', 'FFN', 'Encoder',
+           'TextEncoder', 'GradTTS', 'DEFAULTS']
 
 # Cell
 import random
@@ -18,8 +19,8 @@ import torch.nn.functional as F
 from .base import TTSModel
 from ..vendor.tfcompat.hparam import HParams
 from ..text.symbols import SYMBOL_SETS
-from ..text.util import text_to_sequence
-from ..utils.utils import intersperse
+from ..text.util import text_to_sequence, text_to_sequence_for_editts
+from ..utils.utils import intersperse, intersperse_emphases
 
 # Cell
 
@@ -367,6 +368,160 @@ class Diffusion(BaseModule):
         t = torch.clamp(t, offset, 1.0 - offset)
         return self.loss_t(x0, mask, mu, t, spk)
 
+    @torch.no_grad()
+    def double_forward_pitch(
+        self,
+        z,
+        z_edit,
+        mu,
+        mu_edit,
+        mask,
+        mask_edit,
+        n_timesteps,
+        stoc=False,
+        soften_mask=True,
+        n_soften=20,
+    ):
+        if soften_mask:
+            kernel = [
+                2 ** ((n_soften - 1) - abs(n_soften - 1 - i))
+                for i in range(2 * n_soften - 1)
+            ]  # [1, 2, 4, ..., 2^n_soften , 2^(n_soften-1), ..., 2, 1]
+            kernel = [i / sum(kernel[: len(kernel) // 2 + 1]) for i in kernel]
+            w = torch.tensor(kernel).view(1, 1, 1, len(kernel)).to(mask_edit.device)
+            mask_edit_soft = mask_edit.unsqueeze(1).contiguous()
+            mask_edit_soft = F.pad(
+                mask_edit_soft,
+                (len(kernel) // 2, len(kernel) // 2, 0, 0),
+                mode="replicate",
+            )
+            mask_edit_soft = F.conv2d(
+                mask_edit_soft,
+                w,
+                bias=None,
+                stride=1,
+            )
+            mask_edit_soft = mask_edit_soft.squeeze(1)
+            mask_edit = mask_edit + (1 - mask_edit) * mask_edit_soft
+
+        h = 1.0 / n_timesteps
+        xt = z * mask
+        xt_edit = z_edit * mask
+
+        for i in range(n_timesteps):
+            t = (1.0 - (i + 0.5) * h) * torch.ones(
+                z.shape[0], dtype=z.dtype, device=z.device
+            )
+            time = t.unsqueeze(-1).unsqueeze(-1)
+            noise_t = get_noise(time, self.beta_min, self.beta_max, cumulative=False)
+            if stoc:  # adds stochastic term
+                # NOTE: should not come here
+                assert False
+                dxt_det = 0.5 * (mu - xt) - self.estimator(xt, mask, mu, t)
+                dxt_det = dxt_det * noise_t * h
+                dxt_stoc = torch.randn(
+                    z.shape, dtype=z.dtype, device=z.device, requires_grad=False
+                )
+                dxt_stoc = dxt_stoc * torch.sqrt(noise_t * h)
+                dxt = dxt_det + dxt_stoc
+            else:
+                dxt = 0.5 * (mu - xt - self.estimator(xt, mask, mu, t))
+                dxt = dxt * noise_t * h
+                dxt_edit = 0.5 * (
+                    mu_edit - xt_edit - self.estimator(xt_edit, mask, mu_edit, t)
+                )
+                dxt_edit = dxt_edit * noise_t * h
+            xt = (xt - dxt) * mask
+            xt_edit = (xt_edit - ((1 - mask_edit) * dxt + mask_edit * dxt_edit)) * mask
+        return xt, xt_edit
+
+    @torch.no_grad()
+    def double_forward_text(
+        self,
+        z,
+        z_edit,
+        mu,
+        mu_edit,
+        mask,
+        mask_edit_net,
+        mask_edit_grad,
+        i1,
+        j1,
+        i2,
+        j2,
+        n_timesteps,
+        stoc=False,
+        soften_mask=True,
+        n_soften=20,
+    ):
+        if soften_mask:
+            kernel = [
+                2 ** ((n_soften - 1) - abs(n_soften - 1 - i))
+                for i in range(2 * n_soften - 1)
+            ]  # [1, 2, 4, ..., 2^n_soften , 2^(n_soften-1), ..., 2, 1]
+            kernel = [i / sum(kernel[: len(kernel) // 2 + 1]) for i in kernel]
+            w = (
+                torch.tensor(kernel)
+                .view(1, 1, 1, len(kernel))
+                .to(mask_edit_grad.device)
+                .float()
+            )
+            mask_edit_soft = mask_edit_grad.unsqueeze(1).contiguous()
+            mask_edit_soft = F.pad(
+                mask_edit_soft,
+                (len(kernel) // 2, len(kernel) // 2, 0, 0),
+                mode="replicate",
+            )
+            mask_edit_soft = F.conv2d(
+                mask_edit_soft,
+                w,
+                bias=None,
+                stride=1,
+            )
+            mask_edit_soft = mask_edit_soft.squeeze(1)
+            mask_edit_grad = mask_edit_grad + (1 - mask_edit_grad) * mask_edit_soft
+
+        h = 1.0 / n_timesteps
+        xt = z * mask
+        xt_edit = z_edit * mask_edit_net
+
+        for i in range(n_timesteps):
+            t = (1.0 - (i + 0.5) * h) * torch.ones(
+                z.shape[0], dtype=z.dtype, device=z.device
+            )
+            time = t.unsqueeze(-1).unsqueeze(-1)
+            noise_t = get_noise(time, self.beta_min, self.beta_max, cumulative=False)
+            if stoc:  # adds stochastic term
+                # NOTE: should not come here
+                assert False
+                dxt_det = 0.5 * (mu - xt) - self.estimator(xt, mask, mu, t)
+                dxt_det = dxt_det * noise_t * h
+                dxt_stoc = torch.randn(
+                    z.shape, dtype=z.dtype, device=z.device, requires_grad=False
+                )
+                dxt_stoc = dxt_stoc * torch.sqrt(noise_t * h)
+                dxt = dxt_det + dxt_stoc
+            else:
+                dxt = 0.5 * (mu - xt - self.estimator(xt, mask, mu, t))
+                dxt = dxt * noise_t * h
+                dxt_edit = 0.5 * (
+                    mu_edit
+                    - xt_edit
+                    - self.estimator(xt_edit, mask_edit_net, mu_edit, t)
+                )
+                dxt_edit = dxt_edit * noise_t * h
+
+            xt = (xt - dxt) * mask
+
+            dxt_trg = torch.zeros_like(dxt_edit)
+            dxt_trg[:, :, i1 : i1 + (j2 - i2)] = dxt[:, :, i2:j2]
+
+            xt_edit = (
+                xt_edit - (mask_edit_grad * dxt_trg + (1 - mask_edit_grad) * dxt_edit)
+            ) * mask_edit_net
+
+        return xt, xt_edit
+
 # Cell
 """ from https://github.com/jaywalnut310/glow-tts """
 
@@ -383,6 +538,13 @@ def fix_len_compatibility(length, num_downsamplings_in_unet=2):
         if length % (2 ** num_downsamplings_in_unet) == 0:
             return length
         length += 1
+
+
+def fix_len_compatibility_text_edit(length, num_downsamplings_in_unet=2):
+    while True:
+        if length % (2 ** num_downsamplings_in_unet) == 0:
+            return length
+        length -= 1
 
 
 def convert_pad_shape(pad_shape):
@@ -1010,6 +1172,59 @@ class GradTTS(TTSModel):
         )
         return y_enc, y_dec, attn
 
+    def infer_edit_synthetic_audio(
+        self, text1, text2, n_timesteps, symbol_set, intersperse_token=148
+    ):
+        sequence1, emphases1 = text_to_sequence_for_editts(
+            text1, cleaner_names=["english_cleaners"], symbol_set=symbol_set
+        )
+        sequence2, emphases2 = text_to_sequence_for_editts(
+            text2, cleaner_names=["english_cleaners"], symbol_set=symbol_set
+        )
+        x1 = torch.LongTensor(intersperse(sequence1, intersperse_token)).cuda()[None]
+        x2 = torch.LongTensor(intersperse(sequence2, intersperse_token)).cuda()[None]
+        emphases1 = intersperse_emphases(emphases1)
+        emphases2 = intersperse_emphases(emphases2)
+        x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
+        x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
+
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = self.edit_content(
+            x1,
+            x2,
+            x_lengths1,
+            x_lengths2,
+            emphases1,
+            emphases2,
+            n_timesteps=n_timesteps,
+            temperature=1.5,
+            stoc=False,
+            length_scale=0.91,
+        )
+        return y_dec1, y_dec2, y_dec_edit, y_dec_cat
+
+    def edit_synthetic_audio(text, text2):
+        sequence1, emphases1 = text_to_sequence_for_editts(text1)
+        sequence2, emphases2 = text_to_sequence_for_editts(text2)
+        x1 = torch.LongTensor(intersperse(sequence1, len(symbols))).cuda()[None]
+        x2 = torch.LongTensor(intersperse(sequence2, len(symbols))).cuda()[None]
+        emphases1 = intersperse_emphases(emphases1)
+        emphases2 = intersperse_emphases(emphases2)
+        x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
+        x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
+
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = generator.edit_content(
+            x1,
+            x2,
+            x_lengths1,
+            x_lengths2,
+            emphases1,
+            emphases2,
+            n_timesteps=args.timesteps,
+            temperature=1.5,
+            stoc=False,
+            length_scale=0.91,
+        )
+
     def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
         """
         Computes 3 losses:
@@ -1107,6 +1322,252 @@ class GradTTS(TTSModel):
         prior_loss = prior_loss / (torch.sum(y_mask) * self.n_feats)
 
         return dur_loss, prior_loss, diff_loss
+
+    @torch.no_grad()
+    def edit_pitch(
+        self,
+        x,
+        x_lengths,
+        n_timesteps,
+        temperature=1.0,
+        stoc=False,
+        length_scale=1.0,
+        soften_mask=True,
+        n_soften=16,
+        emphases=None,
+        direction="up",
+    ):
+        x, x_lengths = self.relocate_input([x, x_lengths])
+
+        mu_x, logw, x_mask = self.encoder(x, x_lengths)
+
+        w = torch.exp(logw) * x_mask
+        w_ceil = torch.ceil(w) * length_scale
+        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        y_max_length = int(y_lengths.max())
+        y_max_length_ = fix_len_compatibility(y_max_length)
+
+        y_mask = sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
+        attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+        attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+
+        mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
+        mu_y = mu_y.transpose(1, 2)
+
+        eps = torch.randn_like(mu_y, device=mu_y.device) / temperature
+        z = mu_y + eps
+
+        encoder_outputs = mu_y[:, :, :y_max_length]
+
+        mu_x_edit = mu_x.clone()
+        mask_edit = torch.zeros_like(mu_x[:, :1, :])
+        for j, (start, end) in enumerate(emphases):
+            mask_edit[:, :, start:end] = 1
+            mu_x_edit[:, :, start:end] = shift_mel(
+                mu_x_edit[:, :, start:end], direction=direction
+            )
+
+        mu_y_edit = torch.matmul(
+            attn.squeeze(1).transpose(1, 2), mu_x_edit.transpose(1, 2)
+        )
+        mask_edit = torch.matmul(
+            attn.squeeze(1).transpose(1, 2), mask_edit.transpose(1, 2)
+        )
+
+        mu_y_edit = mu_y_edit.transpose(1, 2)
+        mask_edit = mask_edit.transpose(1, 2)  # [B, 1, T]
+        mask_edit[:, :, y_max_length:] = mask_edit[
+            :, :, y_max_length - 1
+        ]  # for soften_mask
+
+        z_edit = mu_y_edit + eps
+
+        dec_out, dec_edit = self.decoder.double_forward_pitch(
+            z,
+            z_edit,
+            mu_y,
+            mu_y_edit,
+            y_mask,
+            mask_edit,
+            n_timesteps,
+            stoc,
+            soften_mask,
+            n_soften,
+        )
+
+        # For baseline
+        emphases_expanded = []
+        attn = attn.squeeze()
+        for start, end in emphases:
+            i = attn[:start].sum().long().item() if start > 0 else 0
+            j = attn[:end].sum().long().item()
+            itv = [i, j]
+            emphases_expanded.append(itv)
+
+        dec_out = dec_out[:, :, :y_max_length]
+        dec_baseline = dec_out.clone()
+        for start, end in emphases_expanded:
+            dec_baseline[:, :, start:end] = shift_mel(
+                dec_baseline[:, :, start:end], direction=direction
+            )
+        dec_edit = dec_edit[:, :, :y_max_length]
+
+        return dec_out, dec_baseline, dec_edit
+
+    @torch.no_grad()
+    def edit_content(
+        self,
+        x1,
+        x2,
+        x1_lengths,
+        x2_lengths,
+        emphases1,
+        emphases2,
+        n_timesteps,
+        temperature=1.0,
+        stoc=False,
+        length_scale=1.0,
+        soften_mask=True,
+        n_soften_text=9,
+        n_soften=16,
+        amax=0.9,
+        amin=0.1,
+    ):
+        def _process_input(x, x_lengths):
+            x, x_lengths = self.relocate_input([x, x_lengths])
+
+            mu_x, logw, x_mask = self.encoder(x, x_lengths)
+            w = torch.exp(logw) * x_mask
+            w_ceil = torch.ceil(w) * length_scale
+            y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+            y_max_length = int(y_lengths.max())
+            y_max_length_ = fix_len_compatibility(y_max_length)
+
+            y_mask = (
+                sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
+            )
+            attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+            attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+
+            mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
+            mu_y = mu_y.transpose(1, 2)  # [1, n_mels, T]
+            return mu_y, attn, y_mask, y_max_length, y_lengths
+
+        def _soften_juntions(
+            y_edit, y1, y2, y_edit_lengths, y1_lengths, y2_lengths, i1, j1, i2, j2
+        ):
+            for n in range(1, n_soften_text + 1):
+                alpha = (amax - amin) * (n_soften_text - n) / (n_soften_text - 1) + amin
+                if i1 - n >= 0 and i2 - n >= 0:
+                    y_edit[:, :, i1 - n] = (1 - alpha) * y1[:, :, i1 - n] + alpha * y2[
+                        :, :, i2 - n
+                    ]
+                if (
+                    i1 + (j2 - i2) + n < y_edit_lengths
+                    and j1 + (n - 1) < y1_lengths
+                    and j2 + (n - 1) < y2_lengths
+                ):
+                    y_edit[:, :, i1 + (j2 - i2) + (n - 1)] = (1 - alpha) * y1[
+                        :, :, j1 + (n - 1)
+                    ] + alpha * y2[:, :, j2 + (n - 1)]
+            return y_edit
+
+        assert len(x1) == 1 and len(x2) == 1
+        assert emphases1 is not None and emphases2 is not None
+        assert len(emphases1) == 1 and len(emphases2) == 1
+
+        mu_y1, attn1, y1_mask, y1_max_length, y1_lengths = _process_input(
+            x1, x1_lengths
+        )  # mu_y1: [1, n_mels, T]
+        mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_input(
+            x2, x2_lengths
+        )  # mu_y2: [1, n_mels, T]
+
+        attn1 = attn1.squeeze()  # [N, T]
+        attn2 = attn2.squeeze()  # [N, T]
+
+        i1 = attn1[: emphases1[0][0]].sum().long().item() if emphases1[0][0] > 0 else 0
+        j1 = attn1[: emphases1[0][1]].sum().long().item()
+        i2 = attn2[: emphases2[0][0]].sum().long().item() if emphases2[0][0] > 0 else 0
+        j2 = attn2[: emphases2[0][1]].sum().long().item()
+
+        # Step 1. Direct concatenation
+        mu_y1_a, mu_y1_c = mu_y1[:, :, :i1], mu_y1[:, :, j1:y1_lengths]
+        mu_y2_b = mu_y2[:, :, i2:j2]
+        mu_y_edit = torch.cat((mu_y1_a, mu_y2_b, mu_y1_c), dim=2)
+        y_edit_lengths = int(mu_y_edit.shape[2])
+
+        # Step 2. Soften junctions
+        mu_y_edit = _soften_juntions(
+            mu_y_edit,
+            mu_y1,
+            mu_y2,
+            y_edit_lengths,
+            y1_lengths,
+            y2_lengths,
+            i1,
+            j1,
+            i2,
+            j2,
+        )
+
+        y_edit_length_ = fix_len_compatibility_text_edit(y_edit_lengths)
+        y_edit_lengths_tensor = torch.tensor([y_edit_lengths]).long().to(x1.device)
+        y_edit_mask_for_scorenet = (
+            sequence_mask(y_edit_lengths_tensor, y_edit_length_)
+            .unsqueeze(1)
+            .to(mu_y1.dtype)
+        )
+
+        eps1 = torch.randn_like(mu_y1, device=mu_y1.device) / temperature
+        eps2 = torch.randn_like(mu_y2, device=mu_y1.device) / temperature
+        eps_edit = torch.cat(
+            (eps1[:, :, :i1], eps2[:, :, i2:j2], eps1[:, :, j1:y1_lengths]), dim=2
+        )
+        z1 = mu_y1 + eps1
+        z2 = mu_y2 + eps2
+        z_edit = mu_y_edit + eps_edit
+
+        if z_edit.shape[2] < y_edit_length_:
+            pad = y_edit_length_ - z_edit.shape[2]
+            zeros = torch.zeros_like(z_edit[:, :, :pad])
+            z_edit = torch.cat((z_edit, zeros), dim=2)
+            mu_y_edit = torch.cat((mu_y_edit, zeros), dim=2)
+        elif z_edit.shape[2] > y_edit_length_:
+            res = z_edit.shape[2] - y_edit_length_
+            z_edit = z_edit[:, :, :-res]
+            mu_y_edit = mu_y_edit[:, :, :-res]
+
+        y_edit_mask_for_gradient = torch.zeros_like(mu_y_edit[:, :1, :])
+        y_edit_mask_for_gradient[:, :, i1 : i1 + (j2 - i2)] = 1
+
+        dec1 = self.decoder(z1, y1_mask, mu_y1, n_timesteps, stoc)
+        dec2, dec_edit = self.decoder.double_forward_text(
+            z2,
+            z_edit,
+            mu_y2,
+            mu_y_edit,
+            y2_mask,
+            y_edit_mask_for_scorenet,
+            y_edit_mask_for_gradient,
+            i1,
+            j1,
+            i2,
+            j2,
+            n_timesteps,
+            stoc,
+            soften_mask,
+            n_soften,
+        )
+
+        dec1 = dec1[:, :, :y1_max_length]
+        dec2 = dec2[:, :, :y2_max_length]
+        dec_edit = dec_edit[:, :, :y_edit_lengths]
+        dec_cat = torch.cat(
+            (dec1[:, :, :i1], dec2[:, :, i2:j2], dec1[:, :, j1:y1_lengths]), dim=2
+        )
+
+        return dec1, dec2, dec_edit, dec_cat
 
 # Cell
 DEFAULTS = HParams(
