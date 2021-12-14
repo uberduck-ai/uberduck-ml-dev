@@ -10,6 +10,7 @@ from pathlib import Path
 
 import sqlite3
 from tqdm import tqdm
+import pandas as pd
 
 from ..data.cache import ensure_speaker_table, insert_speaker
 from ..utils.utils import parse_vctk
@@ -95,6 +96,32 @@ def _convert_to_multispeaker(f, inp: str, fmt: str):
     elif fmt == VCTK:
         return _convert_vctk(f, inp)
 
+
+def _convert_standard_multispeaker_relative_pd(f, inp: str, rel_path: str):
+    speakers = os.listdir(inp)
+    speaker_id = 0
+    speaker_dict = {}
+    for speaker in speakers:
+        print(speaker)
+        path = Path(inp + speaker)
+        if not path.is_dir() or path.parts[-1].startswith("."):
+            print("gaa")
+            continue
+        files = os.listdir(path)
+        filelists = [f for f in files if f.endswith(".txt")]
+        data = pd.read_csv(
+            inp + speaker + "/" + filelists[0],
+            sep="|",
+            header=None,
+            error_bad_lines=False,
+        )
+        data[2] = speaker_id
+        speaker_dict[speaker] = data
+        speaker_id += 1
+    data_combined = pd.concat(list(speaker_dict.values()))
+    data_combined[0] = rel_path + data_combined[0]
+    data_combined.to_csv(f, sep="|", index=None, header=None)
+
 # Cell
 
 from typing import List
@@ -108,6 +135,7 @@ def _parse_args(args: List[str]):
         "-f", "--format", help="Input dataset format", default=STANDARD_MULTISPEAKER
     )
     parser.add_argument("-o", "--output", help="asdf", default="list.txt")
+    parser.add_argument("--rel_path", help="add relative path", default=None)
     return parser.parse_args(args)
 
 
@@ -118,4 +146,9 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = _parse_args(sys.argv[1:])
-    _generate_filelist(args.input, args.format, args.output)
+    if args.rel_path:
+        _convert_standard_multispeaker_relative_pd(
+            args.output, args.input, args.rel_path
+        )  # make this for vctk / synthesize
+    else:
+        _generate_filelist(args.input, args.format, args.output)
