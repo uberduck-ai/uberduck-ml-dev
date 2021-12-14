@@ -22,7 +22,7 @@ from ..utils.plot import (
     plot_spectrogram,
 )
 from ..text.util import text_to_sequence, random_utterance
-from ..vocoders.hifigan import HiFiGan
+from ..vocoders.hifigan import HiFiGanGenerator
 
 
 class TTSTrainer:
@@ -111,10 +111,8 @@ class TTSTrainer:
         elif algorithm == "hifigan":
             assert kwargs["hifigan_config"], "hifigan_config must be set"
             assert kwargs["hifigan_checkpoint"], "hifigan_checkpoint must be set"
-            cudnn_enabled = (
-                kwargs["cudnn_enabled"] if kwargs["cudnn_enabled"] else False
-            )
-            hifigan = HiFiGan(
+            cudnn_enabled = bool(kwargs["cudnn_enabled"])
+            hifigan = HiFiGanGenerator(
                 config=kwargs["hifigan_config"],
                 checkpoint=kwargs["hifigan_checkpoint"],
                 cudnn_enabled=cudnn_enabled,

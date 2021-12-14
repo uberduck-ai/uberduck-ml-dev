@@ -87,13 +87,16 @@ class GradTTSTrainer(TTSTrainer):
                 spk=spk,
                 length_scale=0.91,
             )
-            audio = self.sample(
-                y_dec,
-                algorithm="hifigan",
-                hifigan_config="/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/hifigan-config.json",
-                hifigan_checkpoint="/home/w_uberduck_ai/Speech-Backbones/Grad-TTS/checkpts/gen_02640000_studio",
-                cudnn_enabled=self.hparams.cudnn_enabled,
-            )
+            if self.hparams.vocoder_algorithm == "hifigan":
+                audio = self.sample(
+                    y_dec,
+                    algorithm=self.hparams.vocoder_algorithm,
+                    hifigan_config=self.hparams.hifigan_config,
+                    hifigan_checkpoint=self.hparams.hifigan_checkpoint,
+                    cudnn_enabled=self.hparams.cudnn_enabled,
+                )
+            else:
+                audio = self.sample(y_dec.cpu()[0])
             return audio
 
     def train(self, checkpoint=None):
@@ -171,7 +174,7 @@ class GradTTSTrainer(TTSTrainer):
             )
         iteration = 0
         last_time = time.time()
-        for epoch in range(1, self.hparams.n_epochs + 1):
+        for epoch in range(0, self.hparams.n_epochs):
             model.train()
             dur_losses = []
             prior_losses = []
