@@ -24,6 +24,9 @@ def parse_args(args):
     parser.add_argument(
         "--checkpoint_path", help="Path to checkpoint_path", default=None
     )
+    parser.add_argument(
+        "--warm_start_name", help="Path to warm start model", default=None
+    )
     args = parser.parse_args(args)
     return args
 
