@@ -1172,9 +1172,43 @@ class GradTTS(TTSModel):
         )
         return y_enc, y_dec, attn
 
-    def infer_edit_synthetic_audio(
-        self, text1, text2, n_timesteps, symbol_set, intersperse_token=148
+    def infer_editts(
+        self,
+        text1: str,
+        text2: str,
+        n_timesteps: int,
+        symbol_set: str,
+        intersperse_token: int = 148,
     ):
+        """
+        EdiTTS
+        Edit speech/audio via content substitution.
+        This function will substitute the desired portion of text2 into the specified location of text1.
+
+        Arguments:
+        text1 (str): text to substitute content in to. e.g. "This is a | blue | pencil"
+        text2 (str): text to substitute audio from. e.g. "This is a | red | pen."
+        n_timesteps (int): number of steps to use for reverse diffusion in decoder.
+        symbol_set (str): symbol set key to lookup the symbol set
+        intersperse_token (int): value used for interspersing
+
+        Output:
+        y_dec1: Mel spectrogram of text1
+        y_dec2: Mel spectrogram of text2
+        y_dec_edit: Mel spectrogram of source of text2 substituted in to text1 via EdiTTS
+        y_dec_cat: Mel spectrogram of source of text2 substituted in to text1 via mel concatenation
+
+        Usage:
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = model.infer_editts("This is a | blue | pencil.",
+                                                                    "This is a | red | pen.",
+                                                                    n_timesteps=10,
+                                                                    symbol_set="gradtts")
+        y_dec1: "this is a blue pencil"
+        y_dec2: "this is a red pen"
+        y_dec_edit: "this is a red pencil" (EdiTTS)
+        y_dec_cat: "this is a red pencil" (Mel concatenation)
+
+        """
         sequence1, emphases1 = text_to_sequence_for_editts(
             text1, cleaner_names=["english_cleaners"], symbol_set=symbol_set
         )
@@ -1188,7 +1222,7 @@ class GradTTS(TTSModel):
         x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
         x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
 
-        y_dec1, y_dec2, y_dec_edit, y_dec_cat = self.edit_content(
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = self.editts_edit_content(
             x1,
             x2,
             x_lengths1,
@@ -1202,28 +1236,11 @@ class GradTTS(TTSModel):
         )
         return y_dec1, y_dec2, y_dec_edit, y_dec_cat
 
-    def edit_synthetic_audio(text, text2):
-        sequence1, emphases1 = text_to_sequence_for_editts(text1)
-        sequence2, emphases2 = text_to_sequence_for_editts(text2)
-        x1 = torch.LongTensor(intersperse(sequence1, len(symbols))).cuda()[None]
-        x2 = torch.LongTensor(intersperse(sequence2, len(symbols))).cuda()[None]
-        emphases1 = intersperse_emphases(emphases1)
-        emphases2 = intersperse_emphases(emphases2)
-        x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
-        x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
-
-        y_dec1, y_dec2, y_dec_edit, y_dec_cat = generator.edit_content(
-            x1,
-            x2,
-            x_lengths1,
-            x_lengths2,
-            emphases1,
-            emphases2,
-            n_timesteps=args.timesteps,
-            temperature=1.5,
-            stoc=False,
-            length_scale=0.91,
-        )
+    def infer_editts_real_audio(
+        self, text1, text2, n_timesteps, symbol_set, intersperse_token=148
+    ):
+        # TODO
+        return None
 
     def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
         """
@@ -1324,7 +1341,7 @@ class GradTTS(TTSModel):
         return dur_loss, prior_loss, diff_loss
 
     @torch.no_grad()
-    def edit_pitch(
+    def editts_edit_pitch(
         self,
         x,
         x_lengths,
@@ -1415,7 +1432,7 @@ class GradTTS(TTSModel):
         return dec_out, dec_baseline, dec_edit
 
     @torch.no_grad()
-    def edit_content(
+    def editts_edit_content(
         self,
         x1,
         x2,
