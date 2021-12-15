@@ -12,6 +12,7 @@ from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 import time
 
 from ..models.common import MelSTFT
@@ -21,6 +22,7 @@ from ..utils.plot import (
     plot_spectrogram,
 )
 from ..text.util import text_to_sequence, random_utterance
+from ..vocoders.hifigan import HiFiGanGenerator
 
 
 class TTSTrainer:
@@ -106,6 +108,17 @@ class TTSTrainer:
         if algorithm == "griffin-lim":
             mel_stft = MelSTFT()
             audio = mel_stft.griffin_lim(mel)
+        elif algorithm == "hifigan":
+            assert kwargs["hifigan_config"], "hifigan_config must be set"
+            assert kwargs["hifigan_checkpoint"], "hifigan_checkpoint must be set"
+            cudnn_enabled = bool(kwargs["cudnn_enabled"])
+            hifigan = HiFiGanGenerator(
+                config=kwargs["hifigan_config"],
+                checkpoint=kwargs["hifigan_checkpoint"],
+                cudnn_enabled=cudnn_enabled,
+            )
+            audio = hifigan.infer(mel)
+            audio = audio / np.max(audio)
         else:
             raise NotImplemented
         return audio
