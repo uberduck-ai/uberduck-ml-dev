@@ -17,7 +17,7 @@ export LOG_DIR=${RESULT_DIR}/${NAME}/logs
 export CHECKPOINT_PATH=${RESULT_DIR}/${NAME}/checkpoints
 export WARM_START_NAME=${MODEL_DIR}/${WSN}
 #./uberduck-ml-exp/experiments/taco2_lj_lachow/config.json
-git clone -b sam-exp $UBMLEXP_GIT
+git clone $UBMLEXP_GIT
 #sleep 3600
 gcsfuse --implicit-dirs $BUCKET $BUCKET_LOCAL
 #sleep 3600
