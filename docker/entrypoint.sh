@@ -21,4 +21,17 @@ git clone -b sam-exp $UBMLEXP_GIT
 #sleep 3600
 gcsfuse --implicit-dirs $BUCKET $BUCKET_LOCAL
 #sleep 3600
+echo $BUCKET
+echo $UBMLEXP_GIT
+echo $WSN
+echo $FILELIST_TRAIN
+echo $FILELIST_VAL
+echo $NAME
+echo $CONFIG
+echo $BUCKET_LOCAL
+echo $RESULT_DIR
+echo $MODEL_DIR
+echo $LOG_DIR
+echo $CHECKPOINT_PATH
+echo $WARM_START_NAME
 python -m uberduck_ml_dev.exec.train_tacotron2 --config $CONFIG --log_dir $LOG_DIR --checkpoint_path $CHECKPOINT_PATH --training_audiopaths_and_text $FILELIST_TRAIN --val_audiopaths_and_text $FILELIST_VAL --warm_start_name $WARM_START_NAME
