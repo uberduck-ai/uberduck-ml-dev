@@ -5,7 +5,7 @@ WORKDIR /root
 RUN apt-get update && apt-get install -y espeak libsndfile-dev
 #RUN pip install git+https://github.com/uberduck-ai/uberduck-ml-dev
 RUN pip install git+https://github.com/uberduck-ai/uberduck-ml-dev@sam-vertex-v2
-RUN mkdir /bucket
+RUN mkdir /root/bucket
 
 COPY secrets/gcloud_key.json /secrets/gcloud_key.json
 COPY entrypoint.sh entrypoint.sh
