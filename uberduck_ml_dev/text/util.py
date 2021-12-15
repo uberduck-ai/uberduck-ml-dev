@@ -307,7 +307,7 @@ def text_to_sequence(text, cleaner_names, p_arpabet=0.0, symbol_set=DEFAULT_SYMB
             break
         cleaned = clean_text(m.group(1), cleaner_names)
         sequence += text_to_sequence(cleaned, cleaner_names, p_arpabet, symbol_set)
-        sequence += arpabet_to_sequence(m.group(2))
+        sequence += arpabet_to_sequence(m.group(2), symbol_set)
         text = m.group(3)
 
     return sequence

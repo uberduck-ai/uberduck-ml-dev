@@ -342,6 +342,7 @@ class MelSTFT:
         self.sampling_rate = sampling_rate
         if padding is None:
             padding = filter_length // 2
+
         self.stft_fn = STFT(
             filter_length,
             hop_length,
