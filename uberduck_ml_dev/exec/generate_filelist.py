@@ -77,12 +77,54 @@ def _convert_standard_multispeaker(f, inp: str):
             speaker_id += 1
 
 
+def _convert_standard_multispeaker_rel(f, inp: str, rel_path: str):
+    speaker_id = 0
+    speakers = os.listdir(inp)
+    print(speakers)
+    conn = sqlite3.connect(str(CACHE_LOCATION))
+    with conn:
+        for speaker in tqdm(speakers):
+            path = Path(inp) / Path(speaker)
+            if not path.is_dir() or path.parts[-1].startswith("."):
+                continue
+            print(speaker)
+            files = os.listdir(path)
+
+            try:
+                transcriptions, *_ = [f for f in files if f.endswith(".txt")]
+            except:
+                print(files)
+                raise
+            insert_speaker(f.name, speaker, speaker_id, conn)
+            with (path / transcriptions).open("r") as txn_f:
+                transcriptions = txn_f.readlines()
+            for line in transcriptions:
+                line = line.strip("\n")
+                try:
+                    line_path, line_txn, *_ = line.split("|")
+                except Exception as e:
+                    print(e)
+                    print(line)
+                    raise
+                write_path = f"{rel_path}/{speaker}/{line_path}"
+                f.write(f"{write_path}|{line_txn}|{speaker_id}\n")
+            speaker_id += 1
+
+
 def _generate_filelist(input_dataset, fmt, output_filelist):
     full_path = Path(output_filelist).resolve()
     ensure_speaker_table()
     with open(full_path, "w") as f:
         print(f.name)
         _convert_to_multispeaker(f, input_dataset, fmt)
+
+
+def _generate_filelist_rel(input_dataset, output_filelist, rel_path):
+    full_path = Path(output_filelist).resolve()
+    ensure_speaker_table()
+    with open(full_path, "w") as f:
+        print(f.name)
+        _convert_standard_multispeaker_rel(f, input_dataset, rel_path)
 
 
 def _convert_to_multispeaker(f, inp: str, fmt: str):
@@ -95,32 +137,6 @@ def _convert_to_multispeaker(f, inp: str, fmt: str):
         return _convert_standard_multispeaker(f, inp)
     elif fmt == VCTK:
         return _convert_vctk(f, inp)
-
-
-def _convert_standard_multispeaker_relative_pd(f, inp: str, rel_path: str):
-    speakers = os.listdir(inp)
-    speaker_id = 0
-    speaker_dict = {}
-    for speaker in speakers:
-        print(speaker)
-        path = Path(inp + speaker)
-        if not path.is_dir() or path.parts[-1].startswith("."):
-            print("gaa")
-            continue
-        files = os.listdir(path)
-        filelists = [f for f in files if f.endswith(".txt")]
-        data = pd.read_csv(
-            inp + speaker + "/" + filelists[0],
-            sep="|",
-            header=None,
-            error_bad_lines=False,
-        )
-        data[2] = speaker_id
-        speaker_dict[speaker] = data
-        speaker_id += 1
-    data_combined = pd.concat(list(speaker_dict.values()))
-    data_combined[0] = rel_path + data_combined[0]
-    data_combined.to_csv(f, sep="|", index=None, header=None)
 
 # Cell
 
@@ -147,8 +163,8 @@ except:
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = _parse_args(sys.argv[1:])
     if args.rel_path:
-        _convert_standard_multispeaker_relative_pd(
-            args.output, args.input, args.rel_path
+        _generate_filelist_rel(
+            args.input, args.output, args.rel_path
         )  # make this for vctk / synthesize
     else:
         _generate_filelist(args.input, args.format, args.output)
