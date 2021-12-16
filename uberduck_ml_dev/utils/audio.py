@@ -2,7 +2,8 @@
 
 __all__ = ['mel_to_audio', 'differenceFunction', 'cumulativeMeanNormalizedDifferenceFunction', 'getPitch',
            'compute_yin', 'convert_to_wav', 'match_target_amplitude', 'modify_leading_silence',
-           'normalize_audio_segment', 'normalize_audio', 'trim_audio', 'MAX_WAV_INT16', 'load_wav_to_torch']
+           'normalize_audio_segment', 'normalize_audio', 'trim_audio', 'MAX_WAV_INT16', 'load_wav_to_torch', 'overlay',
+           'mono_to_stereo', 'stereo_to_mono', 'resample', 'get_audio_max', 'to_int16']
 
 # Cell
 """
@@ -269,3 +270,53 @@ def trim_audio(path, new_path, top_db=20):
 def load_wav_to_torch(path):
     sr, data = read(path)
     return torch.FloatTensor(data.astype(np.float32)), sr
+
+# Cell
+
+from scipy import signal
+
+
+def overlay(audio1, audio2):
+    """
+    Will overlay two mono audio np arrays starting at the beginning of both audio files.
+    """
+    audio1_padded = np.pad(audio1, (0, max(0, len(audio2) - len(audio1))))
+    audio2_padded = np.pad(audio2, (0, max(0, len(audio1) - len(audio2))))
+    return audio1_padded + audio2_padded
+
+
+def mono_to_stereo(audio):
+    """
+    Convert mono audio data to equally balance stereo.
+    """
+    return np.vstack((audio, audio))
+
+
+def stereo_to_mono(audio):
+    """
+    Convert stereo audio data to mean mono audio data.
+    """
+    return librosa.to_mono(audio)
+
+
+def resample(audio, source_sr, target_sr):
+    """
+    Change the sampling rate of a mono np audio array
+    """
+    resampled_audio = librosa.resample(audio, source_sr, target_sr)
+    return resampled_audio
+
+
+def get_audio_max(*audios):
+    """
+    Find the maximum value in a list of audio files.
+    """
+    max_audio = 0
+    for audio_data in audios:
+        max_audio = max(max_audio, audio_data.max())
+    return max_audio
+
+
+def to_int16(audio, max_wav_value=32768):
+    audio = audio * max_wav_value
+    return audio.astype(np.int16)
