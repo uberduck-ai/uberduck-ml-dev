@@ -1172,80 +1172,6 @@ class GradTTS(TTSModel):
         )
         return y_enc, y_dec, attn
 
-    def infer_editts_edit_content(
-        self,
-        text1,
-        text2,
-        n_timesteps,
-        symbol_set,
-        mel1=None,
-        mel2=None,
-        intersperse_token=148,
-    ):
-        """
-        EdiTTS
-        Edit speech/audio via content substitution.
-        This function will substitute the desired portion of text2 into the specified location of text1.
-
-        Arguments:
-        text1 (str): text to substitute content in to. e.g. "This is a | blue | pencil"
-        text2 (str): text to substitute audio from. e.g. "This is a | red | pen."
-        n_timesteps (int): number of steps to use for reverse diffusion in decoder.
-        symbol_set (str): symbol set key to lookup the symbol set
-        intersperse_token (int): value used for interspersing
-
-        Output:
-        y_dec1: Mel spectrogram of text1
-        y_dec2: Mel spectrogram of text2
-        y_dec_edit: Mel spectrogram of source of text2 substituted in to text1 via EdiTTS
-        y_dec_cat: Mel spectrogram of source of text2 substituted in to text1 via mel concatenation
-
-        Usage:
-        y_dec1, y_dec2, y_dec_edit, y_dec_cat = model.infer_editts_edit_content("This is a | blue | pencil.",
-                                                                    "This is a | red | pen.",
-                                                                    n_timesteps=10,
-                                                                    symbol_set="gradtts")
-        y_dec1: "this is a blue pencil"
-        y_dec2: "this is a red pen"
-        y_dec_edit: "this is a red pencil" (EdiTTS)
-        y_dec_cat: "this is a red pencil" (Mel concatenation)
-
-        """
-        sequence1, emphases1 = text_to_sequence_for_editts(
-            text1, cleaner_names=["english_cleaners"], symbol_set=symbol_set
-        )
-        sequence2, emphases2 = text_to_sequence_for_editts(
-            text2, cleaner_names=["english_cleaners"], symbol_set=symbol_set
-        )
-        x1 = torch.LongTensor(intersperse(sequence1, intersperse_token)).cuda()[None]
-        x2 = torch.LongTensor(intersperse(sequence2, intersperse_token)).cuda()[None]
-        emphases1 = intersperse_emphases(emphases1)
-        emphases2 = intersperse_emphases(emphases2)
-        x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
-        x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
-
-        y_dec1, y_dec2, y_dec_edit, y_dec_cat = self.editts_edit_content(
-            x1,
-            x2,
-            x_lengths1,
-            x_lengths2,
-            emphases1,
-            emphases2,
-            mel1,
-            mel2,
-            n_timesteps=n_timesteps,
-            temperature=1.5,
-            stoc=False,
-            length_scale=0.91,
-        )
-        return y_dec1, y_dec2, y_dec_edit, y_dec_cat
-
-    def infer_editts_real_audio(
-        self, text1, text2, n_timesteps, symbol_set, intersperse_token=148
-    ):
-        # TODO
-        return None
-
     def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
         """
         Computes 3 losses:
@@ -1344,96 +1270,168 @@ class GradTTS(TTSModel):
 
         return dur_loss, prior_loss, diff_loss
 
-    @torch.no_grad()
-    def editts_edit_pitch(
+    def infer_editts_edit_content(
         self,
-        x,
-        x_lengths,
+        text1,
+        text2,
         n_timesteps,
-        temperature=1.0,
-        stoc=False,
-        length_scale=1.0,
-        soften_mask=True,
-        n_soften=16,
-        emphases=None,
-        direction="up",
+        symbol_set,
+        mel1=None,
+        intersperse_token=148,
     ):
-        x, x_lengths = self.relocate_input([x, x_lengths])
+        """
+        EdiTTS
+        Edit speech/audio via content substitution.
+        This function will substitute the desired portion of text2 into the specified location of text1.
 
-        mu_x, logw, x_mask = self.encoder(x, x_lengths)
+        Arguments:
+        text1 (str): text to substitute content in to. e.g. "This is a | blue | pencil"
+        text2 (str): text to substitute audio from. e.g. "This is a | red | pen."
+        n_timesteps (int): number of steps to use for reverse diffusion in decoder.
+        symbol_set (str): symbol set key to lookup the symbol set
+        intersperse_token (int): value used for interspersing
 
-        w = torch.exp(logw) * x_mask
-        w_ceil = torch.ceil(w) * length_scale
-        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-        y_max_length = int(y_lengths.max())
-        y_max_length_ = fix_len_compatibility(y_max_length)
+        Output:
+        y_dec1: Mel spectrogram of text1
+        y_dec2: Mel spectrogram of text2
+        y_dec_edit: Mel spectrogram of source of text2 substituted in to text1 via EdiTTS
+        y_dec_cat: Mel spectrogram of source of text2 substituted in to text1 via mel concatenation
 
-        y_mask = sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
-        attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
-        attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+        Usage:
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = model.infer_editts_edit_content("This is a | blue | pencil.",
+                                                                    "This is a | red | pen.",
+                                                                    n_timesteps=10,
+                                                                    symbol_set="gradtts")
+        y_dec1: "this is a blue pencil"
+        y_dec2: "this is a red pen"
+        y_dec_edit: "this is a red pencil" (EdiTTS)
+        y_dec_cat: "this is a red pencil" (Mel concatenation)
 
-        mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
-        mu_y = mu_y.transpose(1, 2)
-
-        eps = torch.randn_like(mu_y, device=mu_y.device) / temperature
-        z = mu_y + eps
-
-        encoder_outputs = mu_y[:, :, :y_max_length]
-
-        mu_x_edit = mu_x.clone()
-        mask_edit = torch.zeros_like(mu_x[:, :1, :])
-        for j, (start, end) in enumerate(emphases):
-            mask_edit[:, :, start:end] = 1
-            mu_x_edit[:, :, start:end] = shift_mel(
-                mu_x_edit[:, :, start:end], direction=direction
-            )
-
-        mu_y_edit = torch.matmul(
-            attn.squeeze(1).transpose(1, 2), mu_x_edit.transpose(1, 2)
+        """
+        sequence1, emphases1 = text_to_sequence_for_editts(
+            text1, cleaner_names=["english_cleaners"], symbol_set=symbol_set
         )
-        mask_edit = torch.matmul(
-            attn.squeeze(1).transpose(1, 2), mask_edit.transpose(1, 2)
+        sequence2, emphases2 = text_to_sequence_for_editts(
+            text2, cleaner_names=["english_cleaners"], symbol_set=symbol_set
         )
+        x1 = torch.LongTensor(intersperse(sequence1, intersperse_token)).cuda()[None]
+        x2 = torch.LongTensor(intersperse(sequence2, intersperse_token)).cuda()[None]
+        emphases1 = intersperse_emphases(emphases1)
+        emphases2 = intersperse_emphases(emphases2)
+        x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
+        x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
 
-        mu_y_edit = mu_y_edit.transpose(1, 2)
-        mask_edit = mask_edit.transpose(1, 2)  # [B, 1, T]
-        mask_edit[:, :, y_max_length:] = mask_edit[
-            :, :, y_max_length - 1
-        ]  # for soften_mask
-
-        z_edit = mu_y_edit + eps
-
-        dec_out, dec_edit = self.decoder.double_forward_pitch(
-            z,
-            z_edit,
-            mu_y,
-            mu_y_edit,
-            y_mask,
-            mask_edit,
+        y_dec1, y_dec2, y_dec_edit, y_dec_cat = self.editts_edit_content(
+            x1,
+            x2,
+            x_lengths1,
+            x_lengths2,
+            emphases1,
+            emphases2,
             n_timesteps,
-            stoc,
-            soften_mask,
-            n_soften,
+            mel1,
+            temperature=1.5,
+            stoc=False,
+            length_scale=0.91,
         )
+        return y_dec1, y_dec2, y_dec_edit, y_dec_cat
 
-        # For baseline
-        emphases_expanded = []
-        attn = attn.squeeze()
-        for start, end in emphases:
-            i = attn[:start].sum().long().item() if start > 0 else 0
-            j = attn[:end].sum().long().item()
-            itv = [i, j]
-            emphases_expanded.append(itv)
+    def infer_editts_real_audio(
+        self, text1, text2, n_timesteps, symbol_set, intersperse_token=148
+    ):
+        # TODO
+        return None
 
-        dec_out = dec_out[:, :, :y_max_length]
-        dec_baseline = dec_out.clone()
-        for start, end in emphases_expanded:
-            dec_baseline[:, :, start:end] = shift_mel(
-                dec_baseline[:, :, start:end], direction=direction
-            )
-        dec_edit = dec_edit[:, :, :y_max_length]
+    #     @torch.no_grad()
+    #     def editts_edit_pitch(
+    #         self,
+    #         x,
+    #         x_lengths,
+    #         n_timesteps,
+    #         temperature=1.0,
+    #         stoc=False,
+    #         length_scale=1.0,
+    #         soften_mask=True,
+    #         n_soften=16,
+    #         emphases=None,
+    #         direction="up",
+    #     ):
+    #         x, x_lengths = self.relocate_input([x, x_lengths])
 
-        return dec_out, dec_baseline, dec_edit
+    #         mu_x, logw, x_mask = self.encoder(x, x_lengths)
+
+    #         w = torch.exp(logw) * x_mask
+    #         w_ceil = torch.ceil(w) * length_scale
+    #         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+    #         y_max_length = int(y_lengths.max())
+    #         y_max_length_ = fix_len_compatibility(y_max_length)
+
+    #         y_mask = sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
+    #         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+    #         attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+
+    #         mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
+    #         mu_y = mu_y.transpose(1, 2)
+
+    #         eps = torch.randn_like(mu_y, device=mu_y.device) / temperature
+    #         z = mu_y + eps
+
+    #         encoder_outputs = mu_y[:, :, :y_max_length]
+
+    #         mu_x_edit = mu_x.clone()
+    #         mask_edit = torch.zeros_like(mu_x[:, :1, :])
+    #         for j, (start, end) in enumerate(emphases):
+    #             mask_edit[:, :, start:end] = 1
+    #             mu_x_edit[:, :, start:end] = shift_mel(
+    #                 mu_x_edit[:, :, start:end], direction=direction
+    #             )
+
+    #         mu_y_edit = torch.matmul(
+    #             attn.squeeze(1).transpose(1, 2), mu_x_edit.transpose(1, 2)
+    #         )
+    #         mask_edit = torch.matmul(
+    #             attn.squeeze(1).transpose(1, 2), mask_edit.transpose(1, 2)
+    #         )
+
+    #         mu_y_edit = mu_y_edit.transpose(1, 2)
+    #         mask_edit = mask_edit.transpose(1, 2)  # [B, 1, T]
+    #         mask_edit[:, :, y_max_length:] = mask_edit[
+    #             :, :, y_max_length - 1
+    #         ]  # for soften_mask
+
+    #         z_edit = mu_y_edit + eps
+
+    #         dec_out, dec_edit = self.decoder.double_forward_pitch(
+    #             z,
+    #             z_edit,
+    #             mu_y,
+    #             mu_y_edit,
+    #             y_mask,
+    #             mask_edit,
+    #             n_timesteps,
+    #             stoc,
+    #             soften_mask,
+    #             n_soften,
+    #         )
+
+    #         # For baseline
+    #         emphases_expanded = []
+    #         attn = attn.squeeze()
+    #         for start, end in emphases:
+    #             i = attn[:start].sum().long().item() if start > 0 else 0
+    #             j = attn[:end].sum().long().item()
+    #             itv = [i, j]
+    #             emphases_expanded.append(itv)
+
+    #         dec_out = dec_out[:, :, :y_max_length]
+    #         dec_baseline = dec_out.clone()
+    #         for start, end in emphases_expanded:
+    #             dec_baseline[:, :, start:end] = shift_mel(
+    #                 dec_baseline[:, :, start:end], direction=direction
+    #             )
+    #         dec_edit = dec_edit[:, :, :y_max_length]
+
+    #         return dec_out, dec_baseline, dec_edit
 
     @torch.no_grad()
     def editts_edit_content(
@@ -1446,7 +1444,6 @@ class GradTTS(TTSModel):
         emphases2,
         n_timesteps,
         mel1=None,
-        mel2=None,
         temperature=1.0,
         stoc=False,
         length_scale=1.0,
@@ -1459,6 +1456,7 @@ class GradTTS(TTSModel):
         def _process_input(x, x_lengths):
             x, x_lengths = self.relocate_input([x, x_lengths])
 
+            # encoded_text, durations, text_mask
             mu_x, logw, x_mask = self.encoder(x, x_lengths)
             w = torch.exp(logw) * x_mask
             w_ceil = torch.ceil(w) * length_scale
@@ -1474,28 +1472,48 @@ class GradTTS(TTSModel):
 
             mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
             mu_y = mu_y.transpose(1, 2)  # [1, n_mels, T]
+            #             print(f"mu_y: {mu_y.shape}")
+            #             print(f"attn: {attn.shape}")
+            #             print(f"y_mask: {y_mask.shape}")
+            #             print(f"y_max_length: {y_max_length}")
+            #             print(f"y_lengths: {y_lengths}")
             return mu_y, attn, y_mask, y_max_length, y_lengths
 
-        def _process_audio_input(x, x_lengths, mel):
+        def _process_audio_input(x, x_lengths, y):
             x, x_lengths = self.relocate_input([x, x_lengths])
 
-            # Need to get encoded text, durations, and masks
             mu_x, logw, x_mask = self.encoder(x, x_lengths)
-            w = torch.exp(logw) * x_mask
-            w_ceil = torch.ceil(w) * length_scale
-            y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-            y_max_length = int(y_lengths.max())
-            y_max_length_ = fix_len_compatibility(y_max_length)
 
+            y_max_length = y.shape[-1]
+            #             y_max_length_ = fix_len_compatibility(y_max_length)
+
+            y_lengths = torch.LongTensor([y.shape[-1]]).cuda()
             y_mask = (
-                sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
+                sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask.dtype)
             )
             attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
-            attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
 
-            mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
-            mu_y = mu_y.transpose(1, 2)  # [1, n_mels, T]
-            return mu_y, attn, y_mask, y_max_length, y_lengths
+            # Use MAS to get alignment of audio clip
+            with torch.no_grad():
+                const = -0.5 * math.log(2 * math.pi) * self.n_feats
+                factor = -0.5 * torch.ones(
+                    mu_x.shape, dtype=mu_x.dtype, device=mu_x.device
+                )
+                y_square = torch.matmul(factor.transpose(1, 2), y ** 2)
+                y_mu_double = torch.matmul(2.0 * (factor * mu_x).transpose(1, 2), y)
+                mu_square = torch.sum(factor * (mu_x ** 2), 1).unsqueeze(-1)
+                log_prior = y_square - y_mu_double + mu_square + const
+                attn = monotonic_align.maximum_path_gradtts(
+                    log_prior, attn_mask.squeeze(1)
+                )
+                attn = attn.detach()
+
+            #             print(f"y: {y.shape}")
+            #             print(f"attn: {attn.unsqueeze(0).shape}")
+            #             print(f"y_mask: {y_mask.shape}")
+            #             print(f"y_max_length: {y_max_length}")
+            #             print(f"y_lengths: {y_lengths}")
+            return y, attn.unsqueeze(0), y_mask, y_max_length, y_lengths
 
         def _soften_juntions(
             y_edit, y1, y2, y_edit_lengths, y1_lengths, y2_lengths, i1, j1, i2, j2
@@ -1520,7 +1538,7 @@ class GradTTS(TTSModel):
         assert emphases1 is not None and emphases2 is not None
         assert len(emphases1) == 1 and len(emphases2) == 1
 
-        if mel1:
+        if mel1 is not None:
             mu_y1, attn1, y1_mask, y1_max_length, y1_lengths = _process_audio_input(
                 x1, x1_lengths, mel1
             )
@@ -1529,14 +1547,9 @@ class GradTTS(TTSModel):
                 x1, x1_lengths
             )  # mu_y1: [1, n_mels, T]
 
-        if mel2:
-            mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_audio_input(
-                x2, x2_lengths, mel2
-            )  # mu_y2: [1, n_mels, T]
-        else:
-            mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_input(
-                x2, x2_lengths
-            )  # mu_y2: [1, n_mels, T]
+        mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_input(
+            x2, x2_lengths
+        )  # mu_y2: [1, n_mels, T]
 
         attn1 = attn1.squeeze()  # [N, T]
         attn2 = attn2.squeeze()  # [N, T]
@@ -1596,7 +1609,11 @@ class GradTTS(TTSModel):
         y_edit_mask_for_gradient = torch.zeros_like(mu_y_edit[:, :1, :])
         y_edit_mask_for_gradient[:, :, i1 : i1 + (j2 - i2)] = 1
 
-        dec1 = self.decoder(z1, y1_mask, mu_y1, n_timesteps, stoc)
+        if mel1 is not None:
+            dec1 = mu_y1
+        else:
+            dec1 = self.decoder(z1, y1_mask, mu_y1, n_timesteps, stoc)
+
         dec2, dec_edit = self.decoder.double_forward_text(
             z2,
             z_edit,
