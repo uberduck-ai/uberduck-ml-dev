@@ -11,9 +11,10 @@ import csv
 import re
 import json
 
-from scipy.io.wavfile import read, write
 import matplotlib.pyplot as plt
-from pydub import AudioSegment
+import soundfile as sf
+from scipy.io.wavfile import write, read
+import numpy as np
 
 %matplotlib inline
 
@@ -22,7 +23,13 @@ from ..models.common import MelSTFT
 from ..models.gradtts import GradTTS, DEFAULTS as GRADTTS_DEFAULTS
 from ..vocoders.hifigan import HiFiGanGenerator
 from ..utils.plot import plot_spectrogram
-from ..utils.audio import overlay
+from ..utils.audio import (
+    overlay_stereo,
+    stereo_to_mono,
+    mono_to_stereo,
+    to_int16,
+    resample,
+)
 
 
 def parse_args(args):
@@ -33,7 +40,6 @@ def parse_args(args):
 
 # Cell
 def run(hparams):
-
     # Create model
     model = GradTTS(hparams)
     model.load_state_dict(torch.load(hparams.checkpoint))
@@ -56,15 +62,20 @@ def run(hparams):
         cudnn_enabled=True,
     )
 
-    # Get reference audio mel spectrogram
-    #     sample_rate, wav_data = read(hparams.reference_audio)
+    # Convert vocals to 22kHz stereo audio for EdiTTS
     vocal_data, vocal_sample_rate = librosa.load(
-        hparams.reference_vocals, sr=hparams.sampling_rate
+        hparams.reference_vocals, sr=22050, mono=True
     )
-    music_data = music_data / hparams.max_wav_value
-    assert vocal_sample_rate == music_sample_rate
 
-    #     audio_norm = torch.FloatTensor(wav_data) / hparams.max_wav_value
+    # We want to read in the beats as original 44kHz stereo audio
+    beats_data, beats_sample_rate = librosa.load(
+        hparams.reference_beats, sr=44100, mono=False
+    )
+    vocal_data = vocal_data[: 5 * 22050]
+    beats_data = beats_data[:, : 5 * 44100]
+
+    vocal_data = to_int16(vocal_data)
+
     audio_norm = torch.FloatTensor(vocal_data) / hparams.max_wav_value
     audio_norm = audio_norm.unsqueeze(0)
     melspec_original = stft.mel_spectrogram(audio_norm).cuda()
@@ -73,40 +84,73 @@ def run(hparams):
         datareader = csv.reader(csvfile)
         for i, row in enumerate(datareader):
             regex = r"\|(.*?)\|"
-            substitution = f"| {row[1]} |"
+            substitution = f"| {row[0]} |"
             new_transcription = re.sub(regex, substitution, hparams.transcription)
             print(new_transcription)
-
             y_dec1, y_dec2, y_dec_edit, y_dec_cat = model.infer_editts_edit_content(
                 hparams.transcription,
                 new_transcription,
                 n_timesteps=10,
                 symbol_set="gradtts",
                 mel1=melspec_original.cuda(),
+                i1=int(
+                    CUSTOMIZATIONS["first_name"]["start_time"]
+                    * hparams.sampling_rate
+                    / hparams.hop_length
+                ),
+                j1=int(
+                    CUSTOMIZATIONS["first_name"]["end_time"]
+                    * hparams.sampling_rate
+                    / hparams.hop_length
+                ),
+                desired_time=CUSTOMIZATIONS["first_name"]["end_time"]
+                - CUSTOMIZATIONS["first_name"]["start_time"],
             )
+
             personalized_vocals = hifigan.infer(y_dec_edit)
 
-            #             vocal_pydub = AudioSegment.from
-            vocal_audio_segment = AudioSegment(
-                personalized_vocals.tobytes(),
-                frame_rate=vocal_sample_rate,
-                sample_width=personalized_vocals.dtype.itemsize,
-                channels=1,
+            #   VOLUME MASK AND MULTIPLIER
+            volume_multiplier = np.ones(personalized_vocals.shape[-1], dtype=np.int16)
+            volume_boundary_0 = int(
+                CUSTOMIZATIONS["first_name"]["start_time"] * hparams.sampling_rate
             )
+            volume_boundary_1 = int(
+                CUSTOMIZATIONS["first_name"]["end_time"] * hparams.sampling_rate
+            )
+            #             max_volume = personalized_vocals[volume_boundary_0:volume_boundary_1].max()
+            #             print(audio_norm.squeeze().shape)
+            #             print(personalized_vocals.shape)
 
-            music_audio_segment = AudioSegment.from_file(hparams.reference_music)
+            target_dbfs = _dbfs(personalized_vocals[:volume_boundary_0])
+            current_dbfs = _dbfs(
+                personalized_vocals[volume_boundary_0:volume_boundary_1]
+            )
+            coeff = _db_to_float(target_dbfs - current_dbfs)
+            print(f"coeff {coeff}")
+            #             personalized_vocals = personalized_vocals * coeff
+            # #             print(f"max volume: {max_volume}")
+            #             print(f"rms_volume_synthetic: {rms_volume_synthetic}")
+            #             print(f"rms_volume_target: {rms_volume_target}")
 
-            played_togther = vocal_audio_segment.overlay(music_audio_segment)
+            # #             volume_scale = hparams.max_wav_value / max_volume
+            #             volume_scale = rms_volume_target / rms_volume_synthetic
+            #             print(f"volume_scale: {volume_scale}")
+            volume_multiplier[volume_boundary_0:volume_boundary_1] = coeff
 
-            #             final_audio = overlay(personalized_vocals, music_data)
-            #             sound.get_array_of_samples()
-            #             melspec = stft.mel_spectrogram(audio_norm).cuda()
-            #             plot_spectrogram(melspec.squeeze().cpu())
-            #             plt.show()
-            played_together.export(f"{hparams.log_dir}/edited_{i}.wav")
+            personalized_vocals = personalized_vocals * volume_multiplier
+            #             print(f"after: {personalized_vocals.shape}")
 
+            personalized_vocals = personalized_vocals / hparams.max_wav_value
+            #             personalized_vocals = resample(
+            #                 personalized_vocals, hparams.sampling_rate, 44100
+            #             )
+            #             personalized_vocals = mono_to_stereo(personalized_vocals)
 
-#             write(f"{hparams.log_dir}/edited_{i}.wav", hparams.sampling_rate, final_audio)
+            #             final_audio = overlay_stereo(personalized_vocals, beats_data)
+            #             sf.write(f"{hparams.log_dir}/edited_{i}.wav", final_audio.T, 44100)
+            sf.write(f"{hparams.log_dir}/edited_{i}.wav", personalized_vocals, 22050)
+
+        plt.show()
 
 # Cell
 try:

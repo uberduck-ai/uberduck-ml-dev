@@ -2,8 +2,9 @@
 
 __all__ = ['mel_to_audio', 'differenceFunction', 'cumulativeMeanNormalizedDifferenceFunction', 'getPitch',
            'compute_yin', 'convert_to_wav', 'match_target_amplitude', 'modify_leading_silence',
-           'normalize_audio_segment', 'normalize_audio', 'trim_audio', 'MAX_WAV_INT16', 'load_wav_to_torch', 'overlay',
-           'mono_to_stereo', 'stereo_to_mono', 'resample', 'get_audio_max', 'to_int16']
+           'normalize_audio_segment', 'normalize_audio', 'trim_audio', 'MAX_WAV_INT16', 'load_wav_to_torch',
+           'overlay_mono', 'overlay_stereo', 'mono_to_stereo', 'stereo_to_mono', 'resample', 'get_audio_max',
+           'to_int16']
 
 # Cell
 """
@@ -276,12 +277,26 @@ def load_wav_to_torch(path):
 from scipy import signal
 
 
-def overlay(audio1, audio2):
+def overlay_mono(audio1, audio2):
     """
     Will overlay two mono audio np arrays starting at the beginning of both audio files.
     """
     audio1_padded = np.pad(audio1, (0, max(0, len(audio2) - len(audio1))))
     audio2_padded = np.pad(audio2, (0, max(0, len(audio1) - len(audio2))))
+    return audio1_padded + audio2_padded
+
+
+def overlay_stereo(audio1, audio2):
+    """
+    Will overlay two stereo audio np arrays starting at the beginning of both audio files.
+    """
+
+    audio1_padded = np.pad(
+        audio1, ((0, 0), (0, max(0, audio2.shape[-1] - audio1.shape[-1])))
+    )
+    audio2_padded = np.pad(
+        audio2, ((0, 0), (0, max(0, audio1.shape[-1] - audio2.shape[-1])))
+    )
     return audio1_padded + audio2_padded
 
 
