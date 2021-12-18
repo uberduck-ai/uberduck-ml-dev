@@ -1034,6 +1034,8 @@ class GradTTS(TTSModel):
         self.pe_scale = hparams.pe_scale
         self.hop_length = hparams.hop_length
         self.sampling_rate = hparams.sampling_rate
+        # NOTE(zach): Parametrize this later
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         if self.n_spks > 1:
             self.spk_emb = torch.nn.Embedding(self.n_spks, self.spk_emb_dim)
@@ -1115,9 +1117,11 @@ class GradTTS(TTSModel):
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
-
+        print("logw shape: ", logw.shape)
         w = torch.exp(logw) * x_mask
+        print("w shape", w.shape)
         w_ceil = torch.ceil(w) * length_scale
+        print(w_ceil)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         y_max_length = int(y_lengths.max())
         y_max_length_ = fix_len_compatibility(y_max_length)
@@ -1157,11 +1161,16 @@ class GradTTS(TTSModel):
             text, cleaner_names=cleaner_names, p_arpabet=1.0, symbol_set="gradtts"
         )
         if intersperse_text:
-            x = torch.LongTensor(intersperse(seq, intersperse_token)).cuda()[None]
+            x = torch.LongTensor(intersperse(seq, intersperse_token))[None]
         else:
-            x = torch.LongTensor(seq).cuda()[None]
+            x = torch.LongTensor(seq)[None]
 
-        x_lengths = torch.LongTensor([x.shape[-1]]).cuda()
+        x_lengths = torch.LongTensor([x.shape[-1]])
+        print(x)
+        print(x_lengths)
+        if self.device == "cuda":
+            x = x.cuda()
+            x_lengths = x_lengths.cuda()
 
         y_enc, y_dec, attn = self.forward(
             x,
@@ -1319,12 +1328,17 @@ class GradTTS(TTSModel):
         sequence2, emphases2 = text_to_sequence_for_editts(
             text2, cleaner_names=["english_cleaners"], symbol_set=symbol_set
         )
-        x1 = torch.LongTensor(intersperse(sequence1, intersperse_token)).cuda()[None]
-        x2 = torch.LongTensor(intersperse(sequence2, intersperse_token)).cuda()[None]
+        x1 = torch.LongTensor(intersperse(sequence1, intersperse_token))[None]
+        x2 = torch.LongTensor(intersperse(sequence2, intersperse_token))[None]
+        x_lengths1 = torch.LongTensor([x1.shape[-1]])
+        x_lengths2 = torch.LongTensor([x2.shape[-1]])
+        if self.device == "cuda":
+            x1 = x1.cuda()
+            x2 = x2.cuda()
+            x_lengths1 = x_lengths1.cuda()
+            x_lengths2 = x_lengths2.cuda()
         emphases1 = intersperse_emphases(emphases1)
         emphases2 = intersperse_emphases(emphases2)
-        x_lengths1 = torch.LongTensor([x1.shape[-1]]).cuda()
-        x_lengths2 = torch.LongTensor([x2.shape[-1]]).cuda()
 
         y_dec1, y_dec2, y_dec_edit, y_dec_cat = self.editts_edit_content(
             x1,
