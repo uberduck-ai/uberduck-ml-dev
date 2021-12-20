@@ -28,17 +28,18 @@ class HiFiGanGenerator:
         self.config = config
         self.checkpoint = checkpoint
         self.cudnn_enabled = cudnn_enabled
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.vocoder = self.load_checkpoint()
 
     def load_checkpoint(self):
         h = self.load_config()
         vocoder = Generator(h)
         vocoder.load_state_dict(
-            torch.load(self.checkpoint, map_location=lambda loc, storage: loc)[
-                "generator"
-            ]
+            torch.load(
+                self.checkpoint, map_location="cuda" if self.device == "cuda" else "cpu"
+            )["generator"]
         )
-        if self.cudnn_enabled:
+        if self.device == "cuda":
             vocoder = vocoder.cuda()
         return vocoder
 
