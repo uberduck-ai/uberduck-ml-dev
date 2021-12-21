@@ -422,6 +422,9 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
+        if torch.cuda.is_available():
+            decoder_inputs = decoder_inputs.cuda()
+
         B = memory.size(0)
         decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
         decoder_inputs = decoder_inputs.reshape(
