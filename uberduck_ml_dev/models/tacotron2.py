@@ -22,7 +22,10 @@ class Decoder(nn.Module):
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step_initial = hparams.n_frames_per_step_initial
         self.n_frames_per_step_current = hparams.n_frames_per_step_initial
-        self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        # self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        self.encoder_embedding_dim = (
+            hparams.encoder_embedding_dim + hparams.speaker_embedding_dim
+        )
         self.attention_rnn_dim = hparams.attention_rnn_dim
         self.decoder_rnn_dim = hparams.decoder_rnn_dim
         self.prenet_dim = hparams.prenet_dim
@@ -31,6 +34,9 @@ class Decoder(nn.Module):
         self.p_attention_dropout = hparams.p_attention_dropout
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.p_teacher_forcing = hparams.p_teacher_forcing
+        #         self.speaker_embedding = nn.Embedding(
+        #             hparams.n_speakers, hparams.speaker_embedding_dim
+        #         )
 
         self.prenet = Prenet(
             hparams.n_mel_channels,
@@ -725,8 +731,8 @@ class Tacotron2(TTSModel):
 
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
-
-        encoder_outputs = torch.cat((embedded_text,), dim=2)
+        # embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+        encoder_outputs = torch.cat((embedded_text, embedded_speakers), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=input_lengths
@@ -744,8 +750,8 @@ class Tacotron2(TTSModel):
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-
-        encoder_outputs = torch.cat((embedded_text,), dim=2)
+        embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+        encoder_outputs = torch.cat((embedded_text, embedded_speakers), dim=2)
 
         memory_lengths = input_lengths
         mel_outputs, gate_outputs, alignments = self.decoder.inference(
@@ -760,22 +766,19 @@ class Tacotron2(TTSModel):
         )
 
     def inference_noattention(self, inputs):
-        """Run inference conditioned on an attention map.
-
-        NOTE(zach): I don't think it is necessary to do a version
-        of this without f0s passed as well, since it seems like we
-        would always want to condition on pitch when conditioning on rhythm.
-        """
-        text, attention_map = inputs
+        """Run inference conditioned on an attention map."""
+        text, input_lengths, speaker_ids, attention_maps = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs)
 
         encoder_outputs = torch.cat((embedded_text,), dim=2)
 
+        #         mel_outputs, gate_outputs, alignments = self.decoder.inference_noattention(
+        #             encoder_outputs, attention_map, memory_lengths
+        #         )
         mel_outputs, gate_outputs, alignments = self.decoder.inference_noattention(
-            encoder_outputs, attention_map
+            encoder_outputs, attention_maps
         )
-
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
