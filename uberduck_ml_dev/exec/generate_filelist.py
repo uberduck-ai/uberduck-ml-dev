@@ -76,24 +76,52 @@ def _convert_standard_multispeaker(f, inp: str):
             speaker_id += 1
 
 
-def _generate_filelist(input_dataset, fmt, output_filelist):
+from os.path import basename
+
+
+def _convert_singlespeaker(f, inp: str):
+    speaker_id = 0
+    conn = sqlite3.connect(str(CACHE_LOCATION))
+    # speaker = basename(inp)
+    path = Path(inp)
+    speaker = path.parts[-2]
+    with conn:
+        insert_speaker(str(f.name), speaker, speaker_id, conn)
+        with (path).open("r") as txn_f:
+            transcriptions = txn_f.readlines()
+        for line in transcriptions:
+            line = line.strip("\n")
+            try:
+                line_path, line_txn, *_ = line.split("|")
+            except Exception as e:
+                print(e)
+                print(line)
+                raise
+            full_path = (Path(*path.parts[:-1]) / line_path).resolve()
+            f.write(f"{full_path}|{line_txn}|{speaker_id}\n")
+
+
+def _generate_filelist(input_, fmt, output_filelist):
     full_path = Path(output_filelist).resolve()
     ensure_speaker_table()
     with open(full_path, "w") as f:
         print(f.name)
-        _convert_to_multispeaker(f, input_dataset, fmt)
+        _convert_to_multispeaker(f, input_, fmt)
 
 
 def _convert_to_multispeaker(f, inp: str, fmt: str):
     assert fmt in [
         STANDARD_MULTISPEAKER,
         VCTK,
-    ], f"Supported formats: {STANDARD_MULTISPEAKER}, {VCTK}"
+        STANDARD_SINGLESPEAKER,
+    ], f"Supported formats: {STANDARD_MULTISPEAKER}, {VCTK}, {STANDARD_SINGLESPEAKER}"
 
     if fmt == STANDARD_MULTISPEAKER:
         return _convert_standard_multispeaker(f, inp)
     elif fmt == VCTK:
         return _convert_vctk(f, inp)
+    elif fmt == STANDARD_SINGLESPEAKER:
+        return _convert_singlespeaker(f, inp)
 
 # Cell
 

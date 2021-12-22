@@ -51,6 +51,21 @@ def _orig_to_dense_speaker_id(speaker_ids):
     return {orig: idx for orig, idx in zip(speaker_ids, range(len(speaker_ids)))}
 
 
+# self = hparams
+# self.training_audiopaths_and_text,
+# self.text_cleaners,
+# self.p_arpabet,
+# # audio params
+# self.n_mel_channels,
+# self.sampling_rate,
+# self.mel_fmin,
+# self.mel_fmax,
+# self.filter_length,
+# self.hop_length,
+# self.win_length,
+# self.symbol_set,
+# self.max_wav_value,
+# self.pos_weight,
 class TextMelDataset(Dataset):
     def __init__(
         self,
@@ -58,14 +73,14 @@ class TextMelDataset(Dataset):
         text_cleaners: List[str],
         p_arpabet: float,
         n_mel_channels: int,
-        sample_rate: int,
+        sampling_rate: int,
         mel_fmin: float,
         mel_fmax: float,
         filter_length: int,
         hop_length: int,
-        padding: int,
         win_length: int,
         symbol_set: str,
+        padding: int = None,
         max_wav_value: float = 32768.0,
         include_f0: bool = False,
         pos_weight: float = 10,
@@ -92,13 +107,13 @@ class TextMelDataset(Dataset):
             hop_length=hop_length,
             win_length=win_length,
             n_mel_channels=n_mel_channels,
-            sampling_rate=sample_rate,
+            sampling_rate=sampling_rate,
             mel_fmin=mel_fmin,
             mel_fmax=mel_fmax,
             padding=padding,
         )
         self.max_wav_value = max_wav_value
-        self.sample_rate = sample_rate
+        self.sampling_rate = sampling_rate
         self.filter_length = filter_length
         self.hop_length = hop_length
         self.mel_fmin = mel_fmin
@@ -119,7 +134,7 @@ class TextMelDataset(Dataset):
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
             audio,
-            self.sample_rate,
+            self.sampling_rate,
             self.filter_length,
             self.hop_length,
             self.f0_min,
@@ -134,7 +149,7 @@ class TextMelDataset(Dataset):
     def _get_data(self, audiopath_and_text):
         path, transcription, speaker_id = audiopath_and_text
         speaker_id = self._speaker_id_map[speaker_id]
-        sample_rate, wav_data = read(path)
+        sampling_rate, wav_data = read(path)
         text_sequence = torch.LongTensor(
             text_to_sequence(
                 transcription,
@@ -284,42 +299,27 @@ class TextMelCollate:
         gate_padded = torch.FloatTensor(len(batch), max_target_len)
         gate_padded.zero_()
         output_lengths = torch.LongTensor(len(batch))
-        speaker_ids = torch.LongTensor(len(batch))
+        speaker_ids = torch.LongTensor(len(batch)).cuda()
         if self.include_f0:
             f0_padded = torch.FloatTensor(len(batch), 1, max_target_len)
             f0_padded.zero_()
 
+        # pdb.set_trace()
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]][1]
             mel_padded[i, :, : mel.size(1)] = mel
             gate_padded[i, mel.size(1) - 1 :] = 1
             output_lengths[i] = mel.size(1)
             speaker_ids[i] = batch[ids_sorted_decreasing[i]][2]
-            if self.include_f0:
-                f0 = batch[ids_sorted_decreasing[i]][3]
-                f0_padded[i, :, : f0.size(1)] = f0
 
-        # NOTE(zach): would model_inputs be better as a namedtuple or dataclass?
-        if self.include_f0:
-            model_inputs = (
-                text_padded,
-                input_lengths,
-                mel_padded,
-                gate_padded,
-                output_lengths,
-                speaker_ids,
-                f0_padded,
-            )
-        else:
-            model_inputs = (
-                text_padded,
-                input_lengths,
-                mel_padded,
-                gate_padded,
-                output_lengths,
-                speaker_ids,
-            )
-
+        model_inputs = (
+            text_padded,
+            input_lengths,
+            mel_padded,
+            gate_padded,
+            output_lengths,
+            speaker_ids,
+        )
         return model_inputs
 
 # Cell
