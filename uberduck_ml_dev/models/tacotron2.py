@@ -22,10 +22,10 @@ class Decoder(nn.Module):
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step_initial = hparams.n_frames_per_step_initial
         self.n_frames_per_step_current = hparams.n_frames_per_step_initial
-        # self.encoder_embedding_dim = hparams.encoder_embedding_dim
-        self.encoder_embedding_dim = (
-            hparams.encoder_embedding_dim + hparams.speaker_embedding_dim
-        )
+        self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        #         self.encoder_embedding_dim = (
+        #             hparams.encoder_embedding_dim + hparams.speaker_embedding_dim
+        #         )
         self.attention_rnn_dim = hparams.attention_rnn_dim
         self.decoder_rnn_dim = hparams.decoder_rnn_dim
         self.prenet_dim = hparams.prenet_dim
@@ -34,9 +34,6 @@ class Decoder(nn.Module):
         self.p_attention_dropout = hparams.p_attention_dropout
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.p_teacher_forcing = hparams.p_teacher_forcing
-        #         self.speaker_embedding = nn.Embedding(
-        #             hparams.n_speakers, hparams.speaker_embedding_dim
-        #         )
 
         self.prenet = Prenet(
             hparams.n_mel_channels,
@@ -349,9 +346,11 @@ class Decoder(nn.Module):
         not_finished = torch.ones(
             [memory.size(0)], dtype=torch.int32, device=memory.device
         )
-
+        # pdb.set_trace()
+        # print('enter infer loop', not_finished)
+        # i= 0
         while True:
-
+            # print(i)
             to_cat = (self.prenet(decoder_input),)
 
             decoder_input = torch.cat(to_cat, dim=1)
@@ -372,14 +371,17 @@ class Decoder(nn.Module):
 
             not_finished = not_finished * dec
             mel_lengths += not_finished
+            # i+=1
+            # pdb.set_trace()
             if torch.sum(not_finished) == 0:
                 break
-            if len(mel_outputs) == self.max_decoder_steps:
+            if mel_outputs.shape[1] == self.max_decoder_steps:
+                # if len(mel_outputs) == self.max_decoder_steps:
                 print("Warning! Reached max decoder steps")
                 break
 
             decoder_input = mel_output[:, -1, -1 * self.n_mel_channels :]
-
+        # print('exit infer loop', not_finished)
         mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
             mel_outputs, gate_outputs, alignments
         )
@@ -643,7 +645,8 @@ DEFAULTS = HParams(
     postnet_n_convolutions=5,
     # speaker_embedding
     n_speakers=1,
-    speaker_embedding_dim=128,
+    # speaker_embedding_dim=128,
+    speaker_embedding_dim=512,
     # reference encoder
     with_gst=True,
     ref_enc_filters=[32, 32, 64, 64, 128, 128],
@@ -656,6 +659,9 @@ DEFAULTS = HParams(
 )
 
 # Cell
+import pdb
+
+
 class Tacotron2(TTSModel):
     def __init__(self, hparams):
         super().__init__(hparams)
@@ -673,6 +679,14 @@ class Tacotron2(TTSModel):
         self.encoder = Encoder(hparams)
         self.decoder = Decoder(hparams)
         self.postnet = Postnet(hparams)
+        self.speaker_embedding = nn.Embedding(
+            hparams.n_speakers, hparams.speaker_embedding_dim
+        )
+        self.speaker_embedding_dim = hparams.speaker_embedding_dim
+        self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        self.spkr_lin = nn.Linear(
+            self.speaker_embedding_dim, self.encoder_embedding_dim
+        )
 
     def parse_batch(self, batch):
         (
@@ -724,6 +738,7 @@ class Tacotron2(TTSModel):
             targets,
             max_len,
             output_lengths,
+            speaker_ids,
             *_,
         ) = inputs
 
@@ -731,8 +746,12 @@ class Tacotron2(TTSModel):
 
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
-        # embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-        encoder_outputs = torch.cat((embedded_text, embedded_speakers), dim=2)
+        embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+        # pdb.set_trace()
+        # encoder_outputs = torch.cat((embedded_text, embedded_speakers), dim=2)
+        encoder_outputs = embedded_text + self.spkr_lin(embedded_speakers)
+
+        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=input_lengths
@@ -751,7 +770,11 @@ class Tacotron2(TTSModel):
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-        encoder_outputs = torch.cat((embedded_text, embedded_speakers), dim=2)
+
+        # pdb.set_trace()
+        # encoder_outputs = torch.cat((embedded_text, embedded_speakers), dim=2)
+        encoder_outputs = embedded_text + self.spkr_lin(embedded_speakers)
+        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         memory_lengths = input_lengths
         mel_outputs, gate_outputs, alignments = self.decoder.inference(
