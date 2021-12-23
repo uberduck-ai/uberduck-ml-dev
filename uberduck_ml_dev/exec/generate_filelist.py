@@ -10,7 +10,6 @@ from pathlib import Path
 
 import sqlite3
 from tqdm import tqdm
-import pandas as pd
 
 from ..data.cache import ensure_speaker_table, insert_speaker
 from ..utils.utils import parse_vctk
@@ -46,7 +45,7 @@ def _convert_vctk(f, inp: str):
             speaker_id += 1
 
 
-def _convert_standard_multispeaker(f, inp: str):
+def _convert_standard_multispeaker(f, inp: str,rel_path = None: str):
     speaker_id = 0
     speakers = os.listdir(inp)
     conn = sqlite3.connect(str(CACHE_LOCATION))
@@ -72,19 +71,16 @@ def _convert_standard_multispeaker(f, inp: str):
                     print(e)
                     print(line)
                     raise
-                full_path = (path / line_path).resolve()
-                f.write(f"{full_path}|{line_txn}|{speaker_id}\n")
+                if rel_path is not None:
+                    out_path = None
+                else:
+                    out_path = (path / line_path).resolve()
+                f.write(f"{out_path}|{line_txn}|{speaker_id}\n")
             speaker_id += 1
-
-
-<<<<<<< HEAD
-from os.path import basename
-
 
 def _convert_singlespeaker(f, inp: str):
     speaker_id = 0
     conn = sqlite3.connect(str(CACHE_LOCATION))
-    # speaker = basename(inp)
     path = Path(inp)
     speaker = path.parts[-2]
     with conn:
@@ -103,57 +99,13 @@ def _convert_singlespeaker(f, inp: str):
             f.write(f"{full_path}|{line_txn}|{speaker_id}\n")
 
 
-def _generate_filelist(input_, fmt, output_filelist):
-=======
-def _convert_standard_multispeaker_rel(f, inp: str, rel_path: str):
-    speaker_id = 0
-    speakers = os.listdir(inp)
-    print(speakers)
-    conn = sqlite3.connect(str(CACHE_LOCATION))
-    with conn:
-        for speaker in tqdm(speakers):
-            path = Path(inp) / Path(speaker)
-            if not path.is_dir() or path.parts[-1].startswith("."):
-                continue
-            print(speaker)
-            files = os.listdir(path)
-
-            try:
-                transcriptions, *_ = [f for f in files if f.endswith(".txt")]
-            except:
-                print(files)
-                raise
-            insert_speaker(f.name, speaker, speaker_id, conn)
-            with (path / transcriptions).open("r") as txn_f:
-                transcriptions = txn_f.readlines()
-            for line in transcriptions:
-                line = line.strip("\n")
-                try:
-                    line_path, line_txn, *_ = line.split("|")
-                except Exception as e:
-                    print(e)
-                    print(line)
-                    raise
-                write_path = f"{rel_path}/{speaker}/{line_path}"
-                f.write(f"{write_path}|{line_txn}|{speaker_id}\n")
-            speaker_id += 1
-
-
-def _generate_filelist(input_dataset, fmt, output_filelist):
->>>>>>> sam-vertex-v2
+def _generate_filelist(input_, fmt, output_filelist, rel_path):
     full_path = Path(output_filelist).resolve()
     ensure_speaker_table()
     with open(full_path, "w") as f:
         print(f.name)
-        _convert_to_multispeaker(f, input_, fmt)
+        _convert_to_multispeaker(f, input_, fmt, rel_path)
 
-
-def _generate_filelist_rel(input_dataset, output_filelist, rel_path):
-    full_path = Path(output_filelist).resolve()
-    ensure_speaker_table()
-    with open(full_path, "w") as f:
-        print(f.name)
-        _convert_standard_multispeaker_rel(f, input_dataset, rel_path)
 
 
 def _convert_to_multispeaker(f, inp: str, fmt: str):
@@ -182,8 +134,10 @@ def _parse_args(args: List[str]):
     parser.add_argument(
         "-f", "--format", help="Input dataset format", default=STANDARD_MULTISPEAKER
     )
-    parser.add_argument("-o", "--output", help="asdf", default="list.txt")
-    parser.add_argument("--rel_path", help="add relative path", default=None)
+    parser.add_argument("-o", "--output", help="Output filename", default="list.txt")
+    parser.add_argument(
+        "--rel_path", help="Relative path of audiofiles in output", default=None
+    )
     return parser.parse_args(args)
 
 
@@ -194,9 +148,6 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = _parse_args(sys.argv[1:])
-    if args.rel_path:
-        _generate_filelist_rel(
-            args.input, args.output, args.rel_path
-        )  # make this for vctk / synthesize
-    else:
-        _generate_filelist(args.input, args.format, args.output)
+    _generate_filelist(
+        args.input, args.format, args.output, args.rel_path
+    )  # make this for vctk
