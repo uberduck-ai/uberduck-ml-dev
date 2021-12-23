@@ -95,6 +95,7 @@ def select_speakers(filelists: List[Filelist], output_filelist: str):
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", help="path to JSON config")
+    parser.add_argument("--output", help="path to save filelist", default=None)
     return parser.parse_args(args)
 
 
@@ -108,6 +109,7 @@ if __name__ == "__main__" and not IN_NOTEBOOK:
     if args.config:
         with open(args.config) as f:
             config = json.load(f)
+        config.update(vars(args))
         filelists = [Filelist(**f) for f in config["filelists"]]
         output_filelist = config["output"]
     else:
