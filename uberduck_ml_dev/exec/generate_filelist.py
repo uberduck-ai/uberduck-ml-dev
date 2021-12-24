@@ -72,13 +72,13 @@ def _convert_standard_multispeaker(f, inp: str,rel_path = None: str):
                     print(line)
                     raise
                 if rel_path is not None:
-                    out_path = None
+                    out_path = rel_path
                 else:
                     out_path = (path / line_path).resolve()
                 f.write(f"{out_path}|{line_txn}|{speaker_id}\n")
             speaker_id += 1
 
-def _convert_singlespeaker(f, inp: str):
+def _convert_singlespeaker(f, inp: str,rel_path = None: str):
     speaker_id = 0
     conn = sqlite3.connect(str(CACHE_LOCATION))
     path = Path(inp)
