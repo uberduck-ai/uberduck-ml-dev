@@ -378,7 +378,7 @@ class Decoder(nn.Module):
             mel_outputs, gate_outputs, alignments
         )
 
-        return mel_outputs, gate_outputs, alignments
+        return mel_outputs, gate_outputs, alignments, mel_lengths
 
     def inference_noattention(self, memory, attention_map):
         """Decoder inference
@@ -765,7 +765,7 @@ class Tacotron2(TTSModel):
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         memory_lengths = input_lengths
-        mel_outputs, gate_outputs, alignments = self.decoder.inference(
+        mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(
             encoder_outputs, memory_lengths
         )
         mel_outputs_postnet = self.postnet(mel_outputs)
