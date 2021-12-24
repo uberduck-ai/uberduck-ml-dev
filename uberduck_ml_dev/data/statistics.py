@@ -15,7 +15,6 @@ import numpy as np
 from PIL import Image, ImageOps
 from pydub.utils import mediainfo_json
 import seaborn as sns
-import speechmetrics
 from wordcloud import WordCloud, STOPWORDS
 from wordfreq import word_frequency
 
@@ -113,6 +112,9 @@ class AbsoluteMetrics:
     """This class loads and calculates the absolute metrics, MOSNet and SRMR"""
 
     def __init__(self, window_length: Optional[int] = None):
+        # NOTE(zach): There are some problems installing speechmetrics via pip and it's not critical, so import inline to avoid issues in CI.
+        import speechmetrics
+
         self.metrics = speechmetrics.load("absolute", window_length)
 
     def __call__(self, wav_file: str) -> Dict[str, float]:
