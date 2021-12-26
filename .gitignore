@@ -3,6 +3,7 @@ experiments/outputs_processed/*
 experiments/logs/*
 src/vendor_tools/*
 docker/secrets/gcloud_key.json
+docker/secrets/*
 
 *.bak
 .gitattributes
