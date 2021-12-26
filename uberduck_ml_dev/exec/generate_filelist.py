@@ -15,7 +15,6 @@ from ..data.cache import ensure_speaker_table, insert_speaker
 from ..utils.utils import parse_vctk
 
 CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
-
 STANDARD_MULTISPEAKER = "standard-multispeaker"
 STANDARD_SINGLESPEAKER = "standard-singlespeaker"
 VCTK = "vctk"
@@ -45,7 +44,7 @@ def _convert_vctk(f, inp: str):
             speaker_id += 1
 
 
-def _convert_standard_multispeaker(f, inp: str,rel_path = None: str):
+def _convert_standard_multispeaker(f, inp: str, rel_path: str = None):
     speaker_id = 0
     speakers = os.listdir(inp)
     conn = sqlite3.connect(str(CACHE_LOCATION))
@@ -72,13 +71,14 @@ def _convert_standard_multispeaker(f, inp: str,rel_path = None: str):
                     print(line)
                     raise
                 if rel_path is not None:
-                    out_path = rel_path
+                    out_path = (rel_path / line_path).resolve()
                 else:
                     out_path = (path / line_path).resolve()
                 f.write(f"{out_path}|{line_txn}|{speaker_id}\n")
             speaker_id += 1
 
-def _convert_singlespeaker(f, inp: str,rel_path = None: str):
+
+def _convert_singlespeaker(f, inp: str, rel_path: str = None):
     speaker_id = 0
     conn = sqlite3.connect(str(CACHE_LOCATION))
     path = Path(inp)
@@ -95,6 +95,7 @@ def _convert_singlespeaker(f, inp: str,rel_path = None: str):
                 print(e)
                 print(line)
                 raise
+
             full_path = (Path(*path.parts[:-1]) / line_path).resolve()
             f.write(f"{full_path}|{line_txn}|{speaker_id}\n")
 
@@ -104,8 +105,7 @@ def _generate_filelist(input_, fmt, output_filelist, rel_path):
     ensure_speaker_table()
     with open(full_path, "w") as f:
         print(f.name)
-        _convert_to_multispeaker(f, input_, fmt, rel_path)
-
+        # _convert_to_multispeaker(f, input_, fmt, rel_path)
 
 
 def _convert_to_multispeaker(f, inp: str, fmt: str):
