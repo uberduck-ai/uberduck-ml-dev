@@ -9,6 +9,7 @@ from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from ..utils.argparse import parse_args
 import sys
 import json
+import torch
 
 # Cell
 def run(rank, device_count, hparams):
