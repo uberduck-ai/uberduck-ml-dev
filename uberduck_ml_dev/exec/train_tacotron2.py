@@ -10,6 +10,7 @@ import argparse
 import sys
 import json
 import torch
+from torch import multiprocessing as mp
 
 # Cell
 def parse_args(args):
