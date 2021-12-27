@@ -696,6 +696,7 @@ class Tacotron2(TTSModel):
         max_len = torch.max(input_lengths.data).item()
         mel_padded = to_gpu(mel_padded).float()
         gate_padded = to_gpu(gate_padded).float()
+        speaker_ids = to_gpu(speaker_ids).long()
         output_lengths = to_gpu(output_lengths).long()
         ret_x = [
             text_padded,
