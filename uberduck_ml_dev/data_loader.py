@@ -299,6 +299,7 @@ class TextMelCollate:
         gate_padded = torch.FloatTensor(len(batch), max_target_len)
         gate_padded.zero_()
         output_lengths = torch.LongTensor(len(batch))
+        # speaker_ids = torch.LongTensor(len(batch)).cuda()
         speaker_ids = torch.LongTensor(len(batch)).cuda()
         if self.include_f0:
             f0_padded = torch.FloatTensor(len(batch), 1, max_target_len)

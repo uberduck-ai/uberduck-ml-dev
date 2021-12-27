@@ -207,12 +207,8 @@ class Tacotron2Trainer(TTSTrainer):
                 else randint(0, self.n_speakers - 1)
             )
             input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
-            #
-            # pdb.set_trace()
             input_ = [utterance, input_lengths, torch.LongTensor([speaker_id]).cuda()]
-            # input_ = [utterance, torch.LongTensor([speaker_id]).cuda()]
 
-            # 200 can be changed
             model.eval()
 
             _, mel, gate, attn = model.inference(input_)
@@ -465,7 +461,7 @@ class Tacotron2Trainer(TTSTrainer):
                 )
                 log_stop = time.time()
                 # print(log_start - log_stop, 'logging time')
-                print(f"logging_time: {log_start - log_stop:.4f}")
+                print(f"logging_time: {log_stop - log_start:.4f}")
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"tacotron2_{epoch}",
