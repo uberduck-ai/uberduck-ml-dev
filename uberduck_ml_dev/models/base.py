@@ -53,11 +53,3 @@ class TTSModel(nn.Module):
     @classmethod
     def create(cls, name, opts, folders, all_speakers=True):
         pass
-
-
-#         model_cls = cls.get_class(name)
-#         folders = pd.read_csv(folders)
-#         for folder in folders:
-
-
-#         return model_cls(opts)
