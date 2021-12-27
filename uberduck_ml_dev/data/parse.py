@@ -5,77 +5,14 @@ __all__ = ['CACHE_LOCATION', 'STANDARD_MULTISPEAKER', 'STANDARD_SINGLESPEAKER', 
 # Cell
 import os
 import numpy as np
-
-# def load_filepaths_and_text(filename: str, split: str = "|"):
-#     with open(filename, encoding="utf-8") as f:
-#         filepaths_and_text = [line.strip().split(split) for line in f]
-#     return filepaths_and_text
-
-# def _parse_vctk(root: str):
-#     """Parse VCTK dataset and return a dict representation."""
-#     wav_dir = os.path.join(root, "wav48_silence_trimmed")
-#     txt_dir = os.path.join(root, "txt")
-#     speaker_wavs = os.listdir(wav_dir)
-#     speaker_txts = os.listdir(txt_dir)
-#     speakers = list(set(speaker_wavs) & set(speaker_txts))
-#     output_dict = {}
-#     for speaker in speakers:
-#         speaker_wav_dir = os.path.join(wav_dir, speaker)
-#         speaker_txt_dir = os.path.join(txt_dir, speaker)
-#         wav_files_speaker = np.asarray(os.listdir(speaker_wav_dir))
-#         txt_files_speaker = np.asarray(os.listdir(speaker_txt_dir))
-
-#         transcription_basenames = np.asarray([t[:8] for t in txt_files_speaker])
-#         audio_basenames = np.asarray([w[:8] for w in wav_files_speaker])
-#         mic = np.asarray([w[12] for w in wav_files_speaker])
-#         mic1_ind = mic == "1"
-#         wav_files_speaker = wav_files_speaker[mic1_ind]
-#         audio_basenames = audio_basenames[mic1_ind]
-
-#         combined_files = np.intersect1d(transcription_basenames, audio_basenames)
-#         matching_inds1 = np.where(np.isin(transcription_basenames, combined_files))[0]
-#         matching_inds2 = np.where(np.isin(audio_basenames, combined_files))[0]
-#         inds1 = matching_inds1[transcription_basenames[matching_inds1].argsort()]
-#         inds2 = matching_inds2[audio_basenames[matching_inds2].argsort()]
-#         txt_files_speaker = txt_files_speaker[inds1]
-#         wav_files_speaker = wav_files_speaker[inds2]
-#         texts, wavs = [], []
-#         for text_basename, wav_basename in zip(txt_files_speaker, wav_files_speaker):
-#             text_file = os.path.join(speaker_txt_dir, text_basename)
-#             with open(text_file) as f:
-#                 contents = f.read().strip("\n")
-#             texts.append(contents)
-#             wav_file = os.path.join(speaker_wav_dir, wav_basename)
-#             wavs.append(wav_file)
-
-#         if len(wavs):
-#             output_dict[speaker] = list(zip(texts, wavs))
-#     return output_dict
-
-# def _convert_vctk(f, inp: str):
-#     vctk_data = parse_vctk(inp)
-#     speaker_id = 0
-#     conn = sqlite3.connect(str(CACHE_LOCATION))
-#     with conn:
-#         for speaker_name, speaker_data in tqdm(vctk_data.items()):
-#             insert_speaker(f.name, speaker_name, speaker_id, conn)
-#             speaker_out_path = Path(out_path) / speaker_name
-#             if not speaker_out_path.exists():
-#                 os.makedirs(speaker_out_path)
-#             for transcription, flac_path in speaker_data:
-#                 assert flac_path.endswith(".flac")
-#                 wav_path = flac_path.replace(".flac", ".wav")
-#                 convert_to_wav(flac_path, wav_path)
-#                 full_path = Path(full_path).resolve()
-#                 f.write(f"{full_path}|{transcription}|{speaker_id}\n")
-#             speaker_id += 1
-
 import sqlite3
 import uuid
 from pathlib import PosixPath
 from tqdm import tqdm
 from pathlib import Path
 import os
+import pandas as pd
+import json
 
 CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-exp.db")
 STANDARD_MULTISPEAKER = "standard-multispeaker"
@@ -83,20 +20,18 @@ STANDARD_SINGLESPEAKER = "standard-singlespeaker"
 VCTK = "vctk"
 
 
-def _log_filelists(
-    file, fmt, conn, speaker_name: str, dir_path: str = None, dataset_name: str = None
-):
+def _log_filelists(folder, fmt, conn, dataset_name: str = None):
     """
     logs a filelist into the speaker database
     """
     if fmt == STANDARD_MULTISPEAKER:
-        _parse_ms(file, dir_path=dir_path, dataset_name=dataset_name)
+        _parse_ms(root=folder, dataset_name=dataset_name)
     if fmt == STANDARD_SINGLESPEAKER:
         _parse_ss(
             conn=conn,
-            root=file,
-            speaker_name=speaker_name,
-            dir_path=dir_path,
+            root=folder,
+            speaker_name=dataset_name,
+            dir_path=folder,
             dataset_name=dataset_name,
         )
     if fmt == VCTK:
@@ -122,7 +57,8 @@ def _add_speaker_to_db(
     uuid_ = uuid.uuid4()
     if conn is None:
         conn = sqlite3.connect(str(CACHE_LOCATION_EXP))
-    conn.execute(
+    cursor = conn.cursor()
+    cursor.execute(
         "INSERT OR REPLACE INTO FILELISTS VALUES (?, ?, ?,?,?,?,?)",
         (
             str(uuid_),
@@ -134,19 +70,21 @@ def _add_speaker_to_db(
             dataset_name,
         ),
     )
+    conn.commit()
+    cursor.close()
 
 
-def _parse_ms(root: str, dir_path: str, dataset_name: str, conn):
+def _parse_ms(root: str, dataset_name: str, conn):
     speakers = os.listdir(root)
     for speaker in tqdm(speakers):
-        path = Path(root) / Path(speaker)
+        speaker_path = Path(root) / Path(speaker)
         if not path.is_dir() or path.parts[-1].startswith("."):
             continue
         _parse_ss(
-            root=path,
+            root=speaker_path,
             speaker_name=speaker,
             speaker_id=None,
-            dir_path=dir_path,
+            dir_path=root,
             dataset_name=dataset_name,
             rel_path=speaker,
             conn=conn,
@@ -169,21 +107,20 @@ def _parse_ss(
             filelist_path=filelist_path,
             speaker_name=speaker_name,
             speaker_id=speaker_id,
-            dir_path=dir_path,
+            dir_path=root,
             dataset_name=dataset_name,
             rel_path=rel_path,
             conn=conn,
         )
 
 
-def _generate_filelist(config_path, conn):
+def _generate_filelist(config_path, conn, out):
 
-    conn = sqlite3.connect(str(CACHE_LOCATION_EXP))
     with open(config_path) as f:
         filelist_config = json.load(f)
     speaker_id = 0
-    save_path = Path(filelist_config["output"])
-    exp_path = Path(os.path.join(*peth.parts[:-1]))
+    save_path = Path(out)
+    exp_path = Path(os.path.join(*save_path.parts[:-1]))
     if not os.path.exists(exp_path):
         exp_path.mkdir(parents=True)
     with open(save_path, "w") as f_out:
@@ -209,6 +146,18 @@ def _generate_filelist(config_path, conn):
                     print(e)
                     print(line)
                     raise
-                out_path = os.path.join(*([dir_path] + list(results[0][1:])))
+                out_path = os.path.join(
+                    *([dir_path] + list(results[0][1:2]) + [line_path])
+                )
                 f_out.write(f"{out_path}|{line_txn}|{speaker_id}\n")
             speaker_id += 1
+
+
+def _write_db_to_csv(conn, output_path):
+    cursor = conn.cursor()
+    query = cursor.execute("SELECT * From FILELISTS")
+
+    cols = [column[0] for column in query.description]
+    results = pd.DataFrame.from_records(data=query.fetchall(), columns=cols)
+    results.to_csv(output_path, header=True)
+    cursor.close()
