@@ -449,6 +449,7 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                     optimizer.step()
                 step_duration_seconds = time.perf_counter() - start_time
+                log_start = time.time()
                 self.log_training(
                     model,
                     X,
@@ -462,6 +463,9 @@ class Tacotron2Trainer(TTSTrainer):
                     grad_norm,
                     step_duration_seconds,
                 )
+                log_stop = time.time()
+                # print(log_start - log_stop, 'logging time')
+                print(f"logging_time: {log_start - log_stop:.4f}")
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"tacotron2_{epoch}",
