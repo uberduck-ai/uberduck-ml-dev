@@ -4,7 +4,7 @@ experiments/logs/*
 src/vendor_tools/*
 docker/secrets/gcloud_key.json
 docker/secrets/*
-
+nbs/test/fixtures/models/*
 *.bak
 .gitattributes
 .last_checked
