@@ -24,4 +24,5 @@ echo "CONFIG: $CONFIG"
 echo "LOG_PATH: $LOG_PATH"
 echo "CHECKPOINT_PATH: $CHECKPOINT_PATH"
 echo "WARM_START_NAME: $WARM_START_NAME"
+sleep 3600
 python -m uberduck_ml_dev.exec.train_tacotron2 --config $CONFIG --log_dir $LOG_PATH --checkpoint_path $CHECKPOINT_PATH --training_audiopaths_and_text $FILELIST_TRAIN --val_audiopaths_and_text $FILELIST_VAL --warm_start_name $WARM_START_NAME
