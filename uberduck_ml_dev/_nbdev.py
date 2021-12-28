@@ -3,8 +3,8 @@
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
 index = {"ensure_speaker_table": "data.cache.ipynb",
-         "STANDARD_MULTISPEAKER": "exec.parse_data.ipynb",
-         "STANDARD_SINGLESPEAKER": "exec.parse_data.ipynb",
+         "STANDARD_MULTISPEAKER": "data.parse.ipynb",
+         "STANDARD_SINGLESPEAKER": "data.parse.ipynb",
          "VCTK": "data.parse.ipynb",
          "word_frequencies": "data.statistics.ipynb",
          "create_wordcloud": "data.statistics.ipynb",
