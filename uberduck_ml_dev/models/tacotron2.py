@@ -345,7 +345,6 @@ class Decoder(nn.Module):
         )
 
         while True:
-            # print(i)
             to_cat = (self.prenet(decoder_input),)
 
             decoder_input = torch.cat(to_cat, dim=1)
@@ -637,7 +636,6 @@ DEFAULTS = HParams(
     postnet_n_convolutions=5,
     # speaker_embedding
     n_speakers=1,
-    # speaker_embedding_dim=128,
     speaker_embedding_dim=128,
     # reference encoder
     with_gst=True,

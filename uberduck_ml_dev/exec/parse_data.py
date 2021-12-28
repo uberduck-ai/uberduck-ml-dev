@@ -12,11 +12,11 @@ import sqlite3
 from tqdm import tqdm
 
 from ..data.cache import ensure_speaker_table
-from ..data.parse import _log_filelists, _write_db_to_csv
+from ..data.parse import _cache_filelists, _write_db_to_csv
 
-CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-exp.db")
-STANDARD_MULTISPEAKER = "standard-multispeaker"
-STANDARD_SINGLESPEAKER = "standard-singlespeaker"
+CACHE_LOCATION = uberduck_ml_dev.data.cache.CACHE_LOCATION
+STANDARD_MULTISPEAKER = uberduck_ml_dev.data.parse.STANDARD_MULTISPEAKER
+STANDARD_SINGLESPEAKER = uberduck_ml_dev.data.parse.STANDARD_SINGLESPEAKER
 FORMATS = [
     STANDARD_MULTISPEAKER,
     STANDARD_SINGLESPEAKER,
@@ -51,7 +51,7 @@ if __name__ == "__main__" and not IN_NOTEBOOK:
     args = _parse_args(sys.argv[1:])
     ensure_speaker_table(args.database)
     conn = sqlite3.connect(args.database)
-    _log_filelists(
+    _cache_filelists(
         folder=args.input, fmt=args.format, conn=conn, dataset_name=args.name
     )
     if args.csv_path is not None:

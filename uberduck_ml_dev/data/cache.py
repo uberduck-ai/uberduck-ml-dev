@@ -11,7 +11,7 @@ import sqlite3
 
 # Try catch to resolve weirdness in GitHub actions runner.
 try:
-    CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-exp.db")
+    CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-dev.db")
 except:
     pass
 
@@ -31,12 +31,12 @@ def ensure_speaker_table(database_path):
         os.makedirs(db_path.parent)
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
-    sql = """CREATE TABLE IF NOT EXISTS filelists (UUID TEXT,
-            FILELIST_PATH TEXT,
-            SPEAKER_NAME TEXT,
-            SPEAKER_ID INT,
-            DIR_PATH TEXT,
-            REL_PATH TEXT,
-            DATASET_NAME TEXT)
+    sql = """CREATE TABLE IF NOT EXISTS filelists (uuid TEXT,
+            filelist_path TEXT,
+            speaker_name TEXT,
+            speaker_id INT,
+            dir_path TEXT,
+            rel_path TEXT,
+            dataset_name TEXT)
             """
     cursor.execute(sql)

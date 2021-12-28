@@ -14,15 +14,15 @@ import os
 import pandas as pd
 import json
 
-CACHE_LOCATION = Path.home() / Path(".cache/uberduck/uberduck-ml-exp.db")
+CACHE_LOCATION = uberduck_ml_dev.data.cache.CACHE_LOCATION
 STANDARD_MULTISPEAKER = "standard-multispeaker"
 STANDARD_SINGLESPEAKER = "standard-singlespeaker"
 VCTK = "vctk"
 
 
-def _log_filelists(folder, fmt, conn, dataset_name: str = None):
+def _cache_filelists(folder, fmt, conn, dataset_name: str = None):
     """
-    logs a filelist into the speaker database
+    records a filelist into the speaker cache
     """
     if fmt == STANDARD_MULTISPEAKER:
         _parse_ms(root=folder, dataset_name=dataset_name)
@@ -59,7 +59,7 @@ def _add_speaker_to_db(
         conn = sqlite3.connect(str(CACHE_LOCATION_EXP))
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT OR REPLACE INTO FILELISTS VALUES (?, ?, ?,?,?,?,?)",
+        "INSERT OR REPLACE INTO FILELISTS VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             str(uuid_),
             filelist_path,
@@ -129,9 +129,8 @@ def _generate_filelist(config_path, conn, out):
             dir_path = filelist["dir_path"]
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT DIR_PATH,REL_PATH,FILELIST_PATH FROM FILELISTS WHERE UUID == '{uuid}'".format(
-                    uuid=uuid
-                )
+                "SELECT dir_path,rel_path,filelist_path FROM FILELISTS WHERE uuid = :uuid",
+                {"uuid": uuid},
             )
             results = cursor.fetchall()
             assert len(results) == 1

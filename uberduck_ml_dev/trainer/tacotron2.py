@@ -348,7 +348,6 @@ class Tacotron2Trainer(TTSTrainer):
         if self.distributed_run:
             self.init_distributed()
             sampler = DistributedSampler(train_set, rank=self.rank)
-        # pdb.set_trace()
         train_loader = DataLoader(
             train_set,
             batch_size=self.batch_size,
@@ -410,7 +409,6 @@ class Tacotron2Trainer(TTSTrainer):
                         loss = mel_loss + gate_loss
                         loss_batch = mel_loss_batch + gate_loss_batch
                 else:
-                    # pdb.set_trace()
                     y_pred = model(X)
                     mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
                         y_pred, y
@@ -460,7 +458,6 @@ class Tacotron2Trainer(TTSTrainer):
                     step_duration_seconds,
                 )
                 log_stop = time.time()
-                # print(log_start - log_stop, 'logging time')
                 print(f"logging_time: {log_stop - log_start:.4f}")
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
@@ -559,25 +556,10 @@ class Tacotron2Trainer(TTSTrainer):
 
     @property
     def val_dataset_args(self):
-        #         val_args = {}
-        #         val_args = [a for a in self.training_dataset_args]
-        #         val_args[0] = self.val_audiopaths_and_text
-        #         return val_args
-        return {
-            "audiopaths_and_text": self.val_audiopaths_and_text,
-            "text_cleaners": self.text_cleaners,
-            "p_arpabet": self.p_arpabet,
-            "n_mel_channels": self.n_mel_channels,
-            "sampling_rate": self.sampling_rate,
-            "mel_fmin": self.mel_fmin,
-            "mel_fmax": self.mel_fmax,
-            "filter_length": self.filter_length,
-            "hop_length": self.hop_length,
-            "win_length": self.win_length,
-            "symbol_set": self.symbol_set,
-            "max_wav_value": self.max_wav_value,
-            "pos_weight": self.pos_weight,
-        }
+
+        args = dict(**self.training_dataset_args)
+        args["audiopaths_and_text"] = self.val_audiopaths_and_text
+        return args
 
     @property
     def training_dataset_args(self):
@@ -596,21 +578,3 @@ class Tacotron2Trainer(TTSTrainer):
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
         }
-
-
-#         return [
-#             self.training_audiopaths_and_text,
-#             self.text_cleaners,
-#             self.p_arpabet,
-#             # audio params
-#             self.n_mel_channels,
-#             self.sampling_rate,
-#             self.mel_fmin,
-#             self.mel_fmax,
-#             self.filter_length,
-#             self.hop_length,
-#             self.win_length,
-#             self.symbol_set,
-#             self.max_wav_value,
-#             self.pos_weight,
-#         ]
