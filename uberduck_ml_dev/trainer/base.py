@@ -8,20 +8,12 @@ from pathlib import Path
 from pprint import pprint
 
 import torch
-from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import time
 
 from ..models.common import MelSTFT
-from ..utils.plot import (
-    plot_attention,
-    plot_gate_outputs,
-    plot_spectrogram,
-)
-from ..text.util import text_to_sequence, random_utterance
 from ..vocoders.hifigan import HiFiGanGenerator
 
 
