@@ -3,7 +3,6 @@
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
 index = {"ensure_speaker_table": "data.cache.ipynb",
-         "CACHE_LOCATION": "exec.parse_data.ipynb",
          "STANDARD_MULTISPEAKER": "exec.parse_data.ipynb",
          "STANDARD_SINGLESPEAKER": "exec.parse_data.ipynb",
          "VCTK": "data.parse.ipynb",
@@ -25,6 +24,7 @@ index = {"ensure_speaker_table": "data.cache.ipynb",
          "generate_markdown": "exec.dataset_statistics.ipynb",
          "parse_args": "utils.exec.ipynb",
          "run": "exec.train_vits.ipynb",
+         "CACHE_LOCATION": "exec.generate_filelist.ipynb",
          "FORMATS": "exec.parse_data.ipynb",
          "batch": "exec.preprocess_vits.ipynb",
          "flatten": "exec.preprocess_vits.ipynb",
