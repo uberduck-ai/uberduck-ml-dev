@@ -636,7 +636,7 @@ DEFAULTS = HParams(
     postnet_n_convolutions=5,
     # speaker_embedding
     n_speakers=1,
-    speaker_embedding_dim=128,
+    speaker_embedding_dim=0,
     # reference encoder
     with_gst=True,
     ref_enc_filters=[32, 32, 64, 64, 128, 128],

@@ -60,8 +60,8 @@
     "sampling_rate": 22050,
     "steps_per_sample": 100,
     "text_cleaners": ["english_cleaners"],
-    "training_audiopaths_and_text": "test/fixtures/lj64/list64.txt",
-    "val_audiopaths_and_text": "test/fixtures/lj64/list64.txt",
+    "training_audiopaths_and_text": "test/fixtures/ljtest/list.txt",
+    "val_audiopaths_and_text": "test/fixtures/ljtest/list.txt",
     "warm_start_name":"test/fixtures/models/taco2ljdefault",
     "weight_decay": 1e-6,
     "win_length": 1024
