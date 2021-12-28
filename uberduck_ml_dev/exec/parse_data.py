@@ -12,8 +12,12 @@ import sqlite3
 from tqdm import tqdm
 
 from ..data.cache import ensure_speaker_table, CACHE_LOCATION
-from ..data.parse import _cache_filelists, _write_db_to_csv, STANDARD_MULTISPEAKER, STANDARD_SINGLESPEAKER
-from ..data.cache import
+from ..data.parse import (
+    _cache_filelists,
+    _write_db_to_csv,
+    STANDARD_MULTISPEAKER,
+    STANDARD_SINGLESPEAKER,
+)
 
 FORMATS = [
     STANDARD_MULTISPEAKER,
