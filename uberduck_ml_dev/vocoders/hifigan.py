@@ -23,14 +23,17 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 # Cell
 
 
-class HiFiGanGenerator:
+class HiFiGanGenerator(nn.Module):
     def __init__(self, config, checkpoint, cudnn_enabled=False):
+        super().__init__()
         self.config = config
         self.checkpoint = checkpoint
         self.cudnn_enabled = cudnn_enabled
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.vocoder = self.load_checkpoint()
+        self.vocoder = self.load_checkpoint().eval()
+        self.vocoder.remove_weight_norm()
 
+    @torch.no_grad()
     def load_checkpoint(self):
         h = self.load_config()
         vocoder = Generator(h)
@@ -44,6 +47,7 @@ class HiFiGanGenerator:
             vocoder = vocoder.cuda()
         return vocoder
 
+    @torch.no_grad()
     def load_config(self):
         with open(self.config) as f:
             h = AttrDict(json.load(f))
@@ -51,12 +55,6 @@ class HiFiGanGenerator:
 
     @torch.no_grad()
     def infer(self, mel, max_wav_value=32768):
-        _ = self.vocoder.eval()
-        try:
-            self.vocoder.remove_weight_norm()
-        except Exception as e:
-            print("weight norm already removed")
-
         audio = (
             self.vocoder.forward(mel).cpu().squeeze().clamp(-1, 1).numpy()
             * max_wav_value
