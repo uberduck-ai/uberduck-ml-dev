@@ -28,8 +28,7 @@ class HiFiGanGenerator(nn.Module):
         super().__init__()
         self.config = config
         self.checkpoint = checkpoint
-        self.cudnn_enabled = cudnn_enabled
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if torch.cuda.is_available() and cudnn_enabled else "cpu"
         self.vocoder = self.load_checkpoint().eval()
         self.vocoder.remove_weight_norm()
 
@@ -43,7 +42,7 @@ class HiFiGanGenerator(nn.Module):
                 map_location="cuda" if self.device == "cuda" else "cpu",
             )["generator"]
         )
-        if self.cudnn_enabled and self.device == "cuda":
+        if self.device == "cuda":
             vocoder = vocoder.cuda()
         return vocoder
 
