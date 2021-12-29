@@ -955,11 +955,8 @@ class GradTTS(TTSModel):
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
-        print("logw shape: ", logw.shape)
         w = torch.exp(logw) * x_mask
-        print("w shape", w.shape)
         w_ceil = torch.ceil(w) * length_scale
-        print(w_ceil)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         y_max_length = int(y_lengths.max())
         y_max_length_ = fix_len_compatibility(y_max_length)
@@ -1004,8 +1001,6 @@ class GradTTS(TTSModel):
             x = torch.LongTensor(seq)[None]
 
         x_lengths = torch.LongTensor([x.shape[-1]])
-        print(x)
-        print(x_lengths)
         if self.device == "cuda":
             x = x.cuda()
             x_lengths = x_lengths.cuda()
