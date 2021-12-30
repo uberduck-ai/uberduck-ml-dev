@@ -2,15 +2,69 @@
 gcloud auth activate-service-account --key-file=/secrets/gcloud_key.json
 #sleep 3600
 export GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcloud_key.json
-export BUCKET=$1
-export BUCKET_LOCAL=$2
-export UBMLEXP_GIT=$3
-export WARM_START_NAME=$4
-export FILELIST_TRAIN=$5
-export FILELIST_VAL=$6
-export CONFIG=$7
-export LOG_PATH=$8
-export CHECKPOINT_PATH=$9
+if [[ -z "$1" ]] then
+    echo "Enter BUCKET: "
+    read inp
+    export BUCKET=$inp
+else
+    export BUCKET=$1
+fi
+if [[ -z "$2" ]] then
+    echo "Enter BUCKET_LOCAL: "
+    read inp
+    export BUCKET_LOCAL=$inp
+else
+    export BUCKET_LOCAL=$2
+fi
+if [[ -z "$3" ]] then
+    echo "Enter Experiemnts repo to clone: "
+    read inp
+    export UBMLEXP_GIT=$inp
+else
+    export UBMLEXP_GIT=$3
+fi
+if [[ -z "$4" ]] then
+    echo "Enter warm start name: "
+    read inp
+    export WARM_START_NAME=$inp
+else
+    export WARM_START_NAME=$4
+fi
+if [[ -z "$5" ]] then
+    echo "Enter training filelist: "
+    read inp
+    export FILELIST_TRAIN=$inp
+else
+    export FILELIST_TRAIN=$5
+fi
+if [[ -z "$6" ]] then
+    echo "Enter validation filelist: "
+    read inp
+    export FILELIST_VAL=$inp
+else
+    export FILELIST_VAL=$6
+fi
+if [[ -z "$7" ]] then
+    echo "Enter config: "
+    read inp
+    export CONFIG=$inp
+else
+    export CONFIG=$7
+fi
+if [[ -z "$8" ]] then
+    echo "Enter log path: "
+    read inp
+    export LOG_PATH=$inp
+else
+    export LOG_PATH=$8
+fi
+if [[ -z "$9" ]] then
+    echo "Enter checkpoint path: "
+    read inp
+    export CHECKPOINT_PATH=$inp
+else
+    export CHECKPOINT_PATH=$9
+fi
 
 git clone $UBMLEXP_GIT
 gcsfuse --implicit-dirs $BUCKET $BUCKET_LOCAL
