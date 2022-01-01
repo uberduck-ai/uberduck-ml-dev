@@ -14,6 +14,7 @@ class TTSModel(nn.Module):
         super().__init__()
         self.symbol_set = hparams.symbol_set
         self.n_symbols = len(SYMBOL_SETS[self.symbol_set])
+        self.n_speakers = hparams.n_speakers
         # symbols = __import__('uberduck_ml_dev.text.' + hparams.symbols)
 
     def infer(self):
@@ -44,6 +45,7 @@ class TTSModel(nn.Module):
         dummy_dict.update(model_dict)
         model_dict = dummy_dict
         self.load_state_dict(model_dict)
+        self.device = device
         if device == "cuda":
             self.cuda()
 
