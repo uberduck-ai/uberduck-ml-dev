@@ -636,7 +636,7 @@ DEFAULTS = HParams(
     postnet_n_convolutions=5,
     # speaker_embedding
     n_speakers=1,
-    speaker_embedding_dim=0,
+    speaker_embedding_dim=128,
     # reference encoder
     with_gst=True,
     ref_enc_filters=[32, 32, 64, 64, 128, 128],
@@ -670,13 +670,18 @@ class Tacotron2(TTSModel):
         self.decoder = Decoder(hparams)
         self.postnet = Postnet(hparams)
         self.speaker_embedding = nn.Embedding(
-            hparams.n_speakers, hparams.speaker_embedding_dim
+            self.n_speakers, hparams.speaker_embedding_dim
         )
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
-        self.spkr_lin = nn.Linear(
-            self.speaker_embedding_dim, self.encoder_embedding_dim
-        )
+        if self.n_speakers > 1:
+            self.spkr_lin = nn.Linear(
+                self.speaker_embedding_dim, self.encoder_embedding_dim
+            )
+        else:
+            self.spkr_lin = lambda a: torch.zeros(
+                self.encoder_embedding_dim, device=self.device
+            )
 
     def parse_batch(self, batch):
         (
