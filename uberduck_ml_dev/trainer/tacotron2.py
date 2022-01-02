@@ -55,7 +55,7 @@ import torch
 from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import time
 from torch.utils.data import DataLoader
 from ..models.common import MelSTFT
