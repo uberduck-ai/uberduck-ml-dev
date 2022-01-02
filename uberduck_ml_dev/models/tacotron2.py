@@ -776,7 +776,7 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
         return self.parse_output(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths]
         )
 
     def inference_noattention(self, inputs):
