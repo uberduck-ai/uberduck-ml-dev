@@ -9,7 +9,7 @@ from pprint import pprint
 
 import torch
 import torch.distributed as dist
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import numpy as np
 import time
 
