@@ -211,7 +211,7 @@ class Tacotron2Trainer(TTSTrainer):
 
             model.eval()
 
-            _, mel, gate, attn = model.inference(input_)
+            _, mel, gate, attn, lengths = model.inference(input_)
 
             model.train()
             try:
