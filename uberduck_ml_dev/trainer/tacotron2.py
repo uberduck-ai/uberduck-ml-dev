@@ -382,7 +382,7 @@ class Tacotron2Trainer(TTSTrainer):
         if self.fp16_run:
             scaler = GradScaler()
 
-        # main training loop
+        start_time, previous_start_time = None, None
         for epoch in range(start_epoch, self.epochs):
             #             train_loader, sampler, collate_fn = self.adjust_frames_per_step(
             #                 model, train_loader, sampler, collate_fn
@@ -390,7 +390,10 @@ class Tacotron2Trainer(TTSTrainer):
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
+                previous_start_time = start_time
                 start_time = time.perf_counter()
+                if previous_start_time:
+                    print(f"E2E step time: {start_time - previous_start_time}")
                 self.global_step += 1
                 model.zero_grad()
                 if self.distributed_run:
