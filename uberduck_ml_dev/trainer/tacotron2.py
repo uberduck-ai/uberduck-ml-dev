@@ -93,6 +93,9 @@ class Tacotron2Trainer(TTSTrainer):
                 self.torchmoji_model_file,
             )
             self.compute_gst = self.torchmoji.encode_texts
+        else:
+            self.compute_gst = None
+
         # pass
 
     def log_training(
@@ -201,7 +204,12 @@ class Tacotron2Trainer(TTSTrainer):
         # Generate an audio sample
         with torch.no_grad():
             transcription = random_utterance()
-            gst_embedding = self.compute_gst([transcription])
+
+            if self.compute_gst:
+                gst_embedding = self.compute_gst([transcription])
+                gst_embedding = torch.FloatTensor(gst_embedding).cuda()
+            else:
+                gst_embedding = None
 
             utterance = torch.LongTensor(
                 text_to_sequence(
@@ -221,7 +229,7 @@ class Tacotron2Trainer(TTSTrainer):
                 utterance,
                 input_lengths,
                 torch.LongTensor([speaker_id]).cuda(),
-                torch.FloatTensor(gst_embedding).cuda(),
+                gst_embedding,
             ]
 
             model.eval()

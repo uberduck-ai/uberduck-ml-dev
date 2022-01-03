@@ -683,7 +683,18 @@ class Tacotron2(TTSModel):
                 self.encoder_embedding_dim, device=self.device
             )
 
-        self.gst_lin = nn.Linear(self.gst_dim, self.encoder_embedding_dim)
+        self.gst_init(hparams)
+
+    def gst_init(self, hparams):
+        if hparams.gst_type == "torchmoji":
+            assert hparams.gst_dim, "gst_dim must be set"
+            self.gst_lin = nn.Linear(self.gst_dim, self.encoder_embedding_dim)
+            print("Initialized Torchmoji GST")
+        else:
+            self.gst_lin = lambda a: torch.zeros(
+                self.encoder_embedding_dim, device=self.device
+            )
+            print("Not using GST")
 
     def parse_batch(self, batch):
         (
@@ -704,7 +715,8 @@ class Tacotron2(TTSModel):
         gate_padded = to_gpu(gate_padded).float()
         speaker_ids = to_gpu(speaker_ids).long()
         output_lengths = to_gpu(output_lengths).long()
-        embedded_gst = to_gpu(embedded_gst).float()
+        if embedded_gst:
+            embedded_gst = to_gpu(embedded_gst).float()
 
         ret_x = [
             text_padded,
@@ -751,6 +763,7 @@ class Tacotron2(TTSModel):
         embedded_text = self.encoder(embedded_inputs, input_lengths)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
 
+        # If no gst is used, embedded_gst will be None and gst_lin will be a zeros tensor
         encoder_outputs = (
             embedded_text
             + self.spkr_lin(embedded_speakers)
@@ -777,6 +790,7 @@ class Tacotron2(TTSModel):
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
 
+        # If no gst is used, embedded_gst will be None and gst_lin will be a zeros tensor
         encoder_outputs = (
             embedded_text
             + self.spkr_lin(embedded_speakers)
