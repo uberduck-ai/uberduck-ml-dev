@@ -4,7 +4,7 @@ __all__ = ['load_filepaths_and_text', 'get_alignment_metrics', 'window_sumsquare
            'dynamic_range_compression', 'dynamic_range_decompression', 'to_gpu', 'get_mask_from_lengths',
            'reduce_tensor', 'subsequent_mask', 'convert_pad_shape', 'sequence_mask', 'generate_path', 'slice_segments',
            'rand_slice_segments', 'init_weights', 'get_padding', 'fused_add_tanh_sigmoid_multiply', 'clip_grad_value_',
-           'intersperse']
+           'intersperse', 'intersperse_emphases']
 
 # Cell
 
@@ -293,7 +293,16 @@ def clip_grad_value_(parameters, clip_value, norm_type=2):
     return total_norm
 
 # Cell
+
+
 def intersperse(lst, item):
     result = [item] * (len(lst) * 2 + 1)
     result[1::2] = lst
     return result
+
+
+def intersperse_emphases(emphases):
+    for n in range(len(emphases)):
+        emphases[n][0] = 2 * emphases[n][0]
+        emphases[n][1] = 2 * emphases[n][1] + 1
+    return emphases
