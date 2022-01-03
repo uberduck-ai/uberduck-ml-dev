@@ -17,6 +17,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from .models.common import STFT, MelSTFT
+from .models.torchmoji import TorchMojiInterface
 from .text.symbols import (
     DEFAULT_SYMBOLS,
     IPA_SYMBOLS,
@@ -75,8 +76,11 @@ class TextMelDataset(Dataset):
         debug: bool = False,
         debug_dataset_size: int = None,
         oversample_weights=None,
-        intersperse_text=False,
-        intersperse_token=0,
+        intersperse_text: bool = False,
+        intersperse_token: int = 0,
+        gst_type: str = None,
+        torchmoji_vocabulary_file: str = None,
+        torchmoji_model_file: str = None,
     ):
         super().__init__()
         path = audiopaths_and_text
@@ -115,6 +119,17 @@ class TextMelDataset(Dataset):
         self.symbol_set = symbol_set
         self.intersperse_text = intersperse_text
         self.intersperse_token = intersperse_token
+        self.gst_type = gst_type
+
+        if self.gst_type == "torchmoji":
+            assert (
+                torchmoji_vocabulary_file
+            ), "Vocabulary file must be set to use torchmoji"
+            assert torchmoji_model_file, "Model file must be set to use torchmoji"
+            torchmoji = TorchMojiInterface(
+                torchmoji_vocabulary_file, torchmoji_model_file
+            )
+            self.compute_gst = torchmoji.encode_texts
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -130,6 +145,9 @@ class TextMelDataset(Dataset):
         f0 = [0.0] * pad + f0 + [0.0] * pad
         f0 = np.array(f0, dtype=np.float32)
         return f0
+
+    def _get_gst(self, transcription):
+        return self.compute_gst(transcription)
 
     def _get_data(self, audiopath_and_text):
         path, transcription, speaker_id = audiopath_and_text
@@ -153,12 +171,21 @@ class TextMelDataset(Dataset):
         audio_norm = audio_norm.unsqueeze(0)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
+
         if not self.include_f0:
+            if self.gst_type:
+                embedded_gst = self._get_gst([transcription])
+                #                 print(f"[0] Computed GST: {embedded_gst}")
+                return (text_sequence, melspec, speaker_id, embedded_gst)
             return (text_sequence, melspec, speaker_id)
+
         f0 = self._get_f0(audio.data.cpu().numpy())
         f0 = torch.from_numpy(f0)[None]
         f0 = f0[:, : melspec.size(1)]
 
+        if self.gst_type:
+            embedded_gst = self._get_gst([transcription])
+            return (text_sequence, melspec, speaker_id, f0, embedded_gst)
         return (text_sequence, melspec, speaker_id, f0)
 
     def __getitem__(self, idx):
@@ -248,6 +275,7 @@ class TextMelCollate:
             output_lengths[i] = mel.size(1)
             speaker_ids[i] = batch[ids_sorted_decreasing[i]][2]
 
+        embedded_gsts = torch.FloatTensor([sample[3] for sample in batch])
         model_inputs = (
             text_padded,
             input_lengths,
@@ -255,6 +283,7 @@ class TextMelCollate:
             gate_padded,
             output_lengths,
             speaker_ids,
+            embedded_gsts,
         )
         return model_inputs
 

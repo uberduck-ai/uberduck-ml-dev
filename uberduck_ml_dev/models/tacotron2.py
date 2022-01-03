@@ -550,7 +550,6 @@ class Encoder(nn.Module):
 
     def forward(self, x, input_lengths):
         if x.size()[0] > 1:
-            print("here")
             x_embedded = []
             for b_ind in range(x.size()[0]):  # TODO: Speed up
                 curr_x = x[b_ind : b_ind + 1, :, : input_lengths[b_ind]].clone()
@@ -673,6 +672,8 @@ class Tacotron2(TTSModel):
         )
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        self.gst_dim = hparams.gst_dim
+
         if self.n_speakers > 1:
             self.spkr_lin = nn.Linear(
                 self.speaker_embedding_dim, self.encoder_embedding_dim
@@ -682,6 +683,8 @@ class Tacotron2(TTSModel):
                 self.encoder_embedding_dim, device=self.device
             )
 
+        self.gst_lin = nn.Linear(self.gst_dim, self.encoder_embedding_dim)
+
     def parse_batch(self, batch):
         (
             text_padded,
@@ -690,6 +693,7 @@ class Tacotron2(TTSModel):
             gate_padded,
             output_lengths,
             speaker_ids,
+            embedded_gst,
             *_,
         ) = batch
 
@@ -700,6 +704,8 @@ class Tacotron2(TTSModel):
         gate_padded = to_gpu(gate_padded).float()
         speaker_ids = to_gpu(speaker_ids).long()
         output_lengths = to_gpu(output_lengths).long()
+        embedded_gst = to_gpu(embedded_gst).float()
+
         ret_x = [
             text_padded,
             input_lengths,
@@ -707,6 +713,7 @@ class Tacotron2(TTSModel):
             max_len,
             output_lengths,
             speaker_ids,
+            embedded_gst,
         ]
         return (
             tuple(ret_x),
@@ -734,6 +741,7 @@ class Tacotron2(TTSModel):
             max_len,
             output_lengths,
             speaker_ids,
+            embedded_gst,
             *_,
         ) = inputs
 
@@ -742,7 +750,12 @@ class Tacotron2(TTSModel):
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-        encoder_outputs = embedded_text + self.spkr_lin(embedded_speakers)
+
+        encoder_outputs = (
+            embedded_text
+            + self.spkr_lin(embedded_speakers)
+            + self.gst_lin(embedded_gst)
+        )
 
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
@@ -758,13 +771,17 @@ class Tacotron2(TTSModel):
         )
 
     def inference(self, inputs):
-        text, input_lengths, speaker_ids, *_ = inputs
+        text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
 
-        encoder_outputs = embedded_text + self.spkr_lin(embedded_speakers)
+        encoder_outputs = (
+            embedded_text
+            + self.spkr_lin(embedded_speakers)
+            + self.gst_lin(embedded_gst)
+        )
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         memory_lengths = input_lengths

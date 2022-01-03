@@ -59,6 +59,7 @@ from torch.utils.tensorboard import SummaryWriter
 import time
 from torch.utils.data import DataLoader
 from ..models.common import MelSTFT
+from ..models.torchmoji import TorchMojiInterface
 from ..utils.plot import (
     plot_attention,
     plot_gate_outputs,
@@ -85,6 +86,10 @@ class Tacotron2Trainer(TTSTrainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.torchmoji = TorchMojiInterface(
+            "../models/vocabulary.json",
+            "../models/pytorch_model.bin",
+        )
         # pass
 
     def log_training(
@@ -101,7 +106,6 @@ class Tacotron2Trainer(TTSTrainer):
         grad_norm,
         step_duration_seconds,
     ):
-        print(f"Loss: {loss}")
         self.log("Loss/train", self.global_step, scalar=loss)
         self.log("MelLoss/train", self.global_step, scalar=mel_loss)
         self.log("GateLoss/train", self.global_step, scalar=gate_loss)
@@ -193,9 +197,11 @@ class Tacotron2Trainer(TTSTrainer):
             return
         # Generate an audio sample
         with torch.no_grad():
+            transcription = random_utterance()
+            gst_embedding = self.torchmoji.encode_texts([transcription])
             utterance = torch.LongTensor(
                 text_to_sequence(
-                    random_utterance(),
+                    transcription,
                     self.text_cleaners,
                     p_arpabet=self.p_arpabet,
                     symbol_set=self.symbol_set,
@@ -207,7 +213,12 @@ class Tacotron2Trainer(TTSTrainer):
                 else randint(0, self.n_speakers - 1)
             )
             input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
-            input_ = [utterance, input_lengths, torch.LongTensor([speaker_id]).cuda()]
+            input_ = [
+                utterance,
+                input_lengths,
+                torch.LongTensor([speaker_id]).cuda(),
+                torch.FloatTensor(gst_embedding).cuda(),
+            ]
 
             model.eval()
 
@@ -389,7 +400,7 @@ class Tacotron2Trainer(TTSTrainer):
             #             )
             if self.distributed_run:
                 sampler.set_epoch(epoch)
-            for batch in train_loader:
+            for batch_idx, batch in enumerate(train_loader):
                 start_time = time.perf_counter()
                 self.global_step += 1
                 model.zero_grad()
@@ -400,6 +411,7 @@ class Tacotron2Trainer(TTSTrainer):
                 if self.fp16_run:
                     with autocast():
                         y_pred = model(X)
+
                         (
                             mel_loss,
                             gate_loss,
@@ -458,7 +470,9 @@ class Tacotron2Trainer(TTSTrainer):
                     step_duration_seconds,
                 )
                 log_stop = time.time()
-                print(f"logging_time: {log_stop - log_start:.4f}")
+                print(
+                    f"epoch: {epoch}/{self.epochs}  |  batch: {batch_idx}/{len(train_loader)}  |  loss: {reduced_loss:.4f}"
+                )
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"tacotron2_{epoch}",
@@ -577,4 +591,7 @@ class Tacotron2Trainer(TTSTrainer):
             "symbol_set": self.symbol_set,
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
+            "gst_type": self.gst_type,
+            "torchmoji_model_file": self.torchmoji_model_file,
+            "torchmoji_vocabulary_file": self.torchmoji_vocabulary_file,
         }
