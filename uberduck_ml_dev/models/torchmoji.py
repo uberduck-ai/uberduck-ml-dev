@@ -683,7 +683,7 @@ class TorchmojiAttention(nn.Module):
                               used for the prediction
 
         """
-        super(Attention, self).__init__()
+        super(TorchmojiAttention, self).__init__()
         self.return_attention = return_attention
         self.attention_size = attention_size
         self.attention_vector = Parameter(torch.FloatTensor(attention_size))

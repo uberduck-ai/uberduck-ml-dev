@@ -86,10 +86,13 @@ class Tacotron2Trainer(TTSTrainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.torchmoji = TorchMojiInterface(
-            "../models/vocabulary.json",
-            "../models/pytorch_model.bin",
-        )
+
+        if self.gst_type == "torchmoji":
+            self.torchmoji = TorchMojiInterface(
+                self.torchmoji_vocabulary_file,
+                self.torchmoji_model_file,
+            )
+            self.compute_gst = self.torchmoji.encode_texts
         # pass
 
     def log_training(
@@ -198,7 +201,8 @@ class Tacotron2Trainer(TTSTrainer):
         # Generate an audio sample
         with torch.no_grad():
             transcription = random_utterance()
-            gst_embedding = self.torchmoji.encode_texts([transcription])
+            gst_embedding = self.compute_gst([transcription])
+
             utterance = torch.LongTensor(
                 text_to_sequence(
                     transcription,
@@ -591,7 +595,5 @@ class Tacotron2Trainer(TTSTrainer):
             "symbol_set": self.symbol_set,
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
-            "gst_type": self.gst_type,
-            "torchmoji_model_file": self.torchmoji_model_file,
-            "torchmoji_vocabulary_file": self.torchmoji_vocabulary_file,
+            "compute_gst": self.compute_gst,
         }
