@@ -9,7 +9,7 @@ from pprint import pprint
 
 import torch
 import torch.distributed as dist
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import numpy as np
 import time
 
@@ -86,6 +86,10 @@ class TTSTrainer:
         if self.rank is not None and self.rank != 0:
             return
         if audio is not None:
+            # NOTE(zach): tensorboardX add_audio requires audio to be 1D, or 2D of the shape
+            # (n_samples, n_channels).
+            if (audio.size(0) == 1 or audio.size(0) == 2) and audio.size(1) > 2:
+                audio = audio.transpose(0, 1)
             self.writer.add_audio(tag, audio, step, sample_rate=self.sampling_rate)
         if scalar is not None:
             self.writer.add_scalar(tag, scalar, step)
@@ -95,6 +99,10 @@ class TTSTrainer:
             self.writer.add_figure(tag, figure, step)
 
     def sample(self, mel, algorithm="griffin-lim", **kwargs):
+        """Invert the mel spectrogram and return the resulting audio.
+
+        audio -> (1, N)
+        """
         if self.rank is not None and self.rank != 0:
             return
         if algorithm == "griffin-lim":
