@@ -1011,10 +1011,6 @@ numbers, according to the given vocabulary.
 import numbers
 import numpy as np
 
-from torchmoji.create_vocab import extend_vocab, VocabBuilder
-from torchmoji.word_generator import WordGenerator
-from torchmoji.global_variables import SPECIAL_TOKENS
-
 # import torch
 
 from sklearn.model_selection import train_test_split
