@@ -45,20 +45,16 @@ else
 fi
 
 git clone $UBMLEXP_GIT
-# gcsfuse --implicit-dirs $BUCKET $BUCKET_LOCAL
-gcsfuse --implicit-dirs $BUCKET /root/bucket
+gcsfuse --stat-cache-ttl 12h \
+	--type-cache-ttl 12h \
+	--stat-cache-capacity 16384 \
+	--implicit-dirs $BUCKET /root/bucket
 
 echo "AIP_TENSORBOARD_LOG_DIR: $AIP_TENSORBOARD_LOG_DIR"
 echo "AIP_CHECKPOINT_DIR: $AIP_CHECKPOINT_DIR"
 echo "AIP_MODEL_DIR: $AIP_MODEL_DIR"
 echo "BUCKET: $BUCKET"
-# Mount Tensorboard log dir
 proto="gs://"
-# url=$(echo $AIP_TENSORBOARD_LOG_DIR | sed -e s,$proto,,g)
-# path="$(echo $url | grep / | cut -d/ -f2-)"
-# host=$(echo $url | cut -d/ -f1)
-# echo "Mounting path: $path. host: $host" 
-# gcsfuse --only-dir $path $host /root/logs
 # Mount checkpoint dir
 url=$(echo $AIP_CHECKPOINT_DIR | sed -e s,$proto,,g)
 path="$(echo $url | grep / | cut -d/ -f2-)"
