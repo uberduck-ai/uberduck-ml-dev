@@ -31,14 +31,18 @@ import sys
 
 def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input", help="Path to input dataset file or directory")
+    parser.add_argument(
+        "-i", "--input", help="Path to input dataset file or directory", required=True
+    )
     parser.add_argument(
         "-f", "--format", help="Input dataset format", default=STANDARD_MULTISPEAKER
     )
     parser.add_argument(
         "-n", "--name", help="Dataset name", default=STANDARD_MULTISPEAKER
     )
-    parser.add_argument("-d", "--database", help="Output database")
+    parser.add_argument(
+        "-d", "--database", help="Output database", default=CACHE_LOCATION
+    )
     parser.add_argument("--csv_path", help="Path to save csv", default=None)
     return parser.parse_args(args)
 
