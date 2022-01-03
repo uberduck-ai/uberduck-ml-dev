@@ -649,7 +649,6 @@ DEFAULTS = HParams(
 )
 
 # Cell
-import pdb
 
 
 class Tacotron2(TTSModel):
