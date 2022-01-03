@@ -45,7 +45,6 @@ class TTSModel(nn.Module):
         dummy_dict.update(model_dict)
         model_dict = dummy_dict
         self.load_state_dict(model_dict)
-        self.device = device
         if device == "cuda":
             self.cuda()
 
