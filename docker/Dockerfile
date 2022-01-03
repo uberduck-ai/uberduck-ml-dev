@@ -4,7 +4,7 @@ WORKDIR /root
 
 RUN apt-get update && apt-get install -y espeak libsndfile-dev
 
-RUN pip install git+https://github.com/uberduck-ai/uberduck-ml-dev@zach-workflow-enhancements
+RUN pip install git+https://github.com/uberduck-ai/uberduck-ml-dev
 
 RUN mkdir /root/bucket
 RUN mkdir /root/model
