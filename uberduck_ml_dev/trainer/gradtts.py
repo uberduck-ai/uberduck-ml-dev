@@ -16,7 +16,7 @@ from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import time
 
 from ..models.common import MelSTFT
