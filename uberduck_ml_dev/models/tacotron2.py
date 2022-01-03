@@ -679,7 +679,7 @@ class Tacotron2(TTSModel):
             )
         else:
             self.spkr_lin = lambda a: torch.zeros(
-                self.encoder_embedding_dim, device=self.device
+                self.encoder_embedding_dim, device=a.device
             )
 
     def parse_batch(self, batch):
