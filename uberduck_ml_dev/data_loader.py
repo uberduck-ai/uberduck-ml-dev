@@ -158,22 +158,25 @@ class TextMelDataset(Dataset):
         audio_norm = audio_norm.unsqueeze(0)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
-
-        if not self.include_f0:
-            if self.compute_gst:
-                embedded_gst = self._get_gst([transcription])
-                return (text_sequence, melspec, speaker_id, embedded_gst)
-            return (text_sequence, melspec, speaker_id)
-
-        f0 = self._get_f0(audio.data.cpu().numpy())
-        f0 = torch.from_numpy(f0)[None]
-        f0 = f0[:, : melspec.size(1)]
+        data = {
+            "text_sequence": text_sequence,
+            "mel": melspec,
+            "speaker_id": speaker_id,
+            "embedded_gst": None,
+            "f0": None,
+        }
 
         if self.compute_gst:
             embedded_gst = self._get_gst([transcription])
-            return (text_sequence, melspec, speaker_id, f0, embedded_gst)
+            data["embedded_gst"] = embedded_gst
 
-        return (text_sequence, melspec, speaker_id, f0)
+        if self.include_f0:
+            f0 = self._get_f0(audio.data.cpu().numpy())
+            f0 = torch.from_numpy(f0)[None]
+            f0 = f0[:, : melspec.size(1)]
+            data["f0"] = f0
+
+        return data  # (text_sequence, melspec, speaker_id, f0)
 
     def __getitem__(self, idx):
         """Return data for a single audio file + transcription."""
@@ -224,19 +227,21 @@ class TextMelCollate:
         """
         # Right zero-pad all one-hot text sequences to max input length
         input_lengths, ids_sorted_decreasing = torch.sort(
-            torch.LongTensor([len(x[0]) for x in batch]), dim=0, descending=True
+            torch.LongTensor([len(x["text_sequence"]) for x in batch]),
+            dim=0,
+            descending=True,
         )
         max_input_len = input_lengths[0]
 
         text_padded = torch.LongTensor(len(batch), max_input_len)
         text_padded.zero_()
         for i in range(len(ids_sorted_decreasing)):
-            text = batch[ids_sorted_decreasing[i]][0]
+            text = batch[ids_sorted_decreasing[i]]["text_sequence"]
             text_padded[i, : text.size(0)] = text
 
         # Right zero-pad mel-spec
-        num_mels = batch[0][1].size(0)
-        max_target_len = max([x[1].size(1) for x in batch])
+        num_mels = batch[0]["mel"].size(0)
+        max_target_len = max([x["mel"].size(1) for x in batch])
         if max_target_len % self.n_frames_per_step != 0:
             max_target_len += (
                 self.n_frames_per_step - max_target_len % self.n_frames_per_step
@@ -256,14 +261,16 @@ class TextMelCollate:
 
         # pdb.set_trace()
         for i in range(len(ids_sorted_decreasing)):
-            mel = batch[ids_sorted_decreasing[i]][1]
+            mel = batch[ids_sorted_decreasing[i]]["mel"]
             mel_padded[i, :, : mel.size(1)] = mel
             gate_padded[i, mel.size(1) - 1 :] = 1
             output_lengths[i] = mel.size(1)
-            speaker_ids[i] = batch[ids_sorted_decreasing[i]][2]
+            speaker_ids[i] = batch[ids_sorted_decreasing[i]]["speaker_id"]
 
-        if len(batch[0]) == 4:
-            embedded_gsts = torch.FloatTensor(np.array([sample[3] for sample in batch]))
+        if batch[0]["embedded_gst"]:
+            embedded_gsts = torch.FloatTensor(
+                [sample["embedded_gst"] for sample in batch]
+            )
         else:
             embedded_gsts = None
 

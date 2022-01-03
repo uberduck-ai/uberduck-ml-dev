@@ -672,7 +672,6 @@ class Tacotron2(TTSModel):
         )
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
-        self.gst_dim = hparams.gst_dim
 
         if self.n_speakers > 1:
             self.spkr_lin = nn.Linear(
@@ -686,9 +685,9 @@ class Tacotron2(TTSModel):
         self.gst_init(hparams)
 
     def gst_init(self, hparams):
-        if hparams.gst_type == "torchmoji":
+        if hparams.get("gst_type") == "torchmoji":
             assert hparams.gst_dim, "gst_dim must be set"
-            self.gst_lin = nn.Linear(self.gst_dim, self.encoder_embedding_dim)
+            self.gst_lin = nn.Linear(hparams.gst_dim, self.encoder_embedding_dim)
             print("Initialized Torchmoji GST")
         else:
             self.gst_lin = lambda a: torch.zeros(

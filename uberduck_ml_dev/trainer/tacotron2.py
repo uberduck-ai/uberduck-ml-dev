@@ -87,10 +87,18 @@ class Tacotron2Trainer(TTSTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if self.gst_type == "torchmoji":
+        if self.hparams.get("gst_type") == "torchmoji":
+            assert self.hparams.get(
+                "torchmoji_vocabulary_file"
+            ), "torchmoji_vocabulary_file must be set"
+            assert self.hparams.get(
+                "torchmoji_model_file"
+            ), "torchmoji_model_file must be set"
+            assert self.hparams.get("gst_dim"), "gst_dim must be set"
+
             self.torchmoji = TorchMojiInterface(
-                self.torchmoji_vocabulary_file,
-                self.torchmoji_model_file,
+                self.hparams.get("torchmoji_vocabulary_file"),
+                self.hparams.get("torchmoji_model_file"),
             )
             self.compute_gst = self.torchmoji.encode_texts
         else:
