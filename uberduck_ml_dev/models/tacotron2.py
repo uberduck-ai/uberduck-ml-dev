@@ -637,15 +637,63 @@ DEFAULTS = HParams(
     # speaker_embedding
     n_speakers=1,
     speaker_embedding_dim=128,
+    has_speaker_embedding=True,
     # reference encoder
     with_gst=True,
     ref_enc_filters=[32, 32, 64, 64, 128, 128],
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
+    filter_length= 1024,
+    fp16_run= false,
+    grad_clip_thresh= 1.0,
+    hop_length= 256,
+    include_f0=false,
     ref_enc_gru_size=128,
     symbol_set="nvidia_taco2",
     num_heads=8,
+    steps_per_sample=100,
+    text_cleaners= ["english_cleaners"],
+    reduction_window_schedule = [
+    {
+        "until_step": 10000,
+        "batch_size": 16,
+        "n_frames_per_step": 1
+    },
+    {
+        "until_step": 50000,
+        "batch_size": 16,
+        "n_frames_per_step": 1
+    },
+    {
+        "until_step": 60000,
+        "batch_size": 16,
+        "n_frames_per_step": 1
+    },
+    {
+        "until_step": 70000,
+        "batch_size": 16,
+        "n_frames_per_step": 1
+    },
+    {
+        "until_step": null,
+        "batch_size": 16,
+        "n_frames_per_step": 1
+    }
+    ],
+    p_arpabet = 1.0,
+    seed = 1234,
+    sampling_rate = 22050,
+    batch_size= 16,
+    checkpoint_name= None,
+    mask_padding= True,
+    max_wav_value= 32768.0,
+    mel_fmax= 8000,
+    mel_fmin= 0,
+    n_frames_per_step_initial= 1,
+    n_mel_channels=80,
+    weight_decay= 1e-6,
+    win_length= 1024
 )
 
 # Cell
