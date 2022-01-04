@@ -636,7 +636,7 @@ DEFAULTS = HParams(
     # speaker_embedding
     n_speakers=1,
     speaker_embedding_dim=128,
-    has_speaker_embedding=True,
+    # has_speaker_embedding=True,
     # reference encoder
     with_gst=True,
     ref_enc_filters=[32, 32, 64, 64, 128, 128],
