@@ -14,6 +14,7 @@ class TTSModel(nn.Module):
         super().__init__()
         self.symbol_set = hparams.symbol_set
         self.n_symbols = len(SYMBOL_SETS[self.symbol_set])
+        self.n_speakers = hparams.n_speakers
         # symbols = __import__('uberduck_ml_dev.text.' + hparams.symbols)
 
     def infer(self):
@@ -54,11 +55,3 @@ class TTSModel(nn.Module):
     @classmethod
     def create(cls, name, opts, folders, all_speakers=True):
         pass
-
-
-#         model_cls = cls.get_class(name)
-#         folders = pd.read_csv(folders)
-#         for folder in folders:
-
-
-#         return model_cls(opts)

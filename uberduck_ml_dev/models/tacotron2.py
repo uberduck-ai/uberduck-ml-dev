@@ -312,7 +312,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    def inference(self, memory):
+    def inference(self, memory, memory_lengths):
         """Decoder inference
         PARAMS
         ------
@@ -325,7 +325,9 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         decoder_input = self.get_go_frame(memory)
-        self.initialize_decoder_states(memory, mask=None)
+        self.initialize_decoder_states(
+            memory, mask=~get_mask_from_lengths(memory_lengths)
+        )
 
         B = memory.size(0)
         mel_outputs = torch.empty(
@@ -334,8 +336,15 @@ class Decoder(nn.Module):
         if torch.cuda.is_available():
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
-        while True:
 
+        mel_lengths = torch.zeros(
+            [memory.size(0)], dtype=torch.int32, device=memory.device
+        )
+        not_finished = torch.ones(
+            [memory.size(0)], dtype=torch.int32, device=memory.device
+        )
+
+        while True:
             to_cat = (self.prenet(decoder_input),)
 
             decoder_input = torch.cat(to_cat, dim=1)
@@ -348,19 +357,27 @@ class Decoder(nn.Module):
             gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
             alignments += [alignment]
 
-            if torch.sigmoid(gate_output.data) > self.gate_threshold:
+            dec = (
+                torch.le(torch.sigmoid(gate_output), self.gate_threshold)
+                .to(torch.int32)
+                .squeeze(1)
+            )
+
+            not_finished = not_finished * dec
+            mel_lengths += not_finished
+
+            if torch.sum(not_finished) == 0:
                 break
-            elif mel_outputs.size(1) == self.max_decoder_steps:
+            if mel_outputs.shape[1] == self.max_decoder_steps:
                 print("Warning! Reached max decoder steps")
                 break
 
             decoder_input = mel_output[:, -1, -1 * self.n_mel_channels :]
-
         mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
             mel_outputs, gate_outputs, alignments
         )
 
-        return mel_outputs, gate_outputs, alignments
+        return mel_outputs, gate_outputs, alignments, mel_lengths
 
     def inference_noattention(self, memory, attention_map):
         """Decoder inference
@@ -628,7 +645,9 @@ class Encoder(nn.Module):
 
         # pytorch tensor are not reversible, hence the conversion
         input_lengths = input_lengths.cpu().numpy()
-        x = nn.utils.rnn.pack_padded_sequence(x, input_lengths, batch_first=True)
+        x = nn.utils.rnn.pack_padded_sequence(
+            x, input_lengths, batch_first=True, enforce_sorted=False
+        )
 
         self.lstm.flatten_parameters()
         outputs, _ = self.lstm(x)
@@ -636,14 +655,21 @@ class Encoder(nn.Module):
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
         return outputs
 
-    def inference(self, x):
+    def inference(self, x, input_lengths):
+        device = x.device
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), self.dropout_rate, self.training)
 
         x = x.transpose(1, 2)
 
-        self.lstm.flatten_parameters()
+        input_lengths = input_lengths.cpu()
+        x = nn.utils.rnn.pack_padded_sequence(
+            x, input_lengths, batch_first=True, enforce_sorted=False
+        )
+
         outputs, _ = self.lstm(x)
+
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
 
         return outputs
 
@@ -686,7 +712,7 @@ DEFAULTS = HParams(
     postnet_embedding_dim=512,
     postnet_kernel_size=5,
     postnet_n_convolutions=5,
-    # speaker_embedding
+    has_speaker_embedding=False,
     n_speakers=1,
     speaker_embedding_dim=128,
     # reference encoder
@@ -701,6 +727,8 @@ DEFAULTS = HParams(
 )
 
 # Cell
+
+
 class Tacotron2(TTSModel):
     def __init__(self, hparams):
         super().__init__(hparams)
@@ -718,6 +746,25 @@ class Tacotron2(TTSModel):
         self.encoder = Encoder(hparams)
         self.decoder = Decoder(hparams)
         self.postnet = Postnet(hparams)
+        self.speaker_embedding_dim = hparams.speaker_embedding_dim
+        self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        self.has_speaker_embedding = hparams.has_speaker_embedding
+        if self.n_speakers > 1 and not self.has_speaker_embedding:
+            raise Exception("Speaker embedding is required if n_speakers > 1")
+        if hparams.has_speaker_embedding:
+            self.speaker_embedding = nn.Embedding(
+                self.n_speakers, hparams.speaker_embedding_dim
+            )
+        else:
+            self.speaker_embedding = None
+        if self.n_speakers > 1:
+            self.spkr_lin = nn.Linear(
+                self.speaker_embedding_dim, self.encoder_embedding_dim
+            )
+        else:
+            self.spkr_lin = lambda a: torch.zeros(
+                self.encoder_embedding_dim, device=a.device
+            )
 
     def parse_batch(self, batch):
         (
@@ -735,6 +782,7 @@ class Tacotron2(TTSModel):
         max_len = torch.max(input_lengths.data).item()
         mel_padded = to_gpu(mel_padded).float()
         gate_padded = to_gpu(gate_padded).float()
+        speaker_ids = to_gpu(speaker_ids).long()
         output_lengths = to_gpu(output_lengths).long()
         ret_x = [
             text_padded,
@@ -769,6 +817,7 @@ class Tacotron2(TTSModel):
             targets,
             max_len,
             output_lengths,
+            speaker_ids,
             *_,
         ) = inputs
 
@@ -776,8 +825,12 @@ class Tacotron2(TTSModel):
 
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        encoder_outputs = torch.cat((embedded_text,), dim=2)
+        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=input_lengths
@@ -792,39 +845,38 @@ class Tacotron2(TTSModel):
 
     @torch.no_grad()
     def inference(self, inputs):
-        text, speaker_ids, *_ = inputs
+        text, input_lengths, speaker_ids, *_ = inputs
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs)
+        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
+        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
-        encoder_outputs = torch.cat((embedded_text,), dim=2)
-
-        mel_outputs, gate_outputs, alignments = self.decoder.inference(encoder_outputs)
-
-        print(mel_outputs.shape)
+        memory_lengths = input_lengths
+        mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(
+            encoder_outputs, memory_lengths
+        )
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
         return self.parse_output(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths]
         )
 
     @torch.no_grad()
     def inference_noattention(self, inputs):
-        """Run inference conditioned on an attention map.
-
-        NOTE(zach): I don't think it is necessary to do a version
-        of this without f0s passed as well, since it seems like we
-        would always want to condition on pitch when conditioning on rhythm.
-        """
-        text, attention_map = inputs
+        """Run inference conditioned on an attention map."""
+        text, input_lengths, speaker_ids, attention_maps = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs)
 
         encoder_outputs = torch.cat((embedded_text,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder.inference_noattention(
-            encoder_outputs, attention_map
+            encoder_outputs, attention_maps
         )
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet

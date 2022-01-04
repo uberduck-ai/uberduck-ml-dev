@@ -55,6 +55,8 @@ Test a single notebook:
  nbdev_test_nbs --fname nbs/text.util.ipynb
  ```
  (can optionally add `--verbose` for more output)
+ 
+ Annotate a notebook cell with the `#skip` flag if it is code which is neither a test nor library code.
 
 ## 📦️ nbdev
 
