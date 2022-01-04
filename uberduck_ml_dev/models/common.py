@@ -177,6 +177,8 @@ class Attention(nn.Module):
         return attention_context, attention_weights
 
 # Cell
+
+
 class STFT:
     """adapted from Prem Seetharaman's https://github.com/pseeth/pytorch-stft"""
 

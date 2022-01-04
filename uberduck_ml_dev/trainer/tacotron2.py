@@ -55,7 +55,7 @@ import torch
 from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import time
 from torch.utils.data import DataLoader
 from ..models.common import MelSTFT
@@ -186,7 +186,6 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-
             self.sample_inference(model)
 
     def sample_inference(self, model):
@@ -207,11 +206,13 @@ class Tacotron2Trainer(TTSTrainer):
                 if self.sample_inference_speaker_ids
                 else randint(0, self.n_speakers - 1)
             )
-            input_ = [utterance, torch.LongTensor([speaker_id]).cuda()]
+            input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
+            input_ = [utterance, input_lengths, torch.LongTensor([speaker_id]).cuda()]
 
-            # 200 can be changed
             model.eval()
-            _, mel, gate, attn = model.inference(input_)
+
+            _, mel, gate, attn, lengths = model.inference(input_)
+
             model.train()
             try:
                 audio = self.sample(mel[0])
@@ -331,12 +332,14 @@ class Tacotron2Trainer(TTSTrainer):
 
     def initialize_loader(self, include_f0: bool = False, n_frames_per_step: int = 1):
         train_set = TextMelDataset(
-            *self.training_dataset_args,
+            **self.training_dataset_args,
             debug=self.debug,
             debug_dataset_size=self.batch_size,
         )
         val_set = TextMelDataset(
-            *self.val_dataset_args, debug=self.debug, debug_dataset_size=self.batch_size
+            **self.val_dataset_args,
+            debug=self.debug,
+            debug_dataset_size=self.batch_size,
         )
         collate_fn = TextMelCollate(
             n_frames_per_step=n_frames_per_step, include_f0=include_f0
@@ -379,7 +382,7 @@ class Tacotron2Trainer(TTSTrainer):
         if self.fp16_run:
             scaler = GradScaler()
 
-        # main training loop
+        start_time, previous_start_time = None, None
         for epoch in range(start_epoch, self.epochs):
             #             train_loader, sampler, collate_fn = self.adjust_frames_per_step(
             #                 model, train_loader, sampler, collate_fn
@@ -387,7 +390,10 @@ class Tacotron2Trainer(TTSTrainer):
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch in train_loader:
+                previous_start_time = start_time
                 start_time = time.perf_counter()
+                if previous_start_time:
+                    print(f"E2E step time: {start_time - previous_start_time}")
                 self.global_step += 1
                 model.zero_grad()
                 if self.distributed_run:
@@ -440,6 +446,7 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                     optimizer.step()
                 step_duration_seconds = time.perf_counter() - start_time
+                log_start = time.time()
                 self.log_training(
                     model,
                     X,
@@ -453,6 +460,8 @@ class Tacotron2Trainer(TTSTrainer):
                     grad_norm,
                     step_duration_seconds,
                 )
+                log_stop = time.time()
+                print(f"logging_time: {log_stop - log_start:.4f}")
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"tacotron2_{epoch}",
@@ -550,25 +559,25 @@ class Tacotron2Trainer(TTSTrainer):
 
     @property
     def val_dataset_args(self):
-        val_args = [a for a in self.training_dataset_args]
-        val_args[0] = self.val_audiopaths_and_text
-        return val_args
+
+        args = dict(**self.training_dataset_args)
+        args["audiopaths_and_text"] = self.val_audiopaths_and_text
+        return args
 
     @property
     def training_dataset_args(self):
-        return [
-            self.training_audiopaths_and_text,
-            self.text_cleaners,
-            self.p_arpabet,
-            # audio params
-            self.n_mel_channels,
-            self.sampling_rate,
-            self.mel_fmin,
-            self.mel_fmax,
-            self.filter_length,
-            self.hop_length,
-            self.win_length,
-            self.symbol_set,
-            self.max_wav_value,
-            self.pos_weight,
-        ]
+        return {
+            "audiopaths_and_text": self.training_audiopaths_and_text,
+            "text_cleaners": self.text_cleaners,
+            "p_arpabet": self.p_arpabet,
+            "n_mel_channels": self.n_mel_channels,
+            "sampling_rate": self.sampling_rate,
+            "mel_fmin": self.mel_fmin,
+            "mel_fmax": self.mel_fmax,
+            "filter_length": self.filter_length,
+            "hop_length": self.hop_length,
+            "win_length": self.win_length,
+            "symbol_set": self.symbol_set,
+            "max_wav_value": self.max_wav_value,
+            "pos_weight": self.pos_weight,
+        }

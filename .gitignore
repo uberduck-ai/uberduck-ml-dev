@@ -2,6 +2,11 @@ experiments/outputs/*
 experiments/outputs_processed/*
 experiments/logs/*
 src/vendor_tools/*
+docker/secrets/gcloud_key.json
+docker/secrets/*
+nbs/test/fixtures/models/*
+nbs/test/fixtures/results/*
+
 *.bak
 .gitattributes
 .last_checked

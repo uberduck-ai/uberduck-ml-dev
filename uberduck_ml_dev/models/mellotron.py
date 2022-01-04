@@ -70,6 +70,7 @@ DEFAULTS = HParams(
     num_heads=8,
     include_f0=False,
     symbol_set="default",
+    has_speaker_embedding=True,
 )
 
 # Cell

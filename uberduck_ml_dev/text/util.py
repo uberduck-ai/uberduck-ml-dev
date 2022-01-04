@@ -4,7 +4,7 @@ __all__ = ['normalize_numbers', 'expand_abbreviations', 'expand_numbers', 'lower
            'convert_to_ascii', 'convert_to_arpabet', 'basic_cleaners', 'transliteration_cleaners', 'english_cleaners',
            'english_cleaners_phonemizer', 'batch_english_cleaners_phonemizer', 'g2p', 'batch_clean_text', 'clean_text',
            'english_to_arpabet', 'cleaned_text_to_sequence', 'text_to_sequence', 'sequence_to_text', 'BATCH_CLEANERS',
-           'CLEANERS', 'random_utterance', 'utterances']
+           'CLEANERS', 'text_to_sequence_for_editts', 'random_utterance', 'utterances']
 
 # Cell
 """ from https://github.com/keithito/tacotron """
@@ -28,7 +28,7 @@ from g2p_en import G2p
 from phonemizer import phonemize
 from unidecode import unidecode
 
-from .symbols import curly_re, words_re
+from .symbols import curly_re, words_re, symbols_to_sequence
 
 g2p = G2p()
 
@@ -234,6 +234,7 @@ from .symbols import (
     DEFAULT_SYMBOLS,
     IPA_SYMBOLS,
     NVIDIA_TACO2_SYMBOLS,
+    GRAD_TTS_SYMBOLS,
     id_to_symbol,
     symbols_to_sequence,
     arpabet_to_sequence,
@@ -332,6 +333,56 @@ def sequence_to_text(sequence, symbol_set=DEFAULT_SYMBOLS):
                 s = "{%s}" % s[1:]
             result += s
     return result.replace("}{", " ")
+
+# Cell
+
+
+def text_to_sequence_for_editts(text, cleaner_names, symbol_set=GRAD_TTS_SYMBOLS):
+    sequence = []
+    emphases = []
+    final_emphases = []
+    space = symbols_to_sequence(" ", symbol_set=symbol_set)
+    cleaned = clean_text(text, cleaner_names)
+
+    i = 0
+    result = []
+    emphasis_interval = []
+    for w in cleaned.split(" "):
+        if w == "|":
+            emphasis_interval.append(i)
+            if len(emphasis_interval) == 2:
+                emphases.append(emphasis_interval)
+                emphasis_interval = []
+        else:
+            i += 1
+            result.append(convert_to_arpabet(w))
+
+    cleaned = result
+    emphasis_interval = []
+    cnt = 0
+    for i in range(len(cleaned)):
+        t = cleaned[i]
+        if cnt < len(emphases) and i == emphases[cnt][0]:
+            emphasis_interval.append(len(sequence))
+
+        if t.startswith("{"):
+            sequence += arpabet_to_sequence(t[1:-1], symbol_set=symbol_set)
+        else:
+            sequence += symbols_to_sequence(t, symbol_set=symbol_set)
+
+        if cnt < len(emphases) and i == emphases[cnt][1] - 1:
+            emphasis_interval.append(len(sequence))
+            final_emphases.append(emphasis_interval)
+            emphasis_interval = []
+            cnt += 1
+
+        sequence += space
+
+    # remove trailing space
+    if sequence[-1] == space[0]:
+        sequence = sequence[:-1]
+
+    return sequence, final_emphases
 
 # Cell
 import random
