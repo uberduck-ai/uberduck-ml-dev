@@ -670,6 +670,7 @@ DEFAULTS = HParams(
     n_frames_per_step_initial=1,
     weight_decay=1e-6,
     win_length=1024,
+    has_speaker_embedding=True,
 )
 
 # Cell
