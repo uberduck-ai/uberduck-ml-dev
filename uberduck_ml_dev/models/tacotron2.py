@@ -819,6 +819,34 @@ class Tacotron2(TTSModel):
 
         return outputs
 
+    @torch.no_grad()
+    def get_alignment(self, inputs):
+        (
+            input_text,
+            input_lengths,
+            targets,
+            max_len,
+            output_lengths,
+            speaker_ids,
+            *_,
+        ) = inputs
+
+        input_lengths, output_lengths = input_lengths.data, output_lengths.data
+
+        embedded_inputs = self.embedding(input_text).transpose(1, 2)
+        embedded_text = self.encoder(embedded_inputs, input_lengths)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
+
+        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
+
+        mel_outputs, gate_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=input_lengths
+        )
+        return alignments
+
     def forward(self, inputs):
         (
             input_text,
