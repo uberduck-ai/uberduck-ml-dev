@@ -633,7 +633,7 @@ DEFAULTS = HParams(
     postnet_embedding_dim=512,
     postnet_kernel_size=5,
     postnet_n_convolutions=5,
-    # speaker_embedding
+    has_speaker_embedding=False,
     n_speakers=1,
     speaker_embedding_dim=128,
     # reference encoder
@@ -692,11 +692,17 @@ class Tacotron2(TTSModel):
         self.encoder = Encoder(hparams)
         self.decoder = Decoder(hparams)
         self.postnet = Postnet(hparams)
-        self.speaker_embedding = nn.Embedding(
-            self.n_speakers, hparams.speaker_embedding_dim
-        )
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        self.has_speaker_embedding = hparams.has_speaker_embedding
+        if self.n_speakers > 1 and not self.has_speaker_embedding:
+            raise Exception("Speaker embedding is required if n_speakers > 1")
+        if hparams.has_speaker_embedding:
+            self.speaker_embedding = nn.Embedding(
+                self.n_speakers, hparams.speaker_embedding_dim
+            )
+        else:
+            self.speaker_embedding = None
         if self.n_speakers > 1:
             self.spkr_lin = nn.Linear(
                 self.speaker_embedding_dim, self.encoder_embedding_dim
@@ -765,8 +771,10 @@ class Tacotron2(TTSModel):
 
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
-        embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-        encoder_outputs = embedded_text + self.spkr_lin(embedded_speakers)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
@@ -786,9 +794,10 @@ class Tacotron2(TTSModel):
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-        embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-
-        encoder_outputs = embedded_text + self.spkr_lin(embedded_speakers)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         memory_lengths = input_lengths
