@@ -5,7 +5,7 @@ __all__ = ['parse_args', 'run']
 # Cell
 from ..trainer.tacotron2 import Tacotron2Trainer
 from ..vendor.tfcompat.hparam import HParams
-from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
+from ..trainer.tacotron2 import DEFAULTS as TACOTRON2_TRAINER_DEFAULTS
 import argparse
 import sys
 import json
@@ -49,7 +49,7 @@ except:
     IN_NOTEBOOK = False
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    config = TACOTRON2_DEFAULTS.values()
+    config = TACOTRON2_TRAINER_DEFAULTS.values()
     if args.config:
         with open(args.config) as f:
             config.update(json.load(f))
