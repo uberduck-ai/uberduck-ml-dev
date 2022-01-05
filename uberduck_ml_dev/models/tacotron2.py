@@ -405,9 +405,8 @@ class Decoder(nn.Module):
         for i in range(len(attention_map)):
 
             attention = attention_map[i]
-            decoder_input = torch.cat((self.prenet(decoder_input),), dim=1)
+            decoder_input = self.prenet(decoder_input)
             mel_output, gate_output, alignment = self.decode(decoder_input, attention)
-            # mel_output, gate_output, alignment = self.decode(decoder_input)
             mel_output = mel_output[
                 :, 0 : self.n_mel_channels * self.n_frames_per_step_current
             ].unsqueeze(1)
@@ -424,7 +423,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    def inference_partial_tf(self, memory, decoder_inputs, tf_until_idx):
+    def inference_partial_tf(self, memory, decoder_inputs, tf_until_idx, device="cpu"):
         """Decoder inference with teacher-forcing up until tf_until_idx
         PARAMS
         ------
@@ -438,7 +437,7 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        if torch.cuda.is_available():
+        if device == "cuda" and torch.cuda.is_available():
             decoder_inputs = decoder_inputs.cuda()
 
         B = memory.size(0)
@@ -455,7 +454,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if device == "cuda" and torch.cuda.is_available():
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
 

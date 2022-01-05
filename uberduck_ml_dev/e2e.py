@@ -66,6 +66,7 @@ def tts(
     arpabet=False,
     symbol_set=NVIDIA_TACO2_SYMBOLS,
     max_wav_value=32768.0,
+    speaker_ids=None,
 ):
     assert isinstance(
         model, Tacotron2
@@ -75,7 +76,8 @@ def tts(
     sequences, input_lengths, sort_indices = prepare_input_sequence(
         lines, cpu_run=cpu_run, arpabet=arpabet, symbol_set=symbol_set
     )
-    speaker_ids = torch.zeros(len(lines), dtype=torch.long, device=device)
+    if speaker_ids is None:
+        speaker_ids = torch.zeros(len(lines), dtype=torch.long, device=device)
     input_ = sequences, input_lengths, speaker_ids
     _, inverse_indices = torch.sort(sort_indices)
     _, mel_outputs_postnet, gate_outputs, alignment, lengths = model.inference(input_)
