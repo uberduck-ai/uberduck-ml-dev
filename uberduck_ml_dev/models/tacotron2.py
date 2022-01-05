@@ -424,7 +424,6 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    # def inference_partial_tf(self, memory, decoder_inputs, memory_lengths, tf_until_idx):
     def inference_partial_tf(self, memory, decoder_inputs, tf_until_idx):
         """Decoder inference with teacher-forcing up until tf_until_idx
         PARAMS
@@ -451,9 +450,6 @@ class Decoder(nn.Module):
         decoder_inputs = torch.cat((decoder_input, decoder_inputs), dim=0)
         decoder_inputs = self.prenet(decoder_inputs)
 
-        # self.initialize_decoder_states(
-        #     memory, mask=~get_mask_from_lengths(memory_lengths)
-        # )
         self.initialize_decoder_states(memory, mask=None)
 
         mel_outputs = torch.empty(
@@ -481,7 +477,6 @@ class Decoder(nn.Module):
             mel_outputs = torch.cat(
                 [
                     mel_outputs,
-                    # teacher_forced_frame.unsqueeze(1)
                     mel_output[
                         :, 0 : self.n_mel_channels * self.n_frames_per_step_current
                     ].unsqueeze(1),
@@ -885,7 +880,7 @@ class Tacotron2(TTSModel):
         """Run inference conditioned on an attention map."""
         text, input_lengths, speaker_ids, attention_maps = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs)
+        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
 
         encoder_outputs = torch.cat((embedded_text,), dim=2)
 
@@ -904,29 +899,19 @@ class Tacotron2(TTSModel):
         self,
         inputs,
         tf_mel,
-        # tf_mel_postnet,
         tf_until_idx,
-        # encoder_until_idx,
-        # original_sequence,
     ):
         """Run inference with partial teacher forcing.
 
+        Teacher forcing is done until tf_until_idx in the mel spectrogram.
+        Make sure you pass the mel index and not the text index!
+
         tf_mel: (B, T, n_mel_channels)
         """
-        # assert (
-        #     tf_mel.shape[2] == self.n_mel_channels
-        # ), "Shape of teacher forced mel should be (B, T, n_mel_channels)"
-        text, *_ = inputs
+        text, input_lengths, *_ = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs)
+        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = torch.cat((embedded_text,), dim=2)
-
-        # print("encoder outputs shape: ", encoder_outputs.shape)
-        # original_embedded_inputs = self.embedding(original_sequence).transpose(1, 2)
-        # original_embedded_text = self.encoder.inference(original_embedded_inputs)
-        # original_encoder_outputs = torch.cat((original_embedded_text,), dim=2)
-        #
-        # encoder_outputs[:, :encoder_until_idx, :] = original_encoder_outputs[:, :encoder_until_idx, :]
 
         mel_outputs, gate_outputs, alignments = self.decoder.inference_partial_tf(
             encoder_outputs,
@@ -934,8 +919,6 @@ class Tacotron2(TTSModel):
             tf_until_idx,
         )
 
-        print(mel_outputs.shape)
-        # mel_outputs[:, :, :tf_until_idx] = tf_mel.transpose(1, 2)[:, :, :tf_until_idx]
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
