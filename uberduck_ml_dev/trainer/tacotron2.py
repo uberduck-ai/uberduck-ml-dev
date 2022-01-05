@@ -204,14 +204,20 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-            self.sample_inference(model)
+            for i in range(5):
+                self.sample_inference(
+                    model,
+                    "Hi there did you know the quick brown fox jumps over the lazy dog.",
+                    i,
+                )
 
-    def sample_inference(self, model):
+    def sample_inference(self, model, transcription=None, speaker_id=None):
         if self.rank is not None and self.rank != 0:
             return
         # Generate an audio sample
         with torch.no_grad():
-            transcription = random_utterance()
+            if transcription is None:
+                transcription = random_utterance()
 
             if self.compute_gst:
                 gst_embedding = self.compute_gst([transcription])
@@ -227,11 +233,12 @@ class Tacotron2Trainer(TTSTrainer):
                     symbol_set=self.symbol_set,
                 )
             )[None].cuda()
-            speaker_id = (
-                choice(self.sample_inference_speaker_ids)
-                if self.sample_inference_speaker_ids
-                else randint(0, self.n_speakers - 1)
-            )
+            if speaker_id is None:
+                speaker_id = (
+                    choice(self.sample_inference_speaker_ids)
+                    if self.sample_inference_speaker_ids
+                    else randint(0, self.n_speakers - 1)
+                )
             input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
             input_ = [
                 utterance,
@@ -247,24 +254,24 @@ class Tacotron2Trainer(TTSTrainer):
             model.train()
             try:
                 audio = self.sample(mel[0])
-                self.log("SampleInference", self.global_step, audio=audio)
+                self.log(f"SampleInference/{speaker_id}", self.global_step, audio=audio)
             except Exception as e:
                 print(f"Exception raised while doing sample inference: {e}")
                 print("Mel shape: ", mel[0].shape)
             self.log(
-                "Attention/sample_inference",
+                f"Attention/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_attention(attn[0].data.cpu().transpose(0, 1))
                 ),
             )
             self.log(
-                "MelPredicted/sample_inference",
+                f"MelPredicted/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
             )
             self.log(
-                "Gate/sample_inference",
+                f"Gate/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_gate_outputs(gate_outputs=gate[0].data.cpu())

@@ -771,12 +771,11 @@ class Tacotron2(TTSModel):
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
             encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        if self.gst_lin:
+        if self.gst_lin is not None:
             assert (
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
-
         #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
@@ -800,14 +799,11 @@ class Tacotron2(TTSModel):
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
             encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        if self.gst_lin:
+        if self.gst_lin is not None:
             assert (
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
-            print(f"Added {self.gst_lin(embedded_gst)}")
-            print(f"Encoder outputs {encoder_outputs}")
-            print("Added GSTs to encoder_outputs")
         #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         memory_lengths = input_lengths
