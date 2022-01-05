@@ -49,7 +49,7 @@ except:
     IN_NOTEBOOK = False
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = parse_args(sys.argv[1:])
-    config = TACOTRON2_TRAINER_DEFAULTS
+    config = TACOTRON2_TRAINER_DEFAULTS.values()
     if args.config:
         with open(args.config) as f:
             config.update(json.load(f))
