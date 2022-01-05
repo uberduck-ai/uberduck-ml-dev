@@ -633,7 +633,6 @@ DEFAULTS = HParams(
     postnet_embedding_dim=512,
     postnet_kernel_size=5,
     postnet_n_convolutions=5,
-    has_speaker_embedding=False,
     n_speakers=1,
     speaker_embedding_dim=128,
     # reference encoder
@@ -669,7 +668,7 @@ DEFAULTS = HParams(
     n_frames_per_step_initial=1,
     weight_decay=1e-6,
     win_length=1024,
-    has_speaker_embedding=True,
+    has_speaker_embedding=False,
 )
 
 # Cell
