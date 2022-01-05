@@ -27,6 +27,7 @@ class TTSModel(nn.Module):
         self, warm_start_path=None, device="cpu", ignore_layers=None, model_dict=None
     ):
 
+        model_dict = model_dict or dict()
         if warm_start_path is None and model_dict is None:
             raise Exception(
                 "TTSModel.from_pretrained requires a warm_start_path or state_dict"

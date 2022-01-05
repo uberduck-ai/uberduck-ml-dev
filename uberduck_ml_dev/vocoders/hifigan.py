@@ -52,6 +52,9 @@ class HiFiGanGenerator(nn.Module):
             h = AttrDict(json.load(f))
         return h
 
+    def forward(self, mel, max_wav_value=32768):
+        return self.infer(mel, max_wav_value=max_wav_value)
+
     @torch.no_grad()
     def infer(self, mel, max_wav_value=32768):
         audio = (
