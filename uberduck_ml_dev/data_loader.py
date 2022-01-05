@@ -267,12 +267,12 @@ class TextMelCollate:
             output_lengths[i] = mel.size(1)
             speaker_ids[i] = batch[ids_sorted_decreasing[i]]["speaker_id"]
 
-        if batch[0]["embedded_gst"]:
-            embedded_gsts = torch.FloatTensor(
-                [sample["embedded_gst"] for sample in batch]
-            )
-        else:
+        if batch[0]["embedded_gst"] is None:
             embedded_gsts = None
+        else:
+            embedded_gsts = torch.FloatTensor(
+                np.array([sample["embedded_gst"] for sample in batch])
+            )
 
         model_inputs = (
             text_padded,

@@ -55,7 +55,7 @@ import torch
 from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import time
 from torch.utils.data import DataLoader
 from ..models.common import MelSTFT
@@ -413,7 +413,7 @@ class Tacotron2Trainer(TTSTrainer):
         if self.fp16_run:
             scaler = GradScaler()
 
-        # main training loop
+        start_time, previous_start_time = time.perf_counter(), time.perf_counter()
         for epoch in range(start_epoch, self.epochs):
             #             train_loader, sampler, collate_fn = self.adjust_frames_per_step(
             #                 model, train_loader, sampler, collate_fn
@@ -421,6 +421,7 @@ class Tacotron2Trainer(TTSTrainer):
             if self.distributed_run:
                 sampler.set_epoch(epoch)
             for batch_idx, batch in enumerate(train_loader):
+                previous_start_time = start_time
                 start_time = time.perf_counter()
                 self.global_step += 1
                 model.zero_grad()
@@ -491,7 +492,7 @@ class Tacotron2Trainer(TTSTrainer):
                 )
                 log_stop = time.time()
                 print(
-                    f"epoch: {epoch}/{self.epochs}  |  batch: {batch_idx}/{len(train_loader)}  |  loss: {reduced_loss:.4f}"
+                    f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_loss:.3f} | time: {start_time - previous_start_time:.2f}s"
                 )
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
