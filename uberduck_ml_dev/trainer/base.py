@@ -171,6 +171,7 @@ DEFAULTS = HParams(
     fp16_run=False,
     steps_per_sample=100,
     weight_decay=1e-6,
+    sample_inference_speaker_ids=None,
 )
 
 config = DEFAULTS.values()
