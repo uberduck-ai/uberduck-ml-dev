@@ -26,16 +26,22 @@ def load_filepaths_and_text(filename: str, split: str = "|"):
     return filepaths_and_text
 
 
-def get_alignment_metrics(alignments, average_across_batch=True):
+def get_alignment_metrics(
+    alignments, average_across_batch=True, input_lengths=None, output_lengths=None
+):
     """See https://github.com/NVIDIA/tacotron2/pull/284,
     https://github.com/CookiePPP/cookietts/blob/c871f5f7b5790656d5b57bcd9e63946a2da52f0f/CookieTTS/utils/model/utils.py#L59"""
     alignments = alignments.transpose(1, 2)  # [B, dec, enc] -> [B, enc, dec]
-    input_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
-        alignments.shape[1] - 1
-    )  # [B]
-    output_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
-        alignments.shape[2] - 1
-    )  # [B]
+
+    if input_lengths == None:
+        input_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
+            alignments.shape[1] - 1
+        )  # [B] # 147
+    if output_lengths == None:
+        output_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
+            alignments.shape[2] - 1
+        )  # [B] # 767
+
     batch_size = alignments.size(0)
     optimums = torch.sqrt(
         input_lengths.double().pow(2) + output_lengths.double().pow(2)
