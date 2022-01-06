@@ -56,11 +56,12 @@ def get_alignment_metrics(alignments, average_across_batch=True):
     maxes = alignments.max(axis=1)[0].mean(axis=1)
     if average_across_batch:
         diagonalness = diagonalness.mean()
-        max_ = maxes.mean()
+        maxes = maxes.mean()
 
     output = {}
     output["diagonalness"] = diagonalness
-    output["max"] = max_
+    output["max"] = maxes
+
     return output
 
 # Cell
