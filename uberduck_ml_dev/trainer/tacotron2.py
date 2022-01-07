@@ -101,7 +101,6 @@ class Tacotron2Trainer(TTSTrainer):
         grad_norm,
         step_duration_seconds,
     ):
-        print(f"Loss: {loss}")
         self.log("Loss/train", self.global_step, scalar=loss)
         self.log("MelLoss/train", self.global_step, scalar=mel_loss)
         self.log("GateLoss/train", self.global_step, scalar=gate_loss)
@@ -186,7 +185,10 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-            self.sample_inference(model)
+            if self.distributed_run:
+                self.sample_inference(model.module)
+            else:
+                self.sample_inference(model)
 
     def sample_inference(self, model):
         if self.rank is not None and self.rank != 0:
@@ -377,23 +379,28 @@ class Tacotron2Trainer(TTSTrainer):
         start_epoch = 0
 
         if self.warm_start_name:
-            model, optimizer, start_epoch = self.warm_start(model, optimizer)
+            if self.distributed_run:
+                module, optimizer, start_epoch = self.warm_start(
+                    model.module, optimizer
+                )
+                model.module = module
+            else:
+                model, optimizer, start_epoch = self.warm_start(model, optimizer)
 
         if self.fp16_run:
             scaler = GradScaler()
 
-        start_time, previous_start_time = None, None
+        start_time, previous_start_time = time.perf_counter(), time.perf_counter()
         for epoch in range(start_epoch, self.epochs):
             #             train_loader, sampler, collate_fn = self.adjust_frames_per_step(
             #                 model, train_loader, sampler, collate_fn
             #             )
             if self.distributed_run:
                 sampler.set_epoch(epoch)
-            for batch in train_loader:
+            for batch_idx, batch in enumerate(train_loader):
                 previous_start_time = start_time
                 start_time = time.perf_counter()
-                if previous_start_time:
-                    print(f"E2E step time: {start_time - previous_start_time}")
+
                 self.global_step += 1
                 model.zero_grad()
                 if self.distributed_run:
@@ -422,7 +429,12 @@ class Tacotron2Trainer(TTSTrainer):
                 if self.distributed_run:
                     reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
                     reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
-                    reduced_loss = reduce_mel_loss + reduced_gate_loss
+                    reduced_gate_loss_batch = reduce_tensor(
+                        gate_loss_batch, self.world_size
+                    )
+                    reduced_mel_loss_batch = reduce_tensor(
+                        mel_loss_batch, self.world_size
+                    )
                 else:
                     reduced_mel_loss = mel_loss.item()
                     reduced_gate_loss = gate_loss.item()
@@ -430,7 +442,6 @@ class Tacotron2Trainer(TTSTrainer):
                     reduced_mel_loss_batch = mel_loss_batch.detach()
 
                 reduced_loss = reduced_mel_loss + reduced_gate_loss
-                reduced_loss_batch = reduced_gate_loss_batch + reduced_mel_loss_batch
                 if self.fp16_run:
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
@@ -461,7 +472,11 @@ class Tacotron2Trainer(TTSTrainer):
                     step_duration_seconds,
                 )
                 log_stop = time.time()
-                print(f"logging_time: {log_stop - log_start:.4f}")
+
+                log_str = f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_loss:.3f} | time: {start_time - previous_start_time:.2f}s"
+                if self.distributed_run:
+                    log_str += f" | rank: {self.rank}"
+                print(log_str)
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"tacotron2_{epoch}",
@@ -525,6 +540,13 @@ class Tacotron2Trainer(TTSTrainer):
                     reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
                     reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
                     reduced_val_loss = reduced_mel_loss + reduced_gate_loss
+                    reduced_gate_loss_val = reduce_tensor(
+                        gate_loss_batch, self.world_size
+                    )
+                    reduced_mel_loss_val = reduce_tensor(
+                        mel_loss_batch, self.world_size
+                    )
+
                 else:
                     reduced_mel_loss = mel_loss.item()
                     reduced_gate_loss = gate_loss.item()
