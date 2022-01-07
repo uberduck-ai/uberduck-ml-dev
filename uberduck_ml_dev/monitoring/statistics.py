@@ -4,7 +4,6 @@ __all__ = ['get_alignment_metrics']
 
 # Cell
 import torch
-from ..utils.utils import get_mask_from_lengths
 
 
 def get_alignment_metrics(
