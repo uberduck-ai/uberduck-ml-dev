@@ -4,15 +4,13 @@ __all__ = ['get_alignment_metrics']
 
 # Cell
 import torch
+from ..utils.utils import get_mask_from_lengths
 
 
 def get_alignment_metrics(
     alignments, average_across_batch=True, input_lengths=None, output_lengths=None
 ):
-    """See https://github.com/NVIDIA/tacotron2/pull/284,
-    https://github.com/CookiePPP/cookietts/blob/c871f5f7b5790656d5b57bcd9e63946a2da52f0f/CookieTTS/utils/model/utils.py#L59"""
     alignments = alignments.transpose(1, 2)  # [B, dec, enc] -> [B, enc, dec]
-
     if input_lengths == None:
         input_lengths = torch.ones(alignments.size(0), device=alignments.device) * (
             alignments.shape[1] - 1
