@@ -18,6 +18,8 @@ from uberduck_ml_dev.text.symbols import (
 
 SYMBOL_LIST = [DEFAULT_SYMBOLS, IPA_SYMBOLS, NVIDIA_TACO2_SYMBOLS, GRAD_TTS_SYMBOLS]
 MODEL_FORMAT = ["OD",'D']
+device = 'cuda'
+
 from collections import namedtuple
 
 try:
@@ -204,8 +206,6 @@ def run():
             hparams.gate_threshold = gate_threshold
             if n_speakers > 1:
                 hparams.has_speaker_embedding = True
-            model = Tacotron2(hparams)
-            device = 'cuda'
             model = Tacotron2(hparams)
             if model_format == 'OD':
                 model.from_pretrained(model_dict=torch.load(model_path), device=device)
