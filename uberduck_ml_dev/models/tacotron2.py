@@ -405,9 +405,8 @@ class Decoder(nn.Module):
         for i in range(len(attention_map)):
 
             attention = attention_map[i]
-            decoder_input = torch.cat((self.prenet(decoder_input)), dim=1)
+            decoder_input = self.prenet(decoder_input)
             mel_output, gate_output, alignment = self.decode(decoder_input, attention)
-            mel_output, gate_output, alignment = self.decode(decoder_input)
             mel_output = mel_output[
                 :, 0 : self.n_mel_channels * self.n_frames_per_step_current
             ].unsqueeze(1)
@@ -417,6 +416,79 @@ class Decoder(nn.Module):
             alignments += [alignment]
 
             decoder_input = mel_output[:, -1, -1 * self.n_mel_channels :]
+
+        mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
+            mel_outputs, gate_outputs, alignments
+        )
+
+        return mel_outputs, gate_outputs, alignments
+
+    def inference_partial_tf(self, memory, decoder_inputs, tf_until_idx, device="cpu"):
+        """Decoder inference with teacher-forcing up until tf_until_idx
+        PARAMS
+        ------
+        memory: Encoder outputs
+        decoder_inputs: Decoder inputs for teacher forcing. i.e. mel-specs
+        memory_lengths: Encoder output lengths for attention masking.
+
+        RETURNS
+        -------
+        mel_outputs: mel outputs from the decoder
+        gate_outputs: gate outputs from the decoder
+        alignments: sequence of attention weights from the decoder
+        """
+        if device == "cuda" and torch.cuda.is_available():
+            decoder_inputs = decoder_inputs.cuda()
+
+        B = memory.size(0)
+        decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
+        decoder_inputs = decoder_inputs.reshape(
+            -1, decoder_inputs.size(1), self.n_mel_channels
+        )
+        decoder_input = self.get_go_frame(memory).unsqueeze(0)
+        decoder_inputs = torch.cat((decoder_input, decoder_inputs), dim=0)
+        decoder_inputs = self.prenet(decoder_inputs)
+
+        self.initialize_decoder_states(memory, mask=None)
+
+        mel_outputs = torch.empty(
+            B, 0, self.n_frames_per_step_current * self.n_mel_channels
+        )
+        if device == "cuda" and torch.cuda.is_available():
+            mel_outputs = mel_outputs.cuda()
+        gate_outputs, alignments = [], []
+
+        while True:
+            if mel_outputs.size(1) < tf_until_idx:
+                teacher_forced_frame = decoder_inputs[
+                    mel_outputs.size(1) * self.n_frames_per_step_current
+                ]
+
+                to_concat = (teacher_forced_frame,)
+                decoder_input = torch.cat(to_concat, dim=1)
+            else:
+
+                to_concat = (
+                    self.prenet(mel_outputs[:, -1, -1 * self.n_mel_channels :]),
+                )
+                decoder_input = torch.cat(to_concat, dim=1)
+            mel_output, gate_output, attention_weights = self.decode(decoder_input)
+            mel_outputs = torch.cat(
+                [
+                    mel_outputs,
+                    mel_output[
+                        :, 0 : self.n_mel_channels * self.n_frames_per_step_current
+                    ].unsqueeze(1),
+                ],
+                dim=1,
+            )
+            gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
+            alignments += [attention_weights]
+            if torch.sigmoid(gate_output.data) > self.gate_threshold:
+                break
+            elif mel_outputs.size(1) == self.max_decoder_steps:
+                print("Warning! Reached max decoder steps")
+                break
 
         mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
             mel_outputs, gate_outputs, alignments
@@ -746,6 +818,34 @@ class Tacotron2(TTSModel):
 
         return outputs
 
+    @torch.no_grad()
+    def get_alignment(self, inputs):
+        (
+            input_text,
+            input_lengths,
+            targets,
+            max_len,
+            output_lengths,
+            speaker_ids,
+            *_,
+        ) = inputs
+
+        input_lengths, output_lengths = input_lengths.data, output_lengths.data
+
+        embedded_inputs = self.embedding(input_text).transpose(1, 2)
+        embedded_text = self.encoder(embedded_inputs, input_lengths)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
+
+        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
+
+        mel_outputs, gate_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=input_lengths
+        )
+        return alignments
+
     def forward(self, inputs):
         (
             input_text,
@@ -779,6 +879,7 @@ class Tacotron2(TTSModel):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments], output_lengths
         )
 
+    @torch.no_grad()
     def inference(self, inputs):
         text, input_lengths, speaker_ids, *_ = inputs
 
@@ -801,17 +902,50 @@ class Tacotron2(TTSModel):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths]
         )
 
+    @torch.no_grad()
     def inference_noattention(self, inputs):
         """Run inference conditioned on an attention map."""
         text, input_lengths, speaker_ids, attention_maps = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs)
+        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
 
         encoder_outputs = torch.cat((embedded_text,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder.inference_noattention(
             encoder_outputs, attention_maps
         )
+        mel_outputs_postnet = self.postnet(mel_outputs)
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+
+        return self.parse_output(
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+        )
+
+    @torch.no_grad()
+    def inference_partial_tf(
+        self,
+        inputs,
+        tf_mel,
+        tf_until_idx,
+    ):
+        """Run inference with partial teacher forcing.
+
+        Teacher forcing is done until tf_until_idx in the mel spectrogram.
+        Make sure you pass the mel index and not the text index!
+
+        tf_mel: (B, T, n_mel_channels)
+        """
+        text, input_lengths, *_ = inputs
+        embedded_inputs = self.embedding(text).transpose(1, 2)
+        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
+        encoder_outputs = torch.cat((embedded_text,), dim=2)
+
+        mel_outputs, gate_outputs, alignments = self.decoder.inference_partial_tf(
+            encoder_outputs,
+            tf_mel,
+            tf_until_idx,
+        )
+
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
