@@ -144,17 +144,17 @@ def run():
     def get_vc():
         return []
     
-    vocoder_path = st.text_input("Add vocoder path", "/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/nbs/test/fixtures/models/gen_02640000_studio")
+    vocoder_path = st.text_input("Add vocoder path")
     if st.button("Add vocoder"):
         get_vocoder().append(vocoder_path)
     vocoder_path = st.sidebar.selectbox('Vocoder', unique(get_vocoder()))
     
-    model_path = st.text_input("Add model path","/mnt/disks/uberduck-experiments-v0/gcs_logbucket/tensorboard-ubstudio_v3_20epochcheckpoints/model/tacotron2_20.pt")
+    model_path = st.text_input("Add model path")
     if st.button("Add model"):
         get_model().append(model_path)
     model_path = st.selectbox('Model', unique(get_model()))
 
-    vc_path = st.text_input("Add vocoder config path","/mnt/disks/uberduck-experiments-v0/uberduck-ml-dev/nbs/test/fixtures/models/config_v1.json")
+    vc_path = st.text_input("Add vocoder config path")
     if st.button("Add vocoder config"):
         get_vc().append(vc_path)
     vc_path = st.sidebar.selectbox('Vocoder config', unique(get_vc()))
