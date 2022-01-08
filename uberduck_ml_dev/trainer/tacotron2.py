@@ -15,7 +15,12 @@ from torch.utils.data.distributed import DistributedSampler
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
-from ..utils.utils import reduce_tensor, get_alignment_metrics
+from ..utils.utils import (
+    reduce_tensor,
+    get_alignment_metrics,
+    intersperse,
+)
+from ..text.symbols import SYMBOL_SETS
 
 
 class Tacotron2Loss(nn.Module):
@@ -101,7 +106,7 @@ class Tacotron2Trainer(TTSTrainer):
         grad_norm,
         step_duration_seconds,
     ):
-        print(f"Loss: {loss}")
+        #         print(f"Loss: {loss}")
         self.log("Loss/train", self.global_step, scalar=loss)
         self.log("MelLoss/train", self.global_step, scalar=mel_loss)
         self.log("GateLoss/train", self.global_step, scalar=gate_loss)
@@ -200,12 +205,21 @@ class Tacotron2Trainer(TTSTrainer):
                     p_arpabet=self.p_arpabet,
                     symbol_set=self.symbol_set,
                 )
-            )[None].cuda()
+            )
+            if self.intersperse_text:
+                utterance = torch.LongTensor(
+                    intersperse(
+                        utterance.numpy(), len(SYMBOL_SETS[self.hparams.symbol_set])
+                    )
+                )
+            utterance = utterance[None].cuda()
+
             speaker_id = (
                 choice(self.sample_inference_speaker_ids)
                 if self.sample_inference_speaker_ids
                 else randint(0, self.n_speakers - 1)
             )
+
             input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
             input_ = [utterance, input_lengths, torch.LongTensor([speaker_id]).cuda()]
 
@@ -580,6 +594,8 @@ class Tacotron2Trainer(TTSTrainer):
             "symbol_set": self.symbol_set,
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
+            "intersperse_text": self.intersperse_text,
+            "intersperse_token": len(SYMBOL_SETS[self.symbol_set]),
         }
 
 # Cell

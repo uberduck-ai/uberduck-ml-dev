@@ -13,7 +13,7 @@ class TTSModel(nn.Module):
 
         super().__init__()
         self.symbol_set = hparams.symbol_set
-        self.n_symbols = len(SYMBOL_SETS[self.symbol_set])
+        self.n_symbols = hparams.n_symbols
         self.n_speakers = hparams.n_speakers
         # symbols = __import__('uberduck_ml_dev.text.' + hparams.symbols)
 
