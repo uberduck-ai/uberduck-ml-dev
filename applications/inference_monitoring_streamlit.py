@@ -1,8 +1,7 @@
 import streamlit as st
 import torch
 from uberduck_ml_dev.monitoring.generate import _get_inference
-from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
-from uberduck_ml_dev.models.tacotron2 import Tacotron2
+from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.vocoders.hifigan import HiFiGanGenerator
 import scipy
 from io import BytesIO
