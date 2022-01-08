@@ -622,7 +622,7 @@ class Encoder(nn.Module):
 
     def forward(self, x, input_lengths):
         if x.size()[0] > 1:
-            #             print("here")
+            print("here")
             x_embedded = []
             for b_ind in range(x.size()[0]):  # TODO: Speed up
                 curr_x = x[b_ind : b_ind + 1, :, : input_lengths[b_ind]].clone()
