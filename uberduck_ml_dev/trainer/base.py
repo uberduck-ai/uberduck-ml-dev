@@ -80,7 +80,7 @@ class TTSTrainer:
         )
 
     def load_checkpoint(self):
-        return torch.load(self.warm_start_name)
+        return torch.load(self.warm_start_name, map_location=self.device)
 
     def log(self, tag, step, scalar=None, audio=None, image=None, figure=None):
         if self.rank is not None and self.rank != 0:
