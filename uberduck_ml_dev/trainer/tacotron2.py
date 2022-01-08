@@ -15,7 +15,8 @@ from torch.utils.data.distributed import DistributedSampler
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
-from ..utils.utils import reduce_tensor, get_alignment_metrics
+from ..utils.utils import reduce_tensor
+from ..monitoring.statistics import get_alignment_metrics
 
 
 class Tacotron2Loss(nn.Module):
