@@ -105,6 +105,9 @@ class Tacotron2Trainer(TTSTrainer):
         else:
             self.compute_gst = None
 
+        if not self.sample_inference_speaker_ids:
+            self.sample_inference_speaker_ids = list(range(self.n_speakers))
+
         # pass
 
     def log_training(
@@ -205,16 +208,19 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-            for i in range(5):
-                self.sample_inference(
-                    model,
-                    "Hi there did you know the quick brown fox jumps over the lazy dog.",
-                    i,
-                )
-            if self.distributed_run:
-                self.sample_inference(model.module)
-            else:
-                self.sample_inference(model)
+            for speaker_id in self.sample_inference_speaker_ids:
+                if self.distributed_run:
+                    self.sample_inference(
+                        model.module,
+                        self.sample_inference_text,
+                        speaker_id,
+                    )
+                else:
+                    self.sample_inference(
+                        model,
+                        self.sample_inference_text,
+                        speaker_id,
+                    )
 
     def sample_inference(self, model, transcription=None, speaker_id=None):
         if self.rank is not None and self.rank != 0:
@@ -295,7 +301,6 @@ class Tacotron2Trainer(TTSTrainer):
         gate_loss_val,
         speakers_val,
     ):
-        print(f"Average loss: {mean_loss}")
         self.log("Loss/val", self.global_step, scalar=mean_loss)
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
         self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
@@ -401,7 +406,8 @@ class Tacotron2Trainer(TTSTrainer):
         return train_set, val_set, train_loader, sampler, collate_fn
 
     def train(self):
-        print("start train", time.perf_counter())
+        train_start_time = time.perf_counter()
+        print("start train", train_start_time)
         train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
         criterion = Tacotron2Loss(
             pos_weight=self.pos_weight
@@ -513,8 +519,7 @@ class Tacotron2Trainer(TTSTrainer):
                     step_duration_seconds,
                 )
                 log_stop = time.time()
-
-                log_str = f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_loss:.3f} | time: {start_time - previous_start_time:.2f}s"
+                log_str = f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_mel_loss:.2f} | mel: {reduced_loss:.2f} | gate: {reduced_gate_loss:.3f} | t: {start_time - previous_start_time:.2f}s | w: {(time.perf_counter() - train_start_time)/(60*60):.2f}h"
                 if self.distributed_run:
                     log_str += f" | rank: {self.rank}"
                 print(log_str)
@@ -539,7 +544,8 @@ class Tacotron2Trainer(TTSTrainer):
             )
 
     def validate(self, **kwargs):
-        print("start validate", time.perf_counter())
+        val_start_time = time.perf_counter()
+
         model = kwargs["model"]
         val_set = kwargs["val_set"]
         collate_fn = kwargs["collate_fn"]
@@ -618,7 +624,11 @@ class Tacotron2Trainer(TTSTrainer):
                 total_gate_loss_val,
                 speakers_val,
             )
+
         model.train()
+
+        val_log_str = f"Validation loss: {mean_loss:.2f} | mel: {mel_loss:.2f} | gate: {mean_gate_loss:.3f} | t: {time.perf_counter() - val_start_time:.2f}s"
+        print(val_log_str)
 
     @property
     def val_dataset_args(self):
@@ -644,7 +654,6 @@ class Tacotron2Trainer(TTSTrainer):
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
             "compute_gst": self.compute_gst,
-        }
         }
 
 # Cell

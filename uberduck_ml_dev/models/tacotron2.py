@@ -727,6 +727,12 @@ DEFAULTS = HParams(
     n_frames_per_step_initial=1,
     win_length=1024,
     has_speaker_embedding=False,
+    gst_type=None,
+    torchmoji_model_file=None,
+    torchmoji_vocabulary_file=None,
+    sample_inference_speaker_ids=None,
+    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
+    distributed_run=False,
 )
 
 config = DEFAULTS.values()
