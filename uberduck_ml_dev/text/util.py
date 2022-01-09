@@ -155,11 +155,11 @@ def convert_to_ascii(text):
     return unidecode(text)
 
 
-def convert_to_arpabet(text):
+def convert_to_arpabet(text, overrides=None):
     return " ".join(
         [
             f"{{ {s.strip()} }}" if s.strip() not in ",." else s.strip()
-            for s in " ".join(g2p(text)).split("  ")
+            for s in " ".join(g2p(text, overrides=overrides)).split("  ")
         ]
     )
 
@@ -274,7 +274,13 @@ def cleaned_text_to_sequence(cleaned_text, symbol_set):
     return symbols_to_sequence(cleaned_text, symbol_set=symbol_set, ignore_symbols=[])
 
 
-def text_to_sequence(text, cleaner_names, p_arpabet=0.0, symbol_set=DEFAULT_SYMBOLS):
+def text_to_sequence(
+    text,
+    cleaner_names,
+    p_arpabet=0.0,
+    symbol_set=DEFAULT_SYMBOLS,
+    arpabet_overrides=None,
+):
     """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
     in it. For example, "Turn left on {HH AW1 S S T AH0 N} Street."
@@ -295,7 +301,9 @@ def text_to_sequence(text, cleaner_names, p_arpabet=0.0, symbol_set=DEFAULT_SYMB
             cleaned_words = []
             for w, nw in words_and_nonwords:
                 if w and random.random() < p_arpabet:
-                    cleaned_words.append(convert_to_arpabet(w))
+                    cleaned_words.append(
+                        convert_to_arpabet(w, overrides=arpabet_overrides)
+                    )
                 elif w:
                     cleaned_words.append(w)
                 else:
