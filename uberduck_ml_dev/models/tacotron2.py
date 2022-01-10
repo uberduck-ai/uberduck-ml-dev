@@ -31,6 +31,7 @@ class Decoder(nn.Module):
         self.p_attention_dropout = hparams.p_attention_dropout
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.p_teacher_forcing = hparams.p_teacher_forcing
+        self.cudnn_enabled = hparams.cudnn_enabled
 
         self.prenet = Prenet(
             hparams.n_mel_channels,
@@ -264,7 +265,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         desired_output_frames = decoder_inputs.size(0) / self.n_frames_per_step_current
@@ -333,7 +334,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
 
@@ -399,7 +400,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         for i in range(len(attention_map)):
@@ -437,7 +438,7 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        if device == "cuda" and torch.cuda.is_available():
+        if device == "cuda" and torch.cuda.is_available() and self.cudnn_enabled:
             decoder_inputs = decoder_inputs.cuda()
 
         B = memory.size(0)
@@ -454,7 +455,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if device == "cuda" and torch.cuda.is_available():
+        if device == "cuda" and torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
 
@@ -733,6 +734,7 @@ DEFAULTS = HParams(
     sample_inference_speaker_ids=None,
     sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
     distributed_run=False,
+    cudnn_enabled=False,
 )
 
 config = DEFAULTS.values()
@@ -762,6 +764,8 @@ class Tacotron2(TTSModel):
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
         self.has_speaker_embedding = hparams.has_speaker_embedding
+        self.cudnn_enabled = hparams.cudnn_enabled
+
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
         if hparams.has_speaker_embedding:
@@ -805,15 +809,17 @@ class Tacotron2(TTSModel):
             *_,
         ) = batch
 
-        text_padded = to_gpu(text_padded).long()
-        input_lengths = to_gpu(input_lengths).long()
+        if self.cudnn_enabled:
+            text_padded = to_gpu(text_padded).long()
+            input_lengths = to_gpu(input_lengths).long()
+            mel_padded = to_gpu(mel_padded).float()
+            gate_padded = to_gpu(gate_padded).float()
+            speaker_ids = to_gpu(speaker_ids).long()
+            output_lengths = to_gpu(output_lengths).long()
+            if embedded_gst is not None:
+                embedded_gst = to_gpu(embedded_gst).float()
+
         max_len = torch.max(input_lengths.data).item()
-        mel_padded = to_gpu(mel_padded).float()
-        gate_padded = to_gpu(gate_padded).float()
-        speaker_ids = to_gpu(speaker_ids).long()
-        output_lengths = to_gpu(output_lengths).long()
-        if embedded_gst is not None:
-            embedded_gst = to_gpu(embedded_gst).float()
 
         ret_x = [
             text_padded,

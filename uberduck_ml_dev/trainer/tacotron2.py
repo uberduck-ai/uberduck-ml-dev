@@ -232,7 +232,7 @@ class Tacotron2Trainer(TTSTrainer):
 
             if self.compute_gst:
                 gst_embedding = self.compute_gst([transcription])
-                gst_embedding = torch.FloatTensor(gst_embedding).cuda()
+                gst_embedding = torch.FloatTensor(gst_embedding)
             else:
                 gst_embedding = None
 
@@ -243,13 +243,21 @@ class Tacotron2Trainer(TTSTrainer):
                     p_arpabet=self.p_arpabet,
                     symbol_set=self.symbol_set,
                 )
-            )[None].cuda()
+            )[None]
 
-            input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
+            input_lengths = torch.LongTensor([utterance.shape[1]])
+            speaker_id_tensor = torch.LongTensor([speaker_id])
+
+            if self.cudnn_enabled and torch.cuda.is_available():
+                utterance = utterance.cuda()
+                input_lengths = input_lengths.cuda()
+                gst_embedding = gst_embedding.cuda() if gst_embedding else None
+                speaker_id_tensor = speaker_id_tensor.cuda()
+
             input_ = [
                 utterance,
                 input_lengths,
-                torch.LongTensor([speaker_id]).cuda(),
+                speaker_id_tensor,
                 gst_embedding,
             ]
 
@@ -409,7 +417,7 @@ class Tacotron2Trainer(TTSTrainer):
         )  # keep higher than 5 to make clips not stretch on
 
         model = Tacotron2(self.hparams)
-        if self.device == "cuda":
+        if self.device == "cuda" and self.cudnn_enabled:
             model = model.cuda()
         if self.distributed_run:
             model = DDP(model, device_ids=[self.rank])
