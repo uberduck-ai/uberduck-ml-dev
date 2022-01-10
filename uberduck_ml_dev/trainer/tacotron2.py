@@ -251,7 +251,9 @@ class Tacotron2Trainer(TTSTrainer):
             if self.cudnn_enabled and torch.cuda.is_available():
                 utterance = utterance.cuda()
                 input_lengths = input_lengths.cuda()
-                gst_embedding = gst_embedding.cuda() if gst_embedding else None
+                gst_embedding = (
+                    gst_embedding.cuda() if gst_embedding is not None else None
+                )
                 speaker_id_tensor = speaker_id_tensor.cuda()
 
             input_ = [
