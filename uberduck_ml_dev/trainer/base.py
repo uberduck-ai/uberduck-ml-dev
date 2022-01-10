@@ -35,7 +35,7 @@ class TTSTrainer:
 
         if device:
             self.device = device
-        elif torch.cuda.is_available():
+        elif torch.cuda.is_available() and self.cudnn_enabled:
             self.device = "cuda"
         else:
             self.device = "cpu"
