@@ -71,6 +71,7 @@ DEFAULTS = HParams(
     include_f0=False,
     symbol_set="default",
     has_speaker_embedding=True,
+    cudnn_enabled=False,
 )
 
 # Cell
@@ -258,6 +259,7 @@ class Decoder(nn.Module):
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.p_teacher_forcing = hparams.p_teacher_forcing
         self.include_f0 = hparams.include_f0
+        self.cudnn_enabled = hparams.cudnn_enabled
 
         if self.include_f0:
             prenet_f0_dim = hparams.prenet_f0_dim
@@ -515,7 +517,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         desired_output_frames = decoder_inputs.size(0) / self.n_frames_per_step_current
@@ -598,7 +600,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         while True:
@@ -662,7 +664,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         for i in range(len(attention_map)):
@@ -705,6 +707,8 @@ class Mellotron(Tacotron2):
         self.encoder = Encoder(hparams)
         self.decoder = Decoder(hparams)
         self.postnet = Postnet(hparams)
+        self.cudnn_enabled = hparams.cudnn_enabled
+
         if hparams.with_gst:
             self.gst = GST(hparams)
         self.speaker_embedding = nn.Embedding(
@@ -725,16 +729,22 @@ class Mellotron(Tacotron2):
             speaker_ids,
             *_,
         ) = batch
+
         if self.include_f0:
             f0_padded = batch[6]
-            f0_padded = to_gpu(f0_padded).float()
-        text_padded = to_gpu(text_padded).long()
-        input_lengths = to_gpu(input_lengths).long()
+            if self.cudnn_enabled:
+                f0_padded = to_gpu(f0_padded).float()
+
+        if self.cudnn_enabled:
+            text_padded = to_gpu(text_padded).long()
+            input_lengths = to_gpu(input_lengths).long()
+            mel_padded = to_gpu(mel_padded).float()
+            gate_padded = to_gpu(gate_padded).float()
+            output_lengths = to_gpu(output_lengths).long()
+            speaker_ids = to_gpu(speaker_ids.data).long()
+
         max_len = torch.max(input_lengths.data).item()
-        mel_padded = to_gpu(mel_padded).float()
-        gate_padded = to_gpu(gate_padded).float()
-        output_lengths = to_gpu(output_lengths).long()
-        speaker_ids = to_gpu(speaker_ids.data).long()
+
         ret_x = [
             text_padded,
             input_lengths,
@@ -813,7 +823,7 @@ class Mellotron(Tacotron2):
         if hasattr(self, "gst"):
             if isinstance(style_input, int):
                 query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size)
-                if torch.cuda.is_available():
+                if torch.cuda.is_available() and self.cudnn_enabled:
                     query = query.cuda()
                 GST = torch.tanh(self.gst.stl.embed)
                 key = GST[style_input].unsqueeze(0).expand(1, -1, -1)
@@ -855,7 +865,7 @@ class Mellotron(Tacotron2):
         if hasattr(self, "gst"):
             if isinstance(style_input, int):
                 query = torch.zeros(1, 1, self.gst.encoder.ref_enc_gru_size)
-                if torch.cuda.is_available():
+                if torch.cuda.is_available() and self.cudnn_enabled:
                     query = query.cuda()
                 GST = torch.tanh(self.gst.stl.embed)
                 key = GST[style_input].unsqueeze(0).expand(1, -1, -1)
