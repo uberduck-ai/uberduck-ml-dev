@@ -101,7 +101,7 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_vocabulary_file"),
                 self.hparams.get("torchmoji_model_file"),
             )
-            self.compute_gst = self.torchmoji.encode_texts
+            self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
             self.compute_gst = None
 
@@ -244,12 +244,7 @@ class Tacotron2Trainer(TTSTrainer):
                     symbol_set=self.symbol_set,
                 )
             )[None].cuda()
-            if speaker_id is None:
-                speaker_id = (
-                    choice(self.sample_inference_speaker_ids)
-                    if self.sample_inference_speaker_ids
-                    else randint(0, self.n_speakers - 1)
-                )
+
             input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
             input_ = [
                 utterance,
