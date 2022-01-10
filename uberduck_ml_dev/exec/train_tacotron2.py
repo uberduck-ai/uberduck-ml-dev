@@ -16,19 +16,6 @@ from torch import multiprocessing as mp
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", help="Path to JSON config")
-    parser.add_argument(
-        "--training_audiopaths_and_text", help="Path to training filelist", default=None
-    )
-    parser.add_argument(
-        "--val_audiopaths_and_text", help="Path to val filelist", default=None
-    )
-    parser.add_argument("--log_dir", help="Path to log_dir", default=None)
-    parser.add_argument(
-        "--checkpoint_path", help="Path to checkpoint_path", default=None
-    )
-    parser.add_argument(
-        "--warm_start_name", help="Path to warm start model", default=None
-    )
     args = parser.parse_args(args)
     return args
 

@@ -60,6 +60,7 @@ from tensorboardX import SummaryWriter
 import time
 from torch.utils.data import DataLoader
 from ..models.common import MelSTFT
+from ..models.torchmoji import TorchMojiInterface
 from ..utils.plot import (
     plot_attention,
     plot_gate_outputs,
@@ -86,6 +87,27 @@ class Tacotron2Trainer(TTSTrainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        if self.hparams.get("gst_type") == "torchmoji":
+            assert self.hparams.get(
+                "torchmoji_vocabulary_file"
+            ), "torchmoji_vocabulary_file must be set"
+            assert self.hparams.get(
+                "torchmoji_model_file"
+            ), "torchmoji_model_file must be set"
+            assert self.hparams.get("gst_dim"), "gst_dim must be set"
+
+            self.torchmoji = TorchMojiInterface(
+                self.hparams.get("torchmoji_vocabulary_file"),
+                self.hparams.get("torchmoji_model_file"),
+            )
+            self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
+        else:
+            self.compute_gst = None
+
+        if not self.sample_inference_speaker_ids:
+            self.sample_inference_speaker_ids = list(range(self.n_speakers))
+
         # pass
 
     def log_training(
@@ -186,31 +208,50 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-            if self.distributed_run:
-                self.sample_inference(model.module)
-            else:
-                self.sample_inference(model)
+            for speaker_id in self.sample_inference_speaker_ids:
+                if self.distributed_run:
+                    self.sample_inference(
+                        model.module,
+                        self.sample_inference_text,
+                        speaker_id,
+                    )
+                else:
+                    self.sample_inference(
+                        model,
+                        self.sample_inference_text,
+                        speaker_id,
+                    )
 
-    def sample_inference(self, model):
+    def sample_inference(self, model, transcription=None, speaker_id=None):
         if self.rank is not None and self.rank != 0:
             return
         # Generate an audio sample
         with torch.no_grad():
+            if transcription is None:
+                transcription = random_utterance()
+
+            if self.compute_gst:
+                gst_embedding = self.compute_gst([transcription])
+                gst_embedding = torch.FloatTensor(gst_embedding).cuda()
+            else:
+                gst_embedding = None
+
             utterance = torch.LongTensor(
                 text_to_sequence(
-                    random_utterance(),
+                    transcription,
                     self.text_cleaners,
                     p_arpabet=self.p_arpabet,
                     symbol_set=self.symbol_set,
                 )
             )[None].cuda()
-            speaker_id = (
-                choice(self.sample_inference_speaker_ids)
-                if self.sample_inference_speaker_ids
-                else randint(0, self.n_speakers - 1)
-            )
+
             input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
-            input_ = [utterance, input_lengths, torch.LongTensor([speaker_id]).cuda()]
+            input_ = [
+                utterance,
+                input_lengths,
+                torch.LongTensor([speaker_id]).cuda(),
+                gst_embedding,
+            ]
 
             model.eval()
 
@@ -219,24 +260,24 @@ class Tacotron2Trainer(TTSTrainer):
             model.train()
             try:
                 audio = self.sample(mel[0])
-                self.log("SampleInference", self.global_step, audio=audio)
+                self.log(f"SampleInference/{speaker_id}", self.global_step, audio=audio)
             except Exception as e:
                 print(f"Exception raised while doing sample inference: {e}")
                 print("Mel shape: ", mel[0].shape)
             self.log(
-                "Attention/sample_inference",
+                f"Attention/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_attention(attn[0].data.cpu().transpose(0, 1))
                 ),
             )
             self.log(
-                "MelPredicted/sample_inference",
+                f"MelPredicted/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
             )
             self.log(
-                "Gate/sample_inference",
+                f"Gate/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_gate_outputs(gate_outputs=gate[0].data.cpu())
@@ -255,7 +296,6 @@ class Tacotron2Trainer(TTSTrainer):
         gate_loss_val,
         speakers_val,
     ):
-        print(f"Average loss: {mean_loss}")
         self.log("Loss/val", self.global_step, scalar=mean_loss)
         self.log("MelLoss/val", self.global_step, scalar=mean_mel_loss)
         self.log("GateLoss/val", self.global_step, scalar=mean_gate_loss)
@@ -361,7 +401,8 @@ class Tacotron2Trainer(TTSTrainer):
         return train_set, val_set, train_loader, sampler, collate_fn
 
     def train(self):
-        print("start train", time.perf_counter())
+        train_start_time = time.perf_counter()
+        print("start train", train_start_time)
         train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
         criterion = Tacotron2Loss(
             pos_weight=self.pos_weight
@@ -401,7 +442,6 @@ class Tacotron2Trainer(TTSTrainer):
             for batch_idx, batch in enumerate(train_loader):
                 previous_start_time = start_time
                 start_time = time.perf_counter()
-
                 self.global_step += 1
                 model.zero_grad()
                 if self.distributed_run:
@@ -411,6 +451,7 @@ class Tacotron2Trainer(TTSTrainer):
                 if self.fp16_run:
                     with autocast():
                         y_pred = model(X)
+
                         (
                             mel_loss,
                             gate_loss,
@@ -473,8 +514,7 @@ class Tacotron2Trainer(TTSTrainer):
                     step_duration_seconds,
                 )
                 log_stop = time.time()
-
-                log_str = f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_loss:.3f} | time: {start_time - previous_start_time:.2f}s"
+                log_str = f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_mel_loss:.2f} | mel: {reduced_loss:.2f} | gate: {reduced_gate_loss:.3f} | t: {start_time - previous_start_time:.2f}s | w: {(time.perf_counter() - train_start_time)/(60*60):.2f}h"
                 if self.distributed_run:
                     log_str += f" | rank: {self.rank}"
                 print(log_str)
@@ -499,7 +539,8 @@ class Tacotron2Trainer(TTSTrainer):
             )
 
     def validate(self, **kwargs):
-        print("start validate", time.perf_counter())
+        val_start_time = time.perf_counter()
+
         model = kwargs["model"]
         val_set = kwargs["val_set"]
         collate_fn = kwargs["collate_fn"]
@@ -578,7 +619,11 @@ class Tacotron2Trainer(TTSTrainer):
                 total_gate_loss_val,
                 speakers_val,
             )
+
         model.train()
+
+        val_log_str = f"Validation loss: {mean_loss:.2f} | mel: {mel_loss:.2f} | gate: {mean_gate_loss:.3f} | t: {time.perf_counter() - val_start_time:.2f}s"
+        print(val_log_str)
 
     @property
     def val_dataset_args(self):
@@ -603,6 +648,7 @@ class Tacotron2Trainer(TTSTrainer):
             "symbol_set": self.symbol_set,
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
+            "compute_gst": self.compute_gst,
         }
 
 # Cell

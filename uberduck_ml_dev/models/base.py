@@ -43,6 +43,13 @@ class TTSModel(nn.Module):
         if ignore_layers:
             model_dict = {k: v for k, v in model_dict.items() if k not in ignore_layers}
         dummy_dict = self.state_dict()
+
+        for k in self.state_dict().keys():
+            if k not in model_dict.keys():
+                print(
+                    f"WARNING! Attempting to load a model with out the {k} layer. This could lead to unexpected results during evaluation."
+                )
+
         dummy_dict.update(model_dict)
         model_dict = dummy_dict
         self.load_state_dict(model_dict)
