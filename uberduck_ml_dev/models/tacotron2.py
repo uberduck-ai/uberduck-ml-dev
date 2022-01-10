@@ -727,6 +727,12 @@ DEFAULTS = HParams(
     n_frames_per_step_initial=1,
     win_length=1024,
     has_speaker_embedding=False,
+    gst_type=None,
+    torchmoji_model_file=None,
+    torchmoji_vocabulary_file=None,
+    sample_inference_speaker_ids=None,
+    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
+    distributed_run=False,
 )
 
 config = DEFAULTS.values()
@@ -773,6 +779,20 @@ class Tacotron2(TTSModel):
                 self.encoder_embedding_dim, device=a.device
             )
 
+        self.gst_init(hparams)
+
+    def gst_init(self, hparams):
+        self.gst_lin = None
+        self.gst_type = None
+
+        if hparams.get("gst_type") == "torchmoji":
+            assert hparams.gst_dim, "gst_dim must be set"
+            self.gst_type = hparams.get("gst_type")
+            self.gst_lin = nn.Linear(hparams.gst_dim, self.encoder_embedding_dim)
+            print("Initialized Torchmoji GST")
+        else:
+            print("Not using any style tokens")
+
     def parse_batch(self, batch):
         (
             text_padded,
@@ -781,6 +801,7 @@ class Tacotron2(TTSModel):
             gate_padded,
             output_lengths,
             speaker_ids,
+            embedded_gst,
             *_,
         ) = batch
 
@@ -791,6 +812,9 @@ class Tacotron2(TTSModel):
         gate_padded = to_gpu(gate_padded).float()
         speaker_ids = to_gpu(speaker_ids).long()
         output_lengths = to_gpu(output_lengths).long()
+        if embedded_gst is not None:
+            embedded_gst = to_gpu(embedded_gst).float()
+
         ret_x = [
             text_padded,
             input_lengths,
@@ -798,6 +822,7 @@ class Tacotron2(TTSModel):
             max_len,
             output_lengths,
             speaker_ids,
+            embedded_gst,
         ]
         return (
             tuple(ret_x),
@@ -853,6 +878,7 @@ class Tacotron2(TTSModel):
             max_len,
             output_lengths,
             speaker_ids,
+            embedded_gst,
             *_,
         ) = inputs
 
@@ -865,7 +891,12 @@ class Tacotron2(TTSModel):
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
             encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
+        if self.gst_lin is not None:
+            assert (
+                embedded_gst is not None
+            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
+            encoder_outputs += self.gst_lin(embedded_gst)
+        #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=input_lengths
@@ -880,7 +911,7 @@ class Tacotron2(TTSModel):
 
     @torch.no_grad()
     def inference(self, inputs):
-        text, input_lengths, speaker_ids, *_ = inputs
+        text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
@@ -888,7 +919,13 @@ class Tacotron2(TTSModel):
         if self.speaker_embedding:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
             encoder_outputs += self.spkr_lin(embedded_speakers)
-        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
+
+        if self.gst_lin is not None:
+            assert (
+                embedded_gst is not None
+            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
+            encoder_outputs += self.gst_lin(embedded_gst)
+        #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         memory_lengths = input_lengths
         mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(

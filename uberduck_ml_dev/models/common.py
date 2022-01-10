@@ -5,8 +5,6 @@ __all__ = ['Conv1d', 'LinearNorm', 'LocationLayer', 'Attention', 'STFT', 'MelSTF
            'WN', 'ResidualCouplingLayer', 'ResBlock1', 'ResBlock2', 'LRELU_SLOPE']
 
 # Cell
-from librosa.filters import mel as librosa_mel
-from librosa.util import pad_center, tiny
 import numpy as np
 from scipy.signal import get_window
 import torch
@@ -14,6 +12,9 @@ from torch.autograd import Variable
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils import remove_weight_norm, weight_norm
+
+from librosa.filters import mel as librosa_mel
+from librosa.util import pad_center, tiny
 
 from ..utils.utils import *
 from ..vendor.tfcompat.hparam import HParams
