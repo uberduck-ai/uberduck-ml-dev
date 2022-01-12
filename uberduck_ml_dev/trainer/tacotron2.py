@@ -17,7 +17,7 @@ from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
 from ..monitoring.statistics import get_alignment_metrics
-
+import nemo
 
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
@@ -130,30 +130,22 @@ class Tacotron2Trainer(TTSTrainer):
         self.log("GradNorm", self.global_step, scalar=grad_norm.item())
         self.log("LearningRate", self.global_step, scalar=self.learning_rate)
         self.log(
-            "StepDurationSeconds",
-            self.global_step,
-            scalar=step_duration_seconds,
+            "StepDurationSeconds", self.global_step, scalar=step_duration_seconds,
         )
 
-        batch_levels = X[5]
+        batch_levels = X.speaker_ids
         batch_levels_unique = torch.unique(batch_levels)
         for l in batch_levels_unique:
             mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
             self.log(
-                f"MelLoss/train/speaker{l.item()}",
-                self.global_step,
-                scalar=mlb,
+                f"MelLoss/train/speaker{l.item()}", self.global_step, scalar=mlb,
             )
             glb = gate_loss_batch[torch.where(batch_levels == l)[0]].mean()
             self.log(
-                f"GateLoss/train/speaker{l.item()}",
-                self.global_step,
-                scalar=glb,
+                f"GateLoss/train/speaker{l.item()}", self.global_step, scalar=glb,
             )
             self.log(
-                f"Loss/train/speaker{l.item()}",
-                self.global_step,
-                scalar=mlb + glb,
+                f"Loss/train/speaker{l.item()}", self.global_step, scalar=mlb + glb,
             )
 
         if self.global_step % self.steps_per_sample == 0:
@@ -195,8 +187,8 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-            input_length = X[1][sample_idx].item()
-            output_length = X[4][sample_idx].item()
+            input_length = X.input_lengths[sample_idx].item()
+            output_length = X.output_lengths[sample_idx].item()
             self.log(
                 "Attention/train",
                 self.global_step,
@@ -211,15 +203,11 @@ class Tacotron2Trainer(TTSTrainer):
             for speaker_id in self.sample_inference_speaker_ids:
                 if self.distributed_run:
                     self.sample_inference(
-                        model.module,
-                        self.sample_inference_text,
-                        speaker_id,
+                        model.module, self.sample_inference_text, speaker_id,
                     )
                 else:
                     self.sample_inference(
-                        model,
-                        self.sample_inference_text,
-                        speaker_id,
+                        model, self.sample_inference_text, speaker_id,
                     )
 
     def sample_inference(self, model, transcription=None, speaker_id=None):
@@ -232,7 +220,7 @@ class Tacotron2Trainer(TTSTrainer):
 
             if self.compute_gst:
                 gst_embedding = self.compute_gst([transcription])
-                gst_embedding = torch.FloatTensor(gst_embedding)
+                gst_embedding = torch.FloatTensor(gst_embedding).cuda()
             else:
                 gst_embedding = None
 
@@ -243,23 +231,13 @@ class Tacotron2Trainer(TTSTrainer):
                     p_arpabet=self.p_arpabet,
                     symbol_set=self.symbol_set,
                 )
-            )[None]
+            )[None].cuda()
 
-            input_lengths = torch.LongTensor([utterance.shape[1]])
-            speaker_id_tensor = torch.LongTensor([speaker_id])
-
-            if self.cudnn_enabled and torch.cuda.is_available():
-                utterance = utterance.cuda()
-                input_lengths = input_lengths.cuda()
-                gst_embedding = (
-                    gst_embedding.cuda() if gst_embedding is not None else None
-                )
-                speaker_id_tensor = speaker_id_tensor.cuda()
-
+            input_lengths = torch.LongTensor([utterance.shape[1]]).cuda()
             input_ = [
                 utterance,
                 input_lengths,
-                speaker_id_tensor,
+                torch.LongTensor([speaker_id]).cuda(),
                 gst_embedding,
             ]
 
@@ -315,20 +293,14 @@ class Tacotron2Trainer(TTSTrainer):
         for l in val_levels_unique:
             mlv = mel_loss_val[torch.where(val_levels == l)[0]].mean()
             self.log(
-                f"MelLoss/val/speaker{l.item()}",
-                self.global_step,
-                scalar=mlv,
+                f"MelLoss/val/speaker{l.item()}", self.global_step, scalar=mlv,
             )
             glv = gate_loss_val[torch.where(val_levels == l)[0]].mean()
             self.log(
-                f"GateLoss/val/speaker{l.item()}",
-                self.global_step,
-                scalar=glv,
+                f"GateLoss/val/speaker{l.item()}", self.global_step, scalar=glv,
             )
             self.log(
-                f"Loss/val/speaker{l.item()}",
-                self.global_step,
-                scalar=mlv + glv,
+                f"Loss/val/speaker{l.item()}", self.global_step, scalar=mlv + glv,
             )
         # Generate the sample from a random item from the last y_pred batch.
         mel_target, gate_target = y
@@ -419,14 +391,12 @@ class Tacotron2Trainer(TTSTrainer):
         )  # keep higher than 5 to make clips not stretch on
 
         model = Tacotron2(self.hparams)
-        if self.device == "cuda" and self.cudnn_enabled:
+        if self.device == "cuda":
             model = model.cuda()
         if self.distributed_run:
             model = DDP(model, device_ids=[self.rank])
         optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
+            model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay,
         )
         start_epoch = 0
 
