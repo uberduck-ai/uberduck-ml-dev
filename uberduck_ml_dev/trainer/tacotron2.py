@@ -4,6 +4,7 @@ __all__ = ['Tacotron2Loss', 'Tacotron2Trainer', 'config', 'DEFAULTS']
 
 # Cell
 from random import choice, randint
+from ..models.tacotron2.tacotron2 import Tacotron2
 import time
 from typing import List
 
@@ -13,11 +14,12 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
 from ..data_loader import TextMelDataset, TextMelCollate
-from ..models.tacotron2 import Tacotron2
+
 from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
 from ..monitoring.statistics import get_alignment_metrics
 import nemo
+
 
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
@@ -88,6 +90,7 @@ class Tacotron2Trainer(TTSTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.include_durations = self.hparams.include_durations
         if self.hparams.get("gst_type") == "torchmoji":
             assert self.hparams.get(
                 "torchmoji_vocabulary_file"
@@ -355,7 +358,12 @@ class Tacotron2Trainer(TTSTrainer):
             ),
         )
 
-    def initialize_loader(self, include_f0: bool = False, n_frames_per_step: int = 1):
+    def initialize_loader(
+        self,
+        include_f0: bool = False,
+        include_durations: bool = False,
+        n_frames_per_step: int = 1,
+    ):
         train_set = TextMelDataset(
             **self.training_dataset_args,
             debug=self.debug,
@@ -367,7 +375,9 @@ class Tacotron2Trainer(TTSTrainer):
             debug_dataset_size=self.batch_size,
         )
         collate_fn = TextMelCollate(
-            n_frames_per_step=n_frames_per_step, include_f0=include_f0
+            n_frames_per_step=n_frames_per_step,
+            include_f0=include_f0,
+            include_durations=include_durations,
         )
         sampler = None
         if self.distributed_run:
@@ -385,7 +395,9 @@ class Tacotron2Trainer(TTSTrainer):
     def train(self):
         train_start_time = time.perf_counter()
         print("start train", train_start_time)
-        train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
+        train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader(
+            include_f0=self.include_f0, include_durations=self.include_durations
+        )
         criterion = Tacotron2Loss(
             pos_weight=self.pos_weight
         )  # keep higher than 5 to make clips not stretch on
@@ -550,10 +562,10 @@ class Tacotron2Trainer(TTSTrainer):
                 total_steps += 1
                 if self.distributed_run:
                     X, y = model.module.parse_batch(batch)
-                    speakers_val.append(X[5])
+                    speakers_val.append(X["speaker_ids"])
                 else:
                     X, y = model.parse_batch(batch)
-                    speakers_val.append(X[5])
+                    speakers_val.append(X["speaker_ids"])
                 y_pred = model(X)
                 mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
                     y_pred, y
@@ -629,12 +641,13 @@ class Tacotron2Trainer(TTSTrainer):
             "max_wav_value": self.max_wav_value,
             "pos_weight": self.pos_weight,
             "compute_gst": self.compute_gst,
+            "include_durations": self.include_durations,
         }
 
 # Cell
 from ..vendor.tfcompat.hparam import HParams
 from .base import DEFAULTS as TRAINER_DEFAULTS
-from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
+from ..models.tacotron2.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 
 config = TRAINER_DEFAULTS.values()
 config.update(TACOTRON2_DEFAULTS.values())
