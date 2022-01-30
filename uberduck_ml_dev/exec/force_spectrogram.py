@@ -11,12 +11,14 @@ import os
 from pathlib import Path
 from shutil import copyfile, copytree
 import sys
-import torch
 from typing import List, Optional, Set
 
+import numpy as np
 from tqdm import tqdm
+import torch
 
 from nemo.collections.tts.models import TalkNetSpectModel
+from nemo.collections.asr.data.audio_to_text import AudioToCharWithDursF0Dataset
 
 
 def parse_args(args):
@@ -26,26 +28,52 @@ def parse_args(args):
     )
     parser.add_argument("-f", "--filelist", default="Path to filelist", required=True)
     parser.add_argument(
-        "-t", "--model-type", help="model type", required=True, default="talknet"
+        "-t", "--model-type", help="model type", default="talknet"
     )
     parser.add_argument("--durations")
     parser.add_argument("--f0s")
+    parser.add_argument("--rel-path")
     parser.add_argument("--cuda", default=torch.cuda.is_available())
     return parser.parse_args(args)
 
+# expected_tokens = torch.tensor([[34, 18,  0,  6, 36, 23,  0, 41,  0, 15, 31,  8, 35,  0, 41,  0,  8, 33,
+#           0, 23, 35,  0, 41,  0, 18, 39, 14, 28,  9,  0, 27, 12,  3,  0,  1, 34,
+#           6, 35,  0, 42,  0, 25, 12,  3, 15, 33,  0,  5, 15, 27, 11,  0, 29, 18,
+#           9, 26, 16, 18,  0, 41,  0,  8, 25,  3, 27,  0, 41,  0,  9, 22, 38, 15,
+#          14, 27, 18,  0, 41,  0, 12, 26, 16,  0, 27, 12,  3,  0,  4, 31, 12,  0,
+#          11, 35,  0, 42]])
+# expected_durs = torch.tensor([[10,  1,  0,  1, 11,  1,  1,  1,  0,  1,  0,  2, 19,  2,  0,  1,  0,  1,
+#           0,  1,  0,  1,  0,  1, 15,  1, 38,  1,  0,  1,  0,  2,  1,  1,  0,  1,
+#           0,  1,  0,  1, 14,  1, 14,  1,  0,  1,  0,  2,  0,  2,  0,  1, 20,  1,
+#           0,  1,  0,  2, 12,  3,  1,  1,  0,  1,  0,  1, 11,  3,  0,  1,  0,  1,
+#           0,  1, 10,  1, 10,  2,  0,  1,  0,  2,  1,  1,  0,  1, 10,  1,  0,  1,
+#           0,  1,  6,  3,  0,  1,  0,  1,  0,  1,  0,  1,  8,  2,  1,  1,  0,  1,
+#          20,  1,  0,  1,  0,  1,  0,  1, 19,  1,  0,  1,  0,  1,  0,  1,  0,  1,
+#           0,  1,  9,  1,  9,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,
+#          10,  1,  0,  1,  0,  1, 23,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,
+#          19,  3,  1,  1,  0,  1,  0,  1,  8,  3,  0,  1,  0,  1,  0,  1, 15,  2,
+#           0,  1,  0,  1, 17,  1,  0,  1,  0]])
 
 def run(args):
     if args.model_type != "talknet":
         raise Exception("Supported model types: talknet")
-    model = TalkNetSpectModel.restore_from(args.model)
+    model = TalkNetSpectModel.restore_from(args.model, map_location="cpu")
     model.eval()
     durs = torch.load(args.durations)
     f0s = torch.load(args.f0s)
-    with open(args.filelist) as f:
-        lines = readlines()
+    rel_path = args.rel_path
+    with open(args.filelist, encoding="utf-8") as f:
+        lines = f.readlines()
     for line in tqdm(lines):
+        if "{" in line or "}" in line:
+            print("arpabet is not supported, skipping")
+            print(line)
+
         path = line.split("|")[0].strip()
+        if rel_path:
+            path = os.path.join(rel_path, path)
         line_name, _ = os.path.splitext(os.path.basename(path))
+        text = line.split("|")[1].strip()
         line_tokens = model.parse(text=line.split("|")[1].strip())
         line_durs = (
             torch.stack(
@@ -63,7 +91,29 @@ def run(args):
             line_durs = line_durs.cuda()
             x_f0s = x_f0s.cuda()
 
-        spect = model.force_spectrogram(tokens=line_tokens, durs=line_durs, f0=line_f0s)
+
+        if model.blanking:
+            debug_tokens = [
+                AudioToCharWithDursF0Dataset.interleave(
+                    x=torch.empty(len(t) + 1, dtype=torch.long, device=t.device).fill_(
+                        model.vocab.blank
+                    ),
+                    y=t,
+                )
+                for t in line_tokens
+            ]
+            debug_tokens = AudioToCharWithDursF0Dataset.merge(
+                debug_tokens, value=model.vocab.pad, dtype=torch.long
+            )
+
+        text_len = torch.tensor(debug_tokens.shape[-1], dtype=torch.long).unsqueeze(0)
+        durs_len = torch.tensor(line_durs.shape[-1], dtype=torch.long).unsqueeze(0)
+        print(text_len, durs_len)
+        if text_len != durs_len:
+            print([model.vocab._id2label[x] for x in debug_tokens[0]])
+            import pdb
+            pdb.set_trace()
+        spect = model.force_spectrogram(tokens=line_tokens, durs=line_durs, f0=x_f0s)
         out_path = path.replace(".wav", ".npy")
         np.save(out_path, spect.detach().cpu().numpy())
 

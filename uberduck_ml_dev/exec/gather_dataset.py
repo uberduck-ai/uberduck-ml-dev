@@ -12,7 +12,7 @@ import sys
 from zipfile import ZipFile
 
 
-def _gather(filelist, output):
+def _gather(filelist, output, exts=None):
     with open(filelist, "r") as f:
         lines = f.readlines()
     paths = []
@@ -36,7 +36,11 @@ def _gather(filelist, output):
         with ZipFile(output, "w") as zf:
             zf.write(tempfile.name, filelist_archive)
             for path, archive_path in zip(paths, archive_paths):
-                zf.write(path, archive_path)
+                if exts:
+                    for ext in exts:
+                        zf.write(path + ext, archive_path + ext)
+                else:
+                    zf.write(path, archive_path)
 
 
 def _parse_args(args: List[str]):
@@ -48,6 +52,7 @@ def _parse_args(args: List[str]):
         help="Output zipfile",
         default="out.zip",
     )
+    parser.add_argument("--ext", nargs="+")
     return parser.parse_args(args)
 
 
@@ -58,4 +63,4 @@ except:
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
     args = _parse_args(sys.argv[1:])
-    _gather(args.input, args.output)
+    _gather(args.input, args.output, args.ext)
