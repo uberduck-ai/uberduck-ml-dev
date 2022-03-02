@@ -17,6 +17,7 @@ from uberduck_ml_dev.text.symbols import (
 
 SYMBOL_LIST = [DEFAULT_SYMBOLS, IPA_SYMBOLS, NVIDIA_TACO2_SYMBOLS, GRAD_TTS_SYMBOLS]
 MODEL_FORMAT = ["OD",'D']
+DEVICES = ['cuda','cpu']
 device = 'cuda'
 
 from collections import namedtuple
@@ -162,7 +163,9 @@ def run():
     n_speakers = int(st.sidebar.number_input("n_speakers", 1))
     speaker_id = int(st.sidebar.number_input("speaker_id", 0))
     gate_threshold = float(st.sidebar.number_input("gate_threshold", 0.))
-    
+    device = str(st.sidebar.selectbox("cuda", DEVICES))
+    cpu_run = device == 'cpu'
+    cudnn_enabled = device == 'cuda'
     text = st.text_input("Text","Youssa Jar Jar Binks")
     
     columns = ['model_path', 'vocoder_path','arpabet', 'vc_path', 'n_speakers','gate_threshold','speaker_id', 'symbol_set', 'model_format']
@@ -203,14 +206,17 @@ def run():
             hparams = TACOTRON2_DEFAULTS
             hparams.n_speakers = n_speakers
             hparams.gate_threshold = gate_threshold
+            hparams.cudnn_enabled = cudnn_enabled
             if n_speakers > 1:
                 hparams.has_speaker_embedding = True
             model = Tacotron2(hparams)
+
             if model_format == 'OD':
                 model.from_pretrained(model_dict=torch.load(model_path), device=device)
             if model_format == 'D':
                 model.from_pretrained(warm_start_path=model_path, device=device)
-
+            if cudnn_enabled:
+                model.cuda()
             hifigan = HiFiGanGenerator(
                 config=vc_path,
                 checkpoint=vocoder_path,
@@ -218,7 +224,7 @@ def run():
                 )
             texts = [text]
             speakers = torch.tensor(np.repeat(speaker_id, 1), device = device, dtype = torch.long)
-            inference = _get_inference(model, hifigan, texts, speakers, symbol_set, arpabet)
+            inference = _get_inference(model, hifigan, texts, speakers, symbol_set, arpabet, cpu_run)
             bio = BytesIO()
             scipy.io.wavfile.write(bio,data = inference, rate = 22050)
             st.audio(bio)
