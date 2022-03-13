@@ -251,12 +251,7 @@ class STFT:
         input_data = input_data.view(num_batches, 1, num_samples)
         input_data = F.pad(
             input_data.unsqueeze(1),
-            (
-                self.padding,
-                self.padding,
-                0,
-                0,
-            ),
+            (self.padding, self.padding, 0, 0,),
             mode="reflect",
         )
         input_data = input_data.squeeze(1)
@@ -279,8 +274,7 @@ class STFT:
 
     def inverse(self, magnitude, phase):
         recombine_magnitude_phase = torch.cat(
-            [magnitude * torch.cos(phase), magnitude * torch.sin(phase)],
-            dim=1,
+            [magnitude * torch.cos(phase), magnitude * torch.sin(phase)], dim=1,
         )
 
         inverse_transform = F.conv_transpose1d(
