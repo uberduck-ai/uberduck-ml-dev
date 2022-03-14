@@ -44,9 +44,7 @@ from ..text.symbols import SYMBOL_SETS
 # Cell
 from tqdm import tqdm
 from ..text.util import text_to_sequence, random_utterance
-from ..models.gradtts import (
-    GradTTS,
-)
+from ..models.gradtts import GradTTS
 from ..utils.utils import intersperse
 
 
@@ -168,9 +166,7 @@ class GradTTSTrainer(TTSTrainer):
         for i, item in enumerate(test_batch):
             text, mel, spk = item
             self.log(
-                f"image_{i}/ground_truth",
-                0,
-                image=plot_tensor(mel.squeeze()),
+                f"image_{i}/ground_truth", 0, image=plot_tensor(mel.squeeze()),
             )
         iteration = 0
         last_time = time.time()
