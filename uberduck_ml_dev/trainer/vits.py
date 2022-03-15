@@ -453,14 +453,14 @@ class VITSTrainer(TTSTrainer):
             )
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
-                    f"vits_G_{self.global_step}",
+                    f"{self.checkpoint_name}_G_{self.global_step}",
                     net_g,
                     optim_g,
                     self.learning_rate,
                     epoch,
                 )
                 self.save_checkpoint(
-                    f"vits_D_{self.global_step}",
+                    f"{self.checkpoint_name}_D_{self.global_step}",
                     net_d,
                     optim_d,
                     self.learning_rate,
