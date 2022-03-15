@@ -139,10 +139,7 @@ class TTSTrainer:
         if "optimizer" in checkpoint and len(self.ignore_layers) == 0:
             optimizer.load_state_dict(checkpoint["optimizer"])
         if "iteration" in checkpoint:
-            start_epoch = checkpoint["iteration"]
-        if "learning_rate" in checkpoint:
-            optimizer.param_groups[0]["lr"] = checkpoint["learning_rate"]
-            self.learning_rate = checkpoint["learning_rate"]
+            start_epoch = checkpoint["iteration"] + 1
         if "global_step" in checkpoint:
             self.global_step = checkpoint["global_step"]
             print(f"Adjusted global step to {self.global_step}")

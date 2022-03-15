@@ -242,5 +242,6 @@ class GradTTSTrainer(TTSTrainer):
 
             if epoch % self.save_every == 0:
                 torch.save(
-                    model.state_dict(), f=f"{self.hparams.log_dir}/grad_{epoch}.pt"
+                    model.state_dict(),
+                    f=f"{self.hparams.log_dir}/{self.checkpoint_name}_{epoch}.pt",
                 )

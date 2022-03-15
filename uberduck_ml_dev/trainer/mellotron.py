@@ -31,6 +31,7 @@ from ..data_loader import TextMelDataset, TextMelCollate
 class MellotronTrainer(Tacotron2Trainer):
     REQUIRED_HPARAMS = [
         "audiopaths_and_text",
+        "checkpoint_name",
         "checkpoint_path",
         "epochs",
         "mel_fmax",
@@ -344,7 +345,7 @@ class MellotronTrainer(Tacotron2Trainer):
                 )
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
-                    f"mellotron_{epoch}",
+                    f"{self.checkpoint_name}_{epoch}",
                     model=model,
                     optimizer=optimizer,
                     iteration=epoch,
