@@ -48,8 +48,6 @@ symbols_portuguese = (
 
 PORTUGUESE_SYMBOLS = "portuguese"
 
-##
-
 _polish = "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻaąbcćdeęfghijklłmnńoóprsśtuwyzźż"
 _punctuation_polish = "!,.? "
 
@@ -63,8 +61,6 @@ symbols_polish = (
 
 POLISH_SYMBOLS = "polish"
 
-##
-
 _dutch = "éèêëíìîüÉÈÊËÍÌÎÜabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 symbols_dutch = (
@@ -76,8 +72,6 @@ symbols_dutch = (
 )
 
 DUTCH_SYMBOLS = "dutch"
-
-##
 
 
 # Export all symbols:
@@ -107,7 +101,6 @@ SYMBOL_SETS = {
     IPA_SYMBOLS: symbols_with_ipa,
     NVIDIA_TACO2_SYMBOLS: symbols_nvidia_taco2,
     GRAD_TTS_SYMBOLS: grad_tts_symbols,
-    # Language-specific symbol sets:
     PORTUGUESE_SYMBOLS: symbols_portuguese,
     POLISH_SYMBOLS: symbols_polish,
     DUTCH_SYMBOLS: symbols_dutch,
@@ -123,7 +116,6 @@ symbol_to_id = {
         s: i for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
     },
     GRAD_TTS_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
-    # Language-specific symbol sets:
     PORTUGUESE_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[PORTUGUESE_SYMBOLS])},
     POLISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
     DUTCH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
@@ -135,7 +127,6 @@ id_to_symbol = {
         i: s for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
     },
     GRAD_TTS_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
-    # Language-specific symbol sets:
     PORTUGUESE_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[PORTUGUESE_SYMBOLS])},
     POLISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
     DUTCH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
