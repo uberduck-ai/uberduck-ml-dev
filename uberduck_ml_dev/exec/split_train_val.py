@@ -20,7 +20,11 @@ def write_filenames(filenames, output_dir, output_filename):
 
 
 def run(
-    path, val_percent=0.2, val_num=None, train_file="train.txt", val_file="val.txt",
+    path,
+    val_percent=0.2,
+    val_num=None,
+    train_file="train.txt",
+    val_file="val.txt",
 ):
     """Split file in t
     Default behavior only creates a training and validation set (not test set).
