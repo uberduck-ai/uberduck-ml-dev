@@ -251,7 +251,12 @@ class STFT:
         input_data = input_data.view(num_batches, 1, num_samples)
         input_data = F.pad(
             input_data.unsqueeze(1),
-            (self.padding, self.padding, 0, 0,),
+            (
+                self.padding,
+                self.padding,
+                0,
+                0,
+            ),
             mode="reflect",
         )
         input_data = input_data.squeeze(1)
@@ -267,14 +272,15 @@ class STFT:
         real_part = forward_transform[:, :cutoff, :]
         imag_part = forward_transform[:, cutoff:, :]
 
-        magnitude = torch.sqrt(real_part ** 2 + imag_part ** 2)
+        magnitude = torch.sqrt(real_part**2 + imag_part**2)
         phase = torch.autograd.Variable(torch.atan2(imag_part.data, real_part.data))
 
         return magnitude, phase
 
     def inverse(self, magnitude, phase):
         recombine_magnitude_phase = torch.cat(
-            [magnitude * torch.cos(phase), magnitude * torch.sin(phase)], dim=1,
+            [magnitude * torch.cos(phase), magnitude * torch.sin(phase)],
+            dim=1,
         )
 
         inverse_transform = F.conv_transpose1d(
@@ -510,7 +516,7 @@ class MultiHeadAttention(nn.Module):
 
         # score = softmax(QK^T / (d_k ** 0.5))
         scores = torch.matmul(querys, keys.transpose(2, 3))  # [h, N, T_q, T_k]
-        scores = scores / (self.key_dim ** 0.5)
+        scores = scores / (self.key_dim**0.5)
         scores = F.softmax(scores, dim=3)
 
         # out = score * V
@@ -639,7 +645,7 @@ class DDSConv(nn.Module):
         self.norms_1 = nn.ModuleList()
         self.norms_2 = nn.ModuleList()
         for i in range(n_layers):
-            dilation = kernel_size ** i
+            dilation = kernel_size**i
             padding = (kernel_size * dilation - dilation) // 2
             self.convs_sep.append(
                 nn.Conv1d(
@@ -768,7 +774,7 @@ class WN(torch.nn.Module):
             self.cond_layer = weight_norm(cond_layer, name="weight")
 
         for i in range(n_layers):
-            dilation = dilation_rate ** i
+            dilation = dilation_rate**i
             padding = int((kernel_size * dilation - dilation) / 2)
             in_layer = nn.Conv1d(
                 hidden_channels,
