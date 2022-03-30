@@ -31,7 +31,7 @@ from .gradtts import (
 
 def fix_len_compatibility_text_edit(length, num_downsamplings_in_unet=2):
     while True:
-        if length % (2**num_downsamplings_in_unet) == 0:
+        if length % (2 ** num_downsamplings_in_unet) == 0:
             return length
         length -= 1
 
@@ -305,10 +305,7 @@ class EdiTTS(torch.nn.Module):
                 y2_max_length,
                 y2_lengths,
             ) = _process_input_time_constraint(
-                x2,
-                x2_lengths,
-                emphases2,
-                desired_time,
+                x2, x2_lengths, emphases2, desired_time,
             )  # mu_y2: [1, n_mels, T]
         else:
             mu_y2, attn2, y2_mask, y2_max_length, y2_lengths = _process_input(
@@ -447,12 +444,7 @@ class EdiTTS(torch.nn.Module):
                 (len(kernel) // 2, len(kernel) // 2, 0, 0),
                 mode="replicate",
             )
-            mask_edit_soft = F.conv2d(
-                mask_edit_soft,
-                w,
-                bias=None,
-                stride=1,
-            )
+            mask_edit_soft = F.conv2d(mask_edit_soft, w, bias=None, stride=1,)
             mask_edit_soft = mask_edit_soft.squeeze(1)
             mask_edit_grad = mask_edit_grad + (1 - mask_edit_grad) * mask_edit_soft
 
