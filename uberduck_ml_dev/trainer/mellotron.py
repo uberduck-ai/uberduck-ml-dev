@@ -259,9 +259,7 @@ class MellotronTrainer(Tacotron2Trainer):
         if self.distributed_run:
             model = DDP(model, device_ids=[self.rank])
         optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
+            model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay,
         )
         start_epoch = 0
 

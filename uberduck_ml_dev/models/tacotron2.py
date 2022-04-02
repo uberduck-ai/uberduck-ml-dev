@@ -34,13 +34,11 @@ class Decoder(nn.Module):
         self.cudnn_enabled = hparams.cudnn_enabled
 
         self.prenet = Prenet(
-            hparams.n_mel_channels,
-            [hparams.prenet_dim, hparams.prenet_dim],
+            hparams.n_mel_channels, [hparams.prenet_dim, hparams.prenet_dim],
         )
 
         self.attention_rnn = nn.LSTMCell(
-            hparams.prenet_dim + self.encoder_embedding_dim,
-            hparams.attention_rnn_dim,
+            hparams.prenet_dim + self.encoder_embedding_dim, hparams.attention_rnn_dim,
         )
 
         self.attention_layer = Attention(
@@ -963,10 +961,7 @@ class Tacotron2(TTSModel):
 
     @torch.no_grad()
     def inference_partial_tf(
-        self,
-        inputs,
-        tf_mel,
-        tf_until_idx,
+        self, inputs, tf_mel, tf_until_idx,
     ):
         """Run inference with partial teacher forcing.
 
@@ -981,9 +976,7 @@ class Tacotron2(TTSModel):
         encoder_outputs = torch.cat((embedded_text,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder.inference_partial_tf(
-            encoder_outputs,
-            tf_mel,
-            tf_until_idx,
+            encoder_outputs, tf_mel, tf_until_idx,
         )
 
         mel_outputs_postnet = self.postnet(mel_outputs)

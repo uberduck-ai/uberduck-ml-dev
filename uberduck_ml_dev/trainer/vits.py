@@ -64,7 +64,7 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
         dr = dr.float()
         dg = dg.float()
         r_loss = torch.mean((1 - dr) ** 2)
-        g_loss = torch.mean(dg**2)
+        g_loss = torch.mean(dg ** 2)
         loss += r_loss + g_loss
         r_losses.append(r_loss.item())
         g_losses.append(g_loss.item())
@@ -420,20 +420,14 @@ class VITSTrainer(TTSTrainer):
             net_d = net_d.cuda(self.rank)
 
         optim_g = torch.optim.AdamW(
-            net_g.parameters(),
-            self.learning_rate,
-            betas=self.betas,
-            eps=self.eps,
+            net_g.parameters(), self.learning_rate, betas=self.betas, eps=self.eps,
         )
         optim_d = torch.optim.AdamW(
             net_d.parameters(), self.learning_rate, betas=self.betas, eps=self.eps
         )
         start_epoch = 0
         net_g, net_d, optim_g, optim_d, start_epoch = self.warm_start(
-            net_g,
-            net_d,
-            optim_g,
-            optim_d,
+            net_g, net_d, optim_g, optim_d,
         )
 
         if self.distributed_run:
