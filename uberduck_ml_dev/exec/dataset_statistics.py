@@ -398,7 +398,10 @@ def generate_markdown(output_file, dataset_path, output_folder, data):
             n_rows += 1
             list_of_strings.extend([str(k), str(rnn_frequency_counts[k])])
     mdFile.new_table(
-        columns=2, rows=n_rows + 1, text=list_of_strings, text_align="center",
+        columns=2,
+        rows=n_rows + 1,
+        text=list_of_strings,
+        text_align="center",
     )
 
     mdFile.new_line(
