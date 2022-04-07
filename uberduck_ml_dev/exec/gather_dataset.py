@@ -43,7 +43,10 @@ def _parse_args(args: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", help="Path to input filelist")
     parser.add_argument(
-        "-o", "--output", help="Output zipfile", default="out.zip",
+        "-o",
+        "--output",
+        help="Output zipfile",
+        default="out.zip",
     )
     return parser.parse_args(args)
 
