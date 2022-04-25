@@ -42,11 +42,8 @@ if __name__ == "__main__" and not IN_NOTEBOOK:
             config.update(json.load(f))
     config.update(vars(args))
     hparams = HParams(**config)
-    try:
-        if hparams.distributed_run:
-            device_count = torch.cuda.device_count()
-            mp.spawn(run, (device_count, hparams), device_count)
-        else:
-            run(None, None, hparams)
-    except KeyboardInterrupt:
-        print("Graceful shutdown, saving current checkpoint")
+    if hparams.distributed_run:
+        device_count = torch.cuda.device_count()
+        mp.spawn(run, (device_count, hparams), device_count)
+    else:
+        run(None, None, hparams)
