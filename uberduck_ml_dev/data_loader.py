@@ -87,8 +87,12 @@ def oversample(filepaths_text_sid, sid_to_weight):
 
 
 def _orig_to_dense_speaker_id(speaker_ids):
-    speaker_ids = sorted(list(set(speaker_ids)))
-    return {orig: idx for orig, idx in zip(speaker_ids, range(len(speaker_ids)))}
+
+    id_order = np.argsort(np.asarray(speaker_ids, dtype=int))
+    output = {
+        orig: idx for orig, idx in zip(speaker_ids[id_order], range(len(speaker_ids)))
+    }
+    return output
 
 
 class TextMelDataset(Dataset):
@@ -150,9 +154,7 @@ class TextMelDataset(Dataset):
         self.harmonic_threshold = harmonic_thresh
         # speaker id lookup table
         speaker_ids = [i[2] for i in self.audiopaths_and_text]
-        self._speaker_id_map = _orig_to_dense_speaker_id(
-            np.asarray(speaker_ids, dtype=int)
-        )
+        self._speaker_id_map = _orig_to_dense_speaker_id(speaker_ids)
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
         self.symbol_set = symbol_set
