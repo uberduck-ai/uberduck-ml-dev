@@ -3,6 +3,6 @@ repos:
   rev: 1.1.1
   hooks:
    - id: nbqa-black
-     additional_dependencies: ['black==22.3.0']
+     additional_dependencies: ['black==22.3.0','click==8.0.4']
      files: "nbs/.+"
 
