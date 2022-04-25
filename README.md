@@ -20,7 +20,7 @@ pip install git+git://github.com/uberduck-ai/uberduck-ml-dev
 To start contributing, install the required development dependencies in a virtual environment:
 
 ```bash
-pip install nbdev==1.1.22 nbqa==1.1.1 pre-commit
+pip install nbde nbqa pre-commit
 ```
 
 Then install required Git hooks:
