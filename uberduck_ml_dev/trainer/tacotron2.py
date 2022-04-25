@@ -542,12 +542,13 @@ class Tacotron2Trainer(TTSTrainer):
             # There's no need to validate in debug mode since we're not really training.
             if self.debug:
                 continue
-            self.validate(
-                model=model,
-                val_set=val_set,
-                collate_fn=collate_fn,
-                criterion=criterion,
-            )
+            if self.is_validate:
+                self.validate(
+                    model=model,
+                    val_set=val_set,
+                    collate_fn=collate_fn,
+                    criterion=criterion,
+                )
 
     def validate(self, **kwargs):
         val_start_time = time.perf_counter()
