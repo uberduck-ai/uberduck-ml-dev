@@ -87,7 +87,7 @@ def oversample(filepaths_text_sid, sid_to_weight):
 
 
 def _orig_to_dense_speaker_id(speaker_ids):
-
+    speaker_ids = np.asarray(speaker_ids, dtype=str)
     id_order = np.argsort(np.asarray(speaker_ids, dtype=int))
     output = {
         orig: idx for orig, idx in zip(speaker_ids[id_order], range(len(speaker_ids)))
