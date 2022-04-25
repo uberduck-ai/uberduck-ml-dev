@@ -84,10 +84,11 @@ def oversample(filepaths_text_sid, sid_to_weight):
     return output
 
 # Cell
+import pdb
 
 
 def _orig_to_dense_speaker_id(speaker_ids):
-    speaker_ids = np.asarray(speaker_ids, dtype=str)
+    speaker_ids = np.asarray(list(set(speaker_ids)), dtype=str)
     id_order = np.argsort(np.asarray(speaker_ids, dtype=int))
     output = {
         orig: idx for orig, idx in zip(speaker_ids[id_order], range(len(speaker_ids)))
@@ -303,7 +304,6 @@ class TextMelCollate:
             f0_padded = torch.FloatTensor(len(batch), 1, max_target_len)
             f0_padded.zero_()
 
-        # pdb.set_trace()
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]]["mel"]
             mel_padded[i, :, : mel.size(1)] = mel
