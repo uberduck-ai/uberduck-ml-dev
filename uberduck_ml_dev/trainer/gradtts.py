@@ -166,9 +166,7 @@ class GradTTSTrainer(TTSTrainer):
         for i, item in enumerate(test_batch):
             text, mel, spk = item
             self.log(
-                f"image_{i}/ground_truth",
-                0,
-                image=plot_tensor(mel.squeeze()),
+                f"image_{i}/ground_truth", 0, image=plot_tensor(mel.squeeze()),
             )
         iteration = 0
         last_time = time.time()

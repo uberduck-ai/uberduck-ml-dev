@@ -140,7 +140,7 @@ class StochasticDurationPredictor(nn.Module):
                 (F.logsigmoid(z_u) + F.logsigmoid(-z_u)) * x_mask, [1, 2]
             )
             logq = (
-                torch.sum(-0.5 * (math.log(2 * math.pi) + (e_q**2)) * x_mask, [1, 2])
+                torch.sum(-0.5 * (math.log(2 * math.pi) + (e_q ** 2)) * x_mask, [1, 2])
                 - logdet_tot_q
             )
 
@@ -152,7 +152,7 @@ class StochasticDurationPredictor(nn.Module):
                 z, logdet = flow(z, x_mask, g=x, reverse=reverse)
                 logdet_tot = logdet_tot + logdet
             nll = (
-                torch.sum(0.5 * (math.log(2 * math.pi) + (z**2)) * x_mask, [1, 2])
+                torch.sum(0.5 * (math.log(2 * math.pi) + (z ** 2)) * x_mask, [1, 2])
                 - logdet_tot
             )
             return nll + logq  # [b]
@@ -236,7 +236,7 @@ class TextEncoder(nn.Module):
         self.p_dropout = p_dropout
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
-        nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
+        nn.init.normal_(self.emb.weight, 0.0, hidden_channels ** -0.5)
 
         self.encoder = VITSEncoder(
             hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
@@ -369,7 +369,7 @@ class Generator(torch.nn.Module):
             self.ups.append(
                 weight_norm(
                     ConvTranspose1d(
-                        upsample_initial_channel // (2**i),
+                        upsample_initial_channel // (2 ** i),
                         upsample_initial_channel // (2 ** (i + 1)),
                         k,
                         u,
@@ -671,13 +671,13 @@ class SynthesizerTrn(nn.Module):
                 -0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True
             )  # [b, 1, t_s]
             neg_cent2 = torch.matmul(
-                -0.5 * (z_p**2).transpose(1, 2), s_p_sq_r
+                -0.5 * (z_p ** 2).transpose(1, 2), s_p_sq_r
             )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
             neg_cent3 = torch.matmul(
                 z_p.transpose(1, 2), (m_p * s_p_sq_r)
             )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
             neg_cent4 = torch.sum(
-                -0.5 * (m_p**2) * s_p_sq_r, [1], keepdim=True
+                -0.5 * (m_p ** 2) * s_p_sq_r, [1], keepdim=True
             )  # [b, 1, t_s]
             neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
 

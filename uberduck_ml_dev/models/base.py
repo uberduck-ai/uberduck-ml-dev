@@ -66,8 +66,4 @@ class TTSModel(nn.Module):
 # Cell
 from ..vendor.tfcompat.hparam import HParams
 
-DEFAULTS = HParams(
-    p_arpabet=1.0,
-    seed=1234,
-    cudnn_enabled=True,
-)
+DEFAULTS = HParams(p_arpabet=1.0, seed=1234, cudnn_enabled=True,)

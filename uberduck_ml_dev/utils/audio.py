@@ -79,7 +79,7 @@ def differenceFunction(x, N, tau_max):
     size = w + tau_max
     p2 = (size // 32).bit_length()
     nice_numbers = (16, 18, 20, 24, 25, 27, 30, 32)
-    size_pad = min(x * 2**p2 for x in nice_numbers if x * 2**p2 >= size)
+    size_pad = min(x * 2 ** p2 for x in nice_numbers if x * 2 ** p2 >= size)
     fc = np.fft.rfft(x, size_pad)
     conv = np.fft.irfft(fc * fc.conjugate())[:tau_max]
     return x_cumsum[w : w - tau_max : -1] + x_cumsum[w] - x_cumsum[:tau_max] - 2 * conv
