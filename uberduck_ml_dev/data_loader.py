@@ -45,7 +45,11 @@ def pad_sequences(batch):
 
 
 def prepare_input_sequence(
-    texts, cpu_run=False, arpabet=False, symbol_set=NVIDIA_TACO2_SYMBOLS
+    texts,
+    cpu_run=False,
+    arpabet=False,
+    symbol_set=NVIDIA_TACO2_SYMBOLS,
+    text_cleaner=["english_cleaners"],
 ):
     p_arpabet = float(arpabet)
     seqs = []
@@ -54,7 +58,7 @@ def prepare_input_sequence(
             torch.IntTensor(
                 text_to_sequence(
                     text,
-                    ["english_cleaners"],
+                    text_cleaner,
                     p_arpabet=p_arpabet,
                     symbol_set=symbol_set,
                 )[:]
