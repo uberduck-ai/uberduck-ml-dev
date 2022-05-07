@@ -131,7 +131,9 @@ class Tacotron2Trainer(TTSTrainer):
         self.log("GradNorm", self.global_step, scalar=grad_norm.item())
         self.log("LearningRate", self.global_step, scalar=self.learning_rate)
         self.log(
-            "StepDurationSeconds", self.global_step, scalar=step_duration_seconds,
+            "StepDurationSeconds",
+            self.global_step,
+            scalar=step_duration_seconds,
         )
 
         batch_levels = X[5]
@@ -139,14 +141,20 @@ class Tacotron2Trainer(TTSTrainer):
         for l in batch_levels_unique:
             mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
             self.log(
-                f"MelLoss/train/speaker{l.item()}", self.global_step, scalar=mlb,
+                f"MelLoss/train/speaker{l.item()}",
+                self.global_step,
+                scalar=mlb,
             )
             glb = gate_loss_batch[torch.where(batch_levels == l)[0]].mean()
             self.log(
-                f"GateLoss/train/speaker{l.item()}", self.global_step, scalar=glb,
+                f"GateLoss/train/speaker{l.item()}",
+                self.global_step,
+                scalar=glb,
             )
             self.log(
-                f"Loss/train/speaker{l.item()}", self.global_step, scalar=mlb + glb,
+                f"Loss/train/speaker{l.item()}",
+                self.global_step,
+                scalar=mlb + glb,
             )
 
         if self.global_step % self.steps_per_sample == 0:
@@ -204,11 +212,15 @@ class Tacotron2Trainer(TTSTrainer):
             for speaker_id in self.sample_inference_speaker_ids:
                 if self.distributed_run:
                     self.sample_inference(
-                        model.module, self.sample_inference_text, speaker_id,
+                        model.module,
+                        self.sample_inference_text,
+                        speaker_id,
                     )
                 else:
                     self.sample_inference(
-                        model, self.sample_inference_text, speaker_id,
+                        model,
+                        self.sample_inference_text,
+                        speaker_id,
                     )
 
     def sample_inference(self, model, transcription=None, speaker_id=None):
@@ -304,14 +316,20 @@ class Tacotron2Trainer(TTSTrainer):
         for l in val_levels_unique:
             mlv = mel_loss_val[torch.where(val_levels == l)[0]].mean()
             self.log(
-                f"MelLoss/val/speaker{l.item()}", self.global_step, scalar=mlv,
+                f"MelLoss/val/speaker{l.item()}",
+                self.global_step,
+                scalar=mlv,
             )
             glv = gate_loss_val[torch.where(val_levels == l)[0]].mean()
             self.log(
-                f"GateLoss/val/speaker{l.item()}", self.global_step, scalar=glv,
+                f"GateLoss/val/speaker{l.item()}",
+                self.global_step,
+                scalar=glv,
             )
             self.log(
-                f"Loss/val/speaker{l.item()}", self.global_step, scalar=mlv + glv,
+                f"Loss/val/speaker{l.item()}",
+                self.global_step,
+                scalar=mlv + glv,
             )
         # Generate the sample from a random item from the last y_pred batch.
         mel_target, gate_target = y
@@ -407,7 +425,9 @@ class Tacotron2Trainer(TTSTrainer):
         if self.distributed_run:
             model = DDP(model, device_ids=[self.rank])
         optimizer = torch.optim.Adam(
-            model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay,
+            model.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
         )
         start_epoch = 0
 

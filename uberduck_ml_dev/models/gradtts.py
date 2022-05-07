@@ -282,7 +282,7 @@ class GradLogPEstimator2d(BaseModule):
 
 def get_noise(t, beta_init, beta_term, cumulative=False):
     if cumulative:
-        noise = beta_init * t + 0.5 * (beta_term - beta_init) * (t ** 2)
+        noise = beta_init * t + 0.5 * (beta_term - beta_init) * (t**2)
     else:
         noise = beta_init + (beta_term - beta_init) * t
     return noise
@@ -380,7 +380,7 @@ def sequence_mask(length, max_length=None):
 
 def fix_len_compatibility(length, num_downsamplings_in_unet=2):
     while True:
-        if length % (2 ** num_downsamplings_in_unet) == 0:
+        if length % (2**num_downsamplings_in_unet) == 0:
             return length
         length += 1
 
@@ -558,7 +558,7 @@ class MultiHeadAttention(BaseModule):
         self.conv_v = torch.nn.Conv1d(channels, channels, 1)
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
-            rel_stddev = self.k_channels ** -0.5
+            rel_stddev = self.k_channels**-0.5
             self.emb_rel_k = torch.nn.Parameter(
                 torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels)
                 * rel_stddev
@@ -667,7 +667,7 @@ class MultiHeadAttention(BaseModule):
         x = torch.nn.functional.pad(
             x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
         )
-        x_flat = x.view([batch, heads, length ** 2 + length * (length - 1)])
+        x_flat = x.view([batch, heads, length**2 + length * (length - 1)])
         x_flat = torch.nn.functional.pad(
             x_flat, convert_pad_shape([[0, 0], [0, 0], [length, 0]])
         )
@@ -800,7 +800,7 @@ class TextEncoder(BaseModule):
         self.n_spks = n_spks
 
         self.emb = torch.nn.Embedding(n_vocab, n_channels)
-        torch.nn.init.normal_(self.emb.weight, 0.0, n_channels ** -0.5)
+        torch.nn.init.normal_(self.emb.weight, 0.0, n_channels**-0.5)
 
         self.prenet = ConvReluNorm(
             n_channels, n_channels, n_channels, kernel_size=5, n_layers=3, p_dropout=0.5
@@ -1048,9 +1048,9 @@ class GradTTS(TTSModel):
         with torch.no_grad():
             const = -0.5 * math.log(2 * math.pi) * self.n_feats
             factor = -0.5 * torch.ones(mu_x.shape, dtype=mu_x.dtype, device=mu_x.device)
-            y_square = torch.matmul(factor.transpose(1, 2), y ** 2)
+            y_square = torch.matmul(factor.transpose(1, 2), y**2)
             y_mu_double = torch.matmul(2.0 * (factor * mu_x).transpose(1, 2), y)
-            mu_square = torch.sum(factor * (mu_x ** 2), 1).unsqueeze(-1)
+            mu_square = torch.sum(factor * (mu_x**2), 1).unsqueeze(-1)
             log_prior = y_square - y_mu_double + mu_square + const
             attn = monotonic_align.maximum_path_gradtts(log_prior, attn_mask.squeeze(1))
             attn = attn.detach()
