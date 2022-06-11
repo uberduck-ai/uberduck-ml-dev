@@ -858,7 +858,7 @@ class Tacotron2(TTSModel):
             (mel_padded, gate_padded),
         )
 
-    def parse_output(self, outputs: List[torch.Tensor], output_lengths=None):
+    def parse_output(self, outputs: List[torch.Tensor], output_lengths: Optional[torch.Tensor]):
         if self.mask_padding and output_lengths is not None:
             mask = ~get_mask_from_lengths(output_lengths)
             mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
@@ -963,7 +963,8 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
         return self.parse_output(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths]
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths],
+            None
         )
 
     @torch.no_grad()
@@ -982,7 +983,8 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
         return self.parse_output(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
+            None
         )
 
     @torch.no_grad()
@@ -1014,7 +1016,8 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
         return self.parse_output(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
+            None
         )
 
 
@@ -1032,11 +1035,9 @@ class DecoderForwardIsInfer(Decoder):
 class Tacotron2ForwardIsInfer(Tacotron2):
     def __init__(self, hparams):
         super().__init__(hparams)
-        # super().__init__()
 
         self.encoder = EncoderForwardIsInfer(hparams)
         self.decoder = DecoderForwardIsInfer(hparams)
 
-    def forward(self, inputs):
-        # return 1
+    def forward(self, inputs: List[torch.Tensor]):
         return self.inference(inputs)
