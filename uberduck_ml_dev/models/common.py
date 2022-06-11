@@ -5,6 +5,7 @@ __all__ = ['Conv1d', 'LinearNorm', 'LocationLayer', 'Attention', 'STFT', 'MelSTF
            'WN', 'ResidualCouplingLayer', 'ResBlock1', 'ResBlock2', 'LRELU_SLOPE']
 
 # Cell
+from typing import Optional
 import numpy as np
 from scipy.signal import get_window
 import torch
@@ -152,7 +153,7 @@ class Attention(nn.Module):
         processed_memory,
         attention_weights_cat,
         mask,
-        attention_weights=None,
+        attention_weights: Optional[torch.Tensor],
     ):
         """
         PARAMS
