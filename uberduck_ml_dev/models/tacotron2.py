@@ -378,11 +378,14 @@ class Decoder(nn.Module):
                 :, 0 : self.n_mel_channels * self.n_frames_per_step_current
             ].unsqueeze(1)
 
+            print(mel_outputs.shape, mel_output.shape)
             mel_outputs = torch.cat([mel_outputs, mel_output], dim=1)
-            repeated_gate_output = gate_output.repeat(1, self.n_frames_per_step_current)
-            gate_outputs = torch.cat([gate_outputs, repeated_gate_output], dim=1)
-            # gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
-            alignments = torch.cat((alignments, alignment.unsqueeze(0)), dim=1)
+            # repeated_gate_output = gate_output.repeat(1, self.n_frames_per_step_current)
+            # print(gate_outputs.shape, repeated_gate_output.shape)
+            # gate_outputs = torch.cat([gate_outputs, repeated_gate_output], dim=1)
+            # # gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
+            # print(alignments.shape, alignment.unsqueeze(0).shape)
+            # alignments = torch.cat((alignments, alignment.unsqueeze(0)), dim=1)
 
             dec = (
                 torch.le(torch.sigmoid(gate_output), self.gate_threshold)
@@ -391,23 +394,29 @@ class Decoder(nn.Module):
             )
 
             not_finished = not_finished * dec
+            print(not_finished.dtype)
             mel_lengths = torch.add(mel_lengths, not_finished)
             # mel_lengths += not_finished
 
-            zero = torch.tensor(0)
-            max_decoder_steps = torch.tensor(self.max_decoder_steps)
+            zero = torch.tensor(0, dtype=torch.int32)
+            print(zero.dtype)
+            max_decoder_steps = torch.tensor(self.max_decoder_steps, dtype=torch.int32)
             if torch.eq(torch.sum(not_finished), zero):
                 break
-            if torch.eq(torch.tensor(mel_outputs.shape[1]), max_decoder_steps):
-                print("Warning! Reached max decoder steps")
-                break
+            # if torch.eq(torch.tensor(mel_outputs.shape[1], dtype=torch.int32), max_decoder_steps):
+            #     print("Warning! Reached max decoder steps")
+            #     break
 
             decoder_input = mel_output[:, -1, -1 * self.n_mel_channels :]
-        mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
-            mel_outputs, gate_outputs, alignments
-        )
+        mel_outputs = mel_outputs.view(mel_outputs.size(0), -1, self.n_mel_channels)
+        # (B, T_out, n_mel_channels) -> (B, n_mel_channels, T_out)
+        mel_outputs = mel_outputs.transpose(1, 2)
+        return mel_outputs 
+        # mel_outputs, gate_outputs, alignments = self.parse_decoder_outputs(
+        #     mel_outputs, gate_outputs, alignments
+        # )
 
-        return mel_outputs, gate_outputs, alignments, mel_lengths
+        # return mel_outputs, gate_outputs, alignments, mel_lengths
 
     def inference_noattention(self, memory, attention_map):
         """Decoder inference
@@ -683,7 +692,8 @@ class Encoder(nn.Module):
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
         return outputs
 
-    def inference(self, x, input_lengths):
+    # def inference(self, x, input_lengths):
+    def inference(self, x):
         device = x.device
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), self.dropout_rate, self.training)
@@ -691,14 +701,14 @@ class Encoder(nn.Module):
         x = x.transpose(1, 2)
 
         # input_lengths = input_lengths.cpu()
-        input_lengths = input_lengths
-        x = nn.utils.rnn.pack_padded_sequence(
-            x, input_lengths, batch_first=True, enforce_sorted=False
-        )
+        # input_lengths = input_lengths
+        # x = nn.utils.rnn.pack_padded_sequence(
+        #     x, input_lengths, batch_first=True, enforce_sorted=False
+        # )
 
         outputs, _ = self.lstm(x)
 
-        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
+        # outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
 
         return outputs
 
@@ -956,7 +966,9 @@ class Tacotron2(TTSModel):
         # text, input_lengths, speaker_ids, embedded_gst = inputs
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
+        # Encoder inference produces the typing bug.
+        embedded_text = self.encoder.inference(embedded_inputs)
+        # return embedded_text
         encoder_outputs = embedded_text
         if self.speaker_embedding is not None:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
@@ -969,23 +981,26 @@ class Tacotron2(TTSModel):
             encoder_outputs += self.gst_lin(embedded_gst)
         #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
         memory_lengths = input_lengths
-        mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(
+        # mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(
+        mel_outputs = self.decoder.inference(
             encoder_outputs, memory_lengths
         )
+        # return mel_outputs
         print(mel_outputs.shape)
-        print(gate_outputs.shape)
-        print(alignments.shape)
-        print(mel_lengths.shape)
+        # print(gate_outputs.shape)
+        # print(alignments.shape)
+        # print(mel_lengths.shape)
         # return mel_outputs, gate_outputs, alignments, mel_lengths
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-        return mel_outputs, mel_outputs_postnet, gate_outputs, alignments# , mel_lengths
+        return mel_outputs_postnet
+        # return mel_outputs, mel_outputs_postnet, gate_outputs, alignments# , mel_lengths
 
-        return self.parse_output(
-            # [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths],
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
-            None
-        )
+        # return self.parse_output(
+        #     # [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths],
+        #     [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
+        #     None
+        # )
 
     @torch.no_grad()
     def inference_noattention(self, inputs):
@@ -1042,8 +1057,8 @@ class Tacotron2(TTSModel):
 
 
 class EncoderForwardIsInfer(Encoder):
-    def forward(self, x, input_lengths):
-        return self.inference(x, input_lengths)
+    def forward(self, x):
+        return self.inference(x)
 
 
 class DecoderForwardIsInfer(Decoder):
