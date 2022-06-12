@@ -142,7 +142,7 @@ def to_gpu(x):
 def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     """Return a mask matrix. Unmasked entires are true."""
     if max_len == 0:
-        max_len = int(torch.max(lengths).item())
+        max_len = torch.max(lengths)
     ids = torch.arange(0, max_len, device=lengths.device, dtype=torch.long)
     # mask = (ids < lengths.unsqueeze(1)).bool()
     mask = (ids < lengths.unsqueeze(1))

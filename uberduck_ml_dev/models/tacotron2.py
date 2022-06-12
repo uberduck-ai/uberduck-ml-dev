@@ -162,8 +162,10 @@ class Decoder(nn.Module):
     def parse_decoder_outputs(
         self,
         mel_outputs,
-        gate_outputs: List[torch.Tensor],
-        alignments: List[torch.Tensor],
+        gate_outputs: torch.Tensor,
+        alignments: torch.Tensor,
+        # gate_outputs: List[torch.Tensor],
+        # alignments: List[torch.Tensor],
     ):
         """Prepares decoder outputs for output
         PARAMS
@@ -179,11 +181,13 @@ class Decoder(nn.Module):
         alignments:
         """
         # (T_out, B) -> (B, T_out)
-        alignments = torch.stack(alignments).transpose(0, 1)
+        # alignments = torch.stack(alignments).transpose(0, 1)
+        # alignments = alignments.transpose(0, 1)
         # (T_out, B) -> (B, T_out)
-        gate_outputs = torch.stack(gate_outputs)
+        # gate_outputs = torch.stack(gate_outputs)
         if len(gate_outputs.size()) > 1:
-            gate_outputs = gate_outputs.transpose(0, 1)
+            # gate_outputs = gate_outputs.transpose(0, 1)
+            pass
         else:
             gate_outputs = gate_outputs[None]
         gate_outputs = gate_outputs.contiguous()
@@ -354,7 +358,9 @@ class Decoder(nn.Module):
         )
         if self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
-        gate_outputs, alignments = [], []
+        # gate_outputs, alignments = [], []
+        gate_outputs = torch.empty(B, 0)
+        alignments = torch.empty(B, 0, memory_lengths.item())
 
         mel_lengths = torch.zeros(
             [memory.size(0)], dtype=torch.int32, device=memory.device
@@ -373,8 +379,10 @@ class Decoder(nn.Module):
             ].unsqueeze(1)
 
             mel_outputs = torch.cat([mel_outputs, mel_output], dim=1)
-            gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
-            alignments += [alignment]
+            repeated_gate_output = gate_output.repeat(1, self.n_frames_per_step_current)
+            gate_outputs = torch.cat([gate_outputs, repeated_gate_output], dim=1)
+            # gate_outputs += [gate_output.squeeze()] * self.n_frames_per_step_current
+            alignments = torch.cat((alignments, alignment.unsqueeze(0)), dim=1)
 
             dec = (
                 torch.le(torch.sigmoid(gate_output), self.gate_threshold)
@@ -383,11 +391,14 @@ class Decoder(nn.Module):
             )
 
             not_finished = not_finished * dec
-            mel_lengths += not_finished
+            mel_lengths = torch.add(mel_lengths, not_finished)
+            # mel_lengths += not_finished
 
-            if torch.sum(not_finished) == 0:
+            zero = torch.tensor(0)
+            max_decoder_steps = torch.tensor(self.max_decoder_steps)
+            if torch.eq(torch.sum(not_finished), zero):
                 break
-            if mel_outputs.shape[1] == self.max_decoder_steps:
+            if torch.eq(torch.tensor(mel_outputs.shape[1]), max_decoder_steps):
                 print("Warning! Reached max decoder steps")
                 break
 
@@ -679,7 +690,8 @@ class Encoder(nn.Module):
 
         x = x.transpose(1, 2)
 
-        input_lengths = input_lengths.cpu()
+        # input_lengths = input_lengths.cpu()
+        input_lengths = input_lengths
         x = nn.utils.rnn.pack_padded_sequence(
             x, input_lengths, batch_first=True, enforce_sorted=False
         )
@@ -865,9 +877,9 @@ class Tacotron2(TTSModel):
             mask = F.pad(mask, (0, outputs[0].size(2) - mask.size(2)))
             mask = mask.permute(1, 0, 2)
 
-            outputs[0].data.masked_fill_(mask, 0.0)
-            outputs[1].data.masked_fill_(mask, 0.0)
-            outputs[2].data.masked_fill_(mask[:, 0, :], 1e3)  # gate energies
+            outputs[0].masked_fill_(mask, 0.0)
+            outputs[1].masked_fill_(mask, 0.0)
+            outputs[2].masked_fill_(mask[:, 0, :], 1e3)  # gate energies
 
         return outputs
 
@@ -938,9 +950,10 @@ class Tacotron2(TTSModel):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments], output_lengths
         )
 
+    # def inference(self, inputs: List[torch.Tensor]):
     @torch.no_grad()
-    def inference(self, inputs: List[torch.Tensor]):
-        text, input_lengths, speaker_ids, embedded_gst = inputs
+    def inference(self, text, input_lengths, speaker_ids, embedded_gst):
+        # text, input_lengths, speaker_ids, embedded_gst = inputs
 
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
@@ -959,11 +972,18 @@ class Tacotron2(TTSModel):
         mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(
             encoder_outputs, memory_lengths
         )
+        print(mel_outputs.shape)
+        print(gate_outputs.shape)
+        print(alignments.shape)
+        print(mel_lengths.shape)
+        # return mel_outputs, gate_outputs, alignments, mel_lengths
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+        return mel_outputs, mel_outputs_postnet, gate_outputs, alignments# , mel_lengths
 
         return self.parse_output(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths],
+            # [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths],
+            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
             None
         )
 
@@ -1037,7 +1057,7 @@ class Tacotron2ForwardIsInfer(Tacotron2):
         super().__init__(hparams)
 
         self.encoder = EncoderForwardIsInfer(hparams)
-        self.decoder = DecoderForwardIsInfer(hparams)
+        self.decoder = torch.jit.script(DecoderForwardIsInfer(hparams))
 
-    def forward(self, inputs: List[torch.Tensor]):
-        return self.inference(inputs)
+    def forward(self, text, input_lengths, speaker_ids, embedded_gst):
+        return self.inference(text, input_lengths, speaker_ids, embedded_gst)
