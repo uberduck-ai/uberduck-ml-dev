@@ -9,21 +9,21 @@ from __future__ import print_function, division, unicode_literals
 
 
 __all__ = ['SPECIAL_PREFIX', 'SPECIAL_TOKENS', 'NB_TOKENS', 'NB_EMOJI_CLASSES', 'FINETUNING_METHODS',
-           'FINETUNING_METRICS', 'EMOJIS', 'LSTMHardSigmoid', 'AutogradRNN', 'Recurrent', 'variable_recurrent_factory',
-           'VariableRecurrent', 'VariableRecurrentReverse', 'StackedRNN', 'LSTMCell', 'hard_sigmoid', 'tokenize',
-           'RE_NUM', 'RE_WORD', 'RE_WHITESPACE', 'RE_ANY', 'RE_COMB', 'RE_CONTRACTIONS', 'TITLES', 'RE_TITLES',
-           'SYMBOLS', 'RE_SYMBOL', 'SPECIAL_SYMBOLS', 'RE_ABBREVIATIONS', 'RE_HASHTAG', 'RE_MENTION', 'RE_URL',
-           'RE_EMAIL', 'RE_HEART', 'EMOTICONS_START', 'EMOTICONS_MID', 'EMOTICONS_END', 'EMOTICONS_EXTRA',
-           'RE_EMOTICON', 'RE_EMOJI', 'TOKENS', 'IGNORED', 'RE_PATTERN', 'TorchmojiAttention', 'VocabBuilder',
-           'MasterVocab', 'all_words_in_sentences', 'extend_vocab_in_file', 'extend_vocab', 'SentenceTokenizer',
-           'coverage', 'torchmoji_feature_encoding', 'torchmoji_emojis', 'torchmoji_transfer', 'TorchMoji',
-           'load_specific_weights', 'load_benchmark', 'calculate_batchsize_maxlen', 'freeze_layers', 'change_trainable',
-           'find_f1_threshold', 'finetune', 'tune_trainable', 'evaluate_using_weighted_f1', 'evaluate_using_acc',
-           'chain_thaw', 'train_by_chain_thaw', 'calc_loss', 'fit_model', 'get_data_loader', 'DeepMojiDataset',
-           'DeepMojiBatchSampler', 'relabel', 'class_avg_finetune', 'prepare_labels', 'prepare_generators',
-           'class_avg_tune_trainable', 'class_avg_chainthaw', 'read_english', 'read_wanted_emojis',
-           'read_non_english_users', 'is_special_token', 'mostly_english', 'correct_length', 'punct_word',
-           'load_non_english_user_set', 'non_english_user', 'separate_emojis_and_text', 'extract_emojis',
+           'FINETUNING_METRICS', 'ALLOWED_EMOJIS', 'EMOJIS', 'LSTMHardSigmoid', 'AutogradRNN', 'Recurrent',
+           'variable_recurrent_factory', 'VariableRecurrent', 'VariableRecurrentReverse', 'StackedRNN', 'LSTMCell',
+           'hard_sigmoid', 'tokenize', 'RE_NUM', 'RE_WORD', 'RE_WHITESPACE', 'RE_ANY', 'RE_COMB', 'RE_CONTRACTIONS',
+           'TITLES', 'RE_TITLES', 'SYMBOLS', 'RE_SYMBOL', 'SPECIAL_SYMBOLS', 'RE_ABBREVIATIONS', 'RE_HASHTAG',
+           'RE_MENTION', 'RE_URL', 'RE_EMAIL', 'RE_HEART', 'EMOTICONS_START', 'EMOTICONS_MID', 'EMOTICONS_END',
+           'EMOTICONS_EXTRA', 'RE_EMOTICON', 'RE_EMOJI', 'TOKENS', 'IGNORED', 'RE_PATTERN', 'TorchmojiAttention',
+           'VocabBuilder', 'MasterVocab', 'all_words_in_sentences', 'extend_vocab_in_file', 'extend_vocab',
+           'SentenceTokenizer', 'coverage', 'torchmoji_feature_encoding', 'torchmoji_emojis', 'torchmoji_transfer',
+           'TorchMoji', 'load_specific_weights', 'load_benchmark', 'calculate_batchsize_maxlen', 'freeze_layers',
+           'change_trainable', 'find_f1_threshold', 'finetune', 'tune_trainable', 'evaluate_using_weighted_f1',
+           'evaluate_using_acc', 'chain_thaw', 'train_by_chain_thaw', 'calc_loss', 'fit_model', 'get_data_loader',
+           'DeepMojiDataset', 'DeepMojiBatchSampler', 'relabel', 'class_avg_finetune', 'prepare_labels',
+           'prepare_generators', 'class_avg_tune_trainable', 'class_avg_chainthaw', 'read_english',
+           'read_wanted_emojis', 'read_non_english_users', 'is_special_token', 'mostly_english', 'correct_length',
+           'punct_word', 'load_non_english_user_set', 'non_english_user', 'separate_emojis_and_text', 'extract_emojis',
            'remove_variation_selectors', 'shorten_word', 'detect_special_tokens', 'process_word',
            'remove_control_chars', 'convert_nonbreaking_space', 'convert_linebreaks', 'AtMentionRegex', 'urlRegex',
            'VARIATION_SELECTORS', 'ALL_CHARS', 'CONTROL_CHARS', 'CONTROL_CHAR_REGEX', 'WordGenerator',
@@ -59,7 +59,6 @@ from io import open
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 import emoji
-from emoji import UNICODE_EMOJI
 
 import torch
 import torch.nn as nn
@@ -97,6 +96,8 @@ NB_TOKENS = 50000
 NB_EMOJI_CLASSES = 64
 FINETUNING_METHODS = ["last", "full", "new", "chain-thaw"]
 FINETUNING_METRICS = ["acc", "weighted"]
+
+ALLOWED_EMOJIS = emoji.get_unicode_emoji_dict("en").values()
 
 # Emoji map in emoji_overview.png
 EMOJIS = ":joy: :unamused: :weary: :sob: :heart_eyes: \
@@ -2883,7 +2884,7 @@ def read_english(path="english_words.txt", add_emojis=True):
             if len(line):
                 english.add(line)
     if add_emojis:
-        for e in UNICODE_EMOJI:
+        for e in ALLOWED_EMOJIS:
             english.add(e)
     return english
 
@@ -3028,7 +3029,7 @@ def separate_emojis_and_text(text):
     emoji_chars = []
     non_emoji_chars = []
     for c in text:
-        if c in emoji.UNICODE_EMOJI:
+        if c in ALLOWED_EMOJIS:
             emoji_chars.append(c)
         else:
             non_emoji_chars.append(c)
