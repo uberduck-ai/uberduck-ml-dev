@@ -97,7 +97,7 @@ NB_EMOJI_CLASSES = 64
 FINETUNING_METHODS = ["last", "full", "new", "chain-thaw"]
 FINETUNING_METRICS = ["acc", "weighted"]
 
-ALLOWED_EMOJIS = emoji.get_unicode_emoji_dict("en").values()
+ALLOWED_EMOJIS = emoji.get_emoji_unicode_dict("en").values()
 
 # Emoji map in emoji_overview.png
 EMOJIS = ":joy: :unamused: :weary: :sob: :heart_eyes: \
