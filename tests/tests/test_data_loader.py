@@ -1,4 +1,5 @@
-from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset, DataLoader
+from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset
+from torch.utils.data import DataLoader
 
 
 class TestTextMelCollation:
