@@ -26,8 +26,6 @@ class TestTacotron2Model:
         ) = trainer.initialize_loader()
         batch = next(enumerate(train_loader))[1]
 
-        assert 2 == 2
-
-        # X, y = model.parse_batch(batch)
-        # forward_output = model(X)
-        # assert len(forward_output) == 4
+        X, y = model.parse_batch(batch)
+        forward_output = model(X)
+        assert len(forward_output) == 4

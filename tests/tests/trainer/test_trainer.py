@@ -21,4 +21,3 @@ class TestTrainer:
         mel = torch.load("tests/fixtures/stevejobs-1.pt")
         audio = trainer.sample(mel)
         assert audio.size(0) == 1
-        # trainer.save_checkpoint("test", foo="bar", baz="blah")

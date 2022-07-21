@@ -35,7 +35,7 @@ class TestTextMelCollation:
             debug_dataset_size=12,
             symbol_set="default",
         )
-        len(ds)
+        assert len(ds) == 1
         collate_fn = TextMelCollate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
@@ -64,12 +64,6 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            # text_padded,
-            # input_lengths,
-            # mel_padded,
-            # gate_padded,
-            # output_lengths,
-            # speaker_ids,
             (
                 text_padded,
                 input_lengths,
@@ -108,12 +102,6 @@ class TestTextMelCollation:
         assert len(ds) == 1
         collate_fn = TextMelCollate(n_frames_per_step=5, include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
-        # text_padded,
-        # input_lengths,
-        # mel_padded,
-        # gate_padded,
-        # output_lengths,
-        # speaker_ids,
         for i, batch in enumerate(dl):
             (
                 text_padded,
