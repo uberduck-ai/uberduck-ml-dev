@@ -1,11 +1,26 @@
-from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset
+from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset, oversample
 from torch.utils.data import DataLoader
 
 
 class TestTextMelCollation:
+    def test_oversample(self):
+
+        mock_fts = [
+            ("speaker0/1.wav", "Test one two", "0"),
+            ("speaker0/2.wav", "Test one two", "0"),
+            ("speaker1/1.wav", "Test one two", "1"),
+        ]
+        assert oversample(mock_fts, {"1": 3}) == [
+            ("speaker0/1.wav", "Test one two", "0"),
+            ("speaker0/2.wav", "Test one two", "0"),
+            ("speaker1/1.wav", "Test one two", "1"),
+            ("speaker1/1.wav", "Test one two", "1"),
+            ("speaker1/1.wav", "Test one two", "1"),
+        ]
+
     def test_batch_structure(self):
         ds = TextMelDataset(
-            "test/fixtures/val.txt",
+            "tests/fixtures/val.txt",
             ["english_cleaners"],
             0.0,
             80,
@@ -29,7 +44,7 @@ class TestTextMelCollation:
     def test_batch_dimensions(self):
 
         ds = TextMelDataset(
-            "test/fixtures/val.txt",
+            "tests/fixtures/val.txt",
             ["english_cleaners"],
             0.0,
             80,
@@ -74,7 +89,7 @@ class TestTextMelCollation:
     def test_batch_dimensions_partial(self):
 
         ds = TextMelDataset(
-            "test/fixtures/val.txt",
+            "tests/fixtures/val.txt",
             ["english_cleaners"],
             0.0,
             80,

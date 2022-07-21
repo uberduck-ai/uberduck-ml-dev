@@ -18,7 +18,7 @@ class TestTrainer:
         assert trainer.hparams == hp
         assert trainer.foo == "bar"
         assert trainer.baz == 123
-        mel = torch.load("./test/fixtures/stevejobs-1.pt")
+        mel = torch.load("tests/fixtures/stevejobs-1.pt")
         audio = trainer.sample(mel)
         assert audio.size(0) == 1
         # trainer.save_checkpoint("test", foo="bar", baz="blah")
