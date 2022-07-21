@@ -41,19 +41,6 @@ class TestTextUtils:
             )
             == 28
         )
-        seq = text_to_sequence(
-            "Not bad bart, not bad at all.", ["english_cleaners"], p_arpabet=1.0
-        )
-        print(sequence_to_text(seq))
-        seq2 = text_to_sequence(
-            "{N AA1 T} {B AE1 D} {B AA1 R T} , {N AA1 T} {B AE1 D} {AE1 T} {AO1 L} .",
-            ["english_cleaners"],
-        )
-        print(sequence_to_text(seq2))
-        seq3 = text_to_sequence(
-            "Not bad bart, not bad at all.", ["english_cleaners"], p_arpabet=0.5
-        )
-        print(sequence_to_text(seq3))
 
     def test_text_to_sequence(self):
         assert cleaned_text_to_sequence(
