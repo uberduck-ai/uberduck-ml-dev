@@ -1,0 +1,66 @@
+{
+  "batch_size": 16,
+  "checkpoint_name": null,
+  "checkpoint_path": "tests/fixtures/results/checkpoints",
+  "cudnn_enabled": true,
+  "dataset_path": "./dataset",
+  "debug": false,
+  "distributed_run": false,
+  "epochs": 5,
+  "epochs_per_checkpoint": 4,
+  "filter_length": 1024,
+  "fp16_run": false,
+  "grad_clip_thresh": 1.0,
+  "hop_length": 256,
+  "ignore_layers": ["speaker_embedding.weight"],
+  "include_f0": false,
+  "learning_rate": 1e-3,
+  "log_dir": "tests/fixtures/results/logs",
+  "mask_padding": true,
+  "max_wav_value": 32768.0,
+  "mel_fmax": 8000,
+  "mel_fmin": 0,
+  "n_frames_per_step_initial": 1,
+  "n_mel_channels": 80,
+  "symbol_set": "nvidia_taco2",
+  "n_symbols": 148,
+  "n_speakers": 1,
+  "p_arpabet": 1.0,
+  "reduction_window_schedule": [
+    {
+      "until_step": 10000,
+      "batch_size": 16,
+      "n_frames_per_step": 1
+    },
+    {
+      "until_step": 50000,
+      "batch_size": 16,
+      "n_frames_per_step": 1
+    },
+    {
+      "until_step": 60000,
+      "batch_size": 16,
+      "n_frames_per_step": 1
+    },
+    {
+      "until_step": 70000,
+      "batch_size": 16,
+      "n_frames_per_step": 1
+    },
+    {
+      "until_step": null,
+      "batch_size": 16,
+      "n_frames_per_step": 1
+    }
+  ],
+  "sample_inference_speaker_ids": [0],
+  "seed": 1234,
+  "sampling_rate": 22050,
+  "steps_per_sample": 100,
+  "text_cleaners": ["english_cleaners"],
+  "training_audiopaths_and_text": "tests/fixtures/ljtest/list.txt",
+  "val_audiopaths_and_text": "tests/fixtures/ljtest/list.txt",
+  "warm_start_name": "tests/fixtures/models/taco2ljdefault",
+  "weight_decay": 1e-6,
+  "win_length": 1024
+}
