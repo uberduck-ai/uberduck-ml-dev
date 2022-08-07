@@ -29,3 +29,10 @@ class TestTacotron2Model:
         X, y = model.parse_batch(batch)
         forward_output = model(X)
         assert len(forward_output) == 4
+
+    @pytest.mark.skipif(
+        "not config.getoption('--run-slow')",
+        reason="Only run when --run-slow is given",
+    )
+    def test_slow(self):
+        pass
