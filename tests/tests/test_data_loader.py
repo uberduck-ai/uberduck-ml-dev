@@ -1,4 +1,5 @@
 from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset, oversample
+from collections import Counter
 from torch.utils.data import DataLoader
 
 
@@ -64,21 +65,28 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            (
-                text_padded,
-                input_lengths,
-                mel_padded,
-                gate_padded,
-                output_lengths,
-                speaker_ids,
-                *_,
-            ) = batch
-            assert output_lengths.item() == 566, print(
-                "output lengths: ", output_lengths
-            )
-            assert gate_padded.size(1) == 566
+            # (
+            #     text_padded,
+            #     input_lengths,
+            #     mel_padded,
+            #     gate_padded,
+            #     output_lengths,
+            #     speaker_ids,
+            #     *_,
+            # ) = batch
+            output_lengths = batch.output_lengths
+            print(output_lengths)
+            gate_target = batch.gate_target
+            mel_padded = batch.mel_padded
+            assert output_lengths.item() == 566
+            print("output lengths: ", output_lengths)
+            assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
             assert len(batch) == 7
+            a = list(batch._field_defaults.values())
+            b = list(batch._asdict().values())
+            c = Counter([a[i] == b[i] for i in range(len(b))])
+            assert c[False] == 7
 
     def test_batch_dimensions_partial(self):
 
