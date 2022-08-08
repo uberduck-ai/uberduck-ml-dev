@@ -1,7 +1,6 @@
 import torch
 
-from collections import NamedTuple
-from typing import List, Optional
+from typing import List, Optional, NamedTuple
 
 
 class Batch(NamedTuple):
