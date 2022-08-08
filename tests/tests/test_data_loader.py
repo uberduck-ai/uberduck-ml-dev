@@ -86,7 +86,7 @@ class TestTextMelCollation:
             a = list(batch._field_defaults.values())
             b = list(batch._asdict().values())
             c = Counter([a[i] == b[i] for i in range(len(b))])
-            assert c[False] == 7
+            assert c[False] == 6
 
     def test_batch_dimensions_partial(self):
 
