@@ -263,12 +263,6 @@ class Tacotron2Trainer(TTSTrainer):
                 )
                 speaker_id_tensor = speaker_id_tensor.cuda()
 
-            # input_ = [
-            #     utterance,
-            #     input_lengths,
-            #     speaker_id_tensor,
-            #     gst_embedding,
-            # ]
             input_ = Batch(
                 text=utterance,
                 input_lengths=input_lengths,

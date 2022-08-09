@@ -341,8 +341,6 @@ class TextMelCollate:
             output_lengths=output_lengths,
             speaker_ids=speaker_ids,
             gst=embedded_gsts,
-            # durations_padded=durations_padded,
-            # f0_padded=f0_padded,
         )
         return model_inputs
 

@@ -812,12 +812,6 @@ class Tacotron2(TTSModel):
             print("Not using any style tokens")
 
     def parse_batch(self, batch: Batch):
-        # NOTE (Sam): I don't see any benefit to using namedtuple over dictionary
-        # Supposedly, the idea was that namedtuple enables retention of tuple ordering for backwards compatibility
-        # However, both X and Y contain certain parameters (e.g. mels for teacher forcing).
-        # Thus, we either need to have separate redundant classes, or unite under one batch class
-        # I think a united class is much easier to understand and only slightly less efficient
-        # However, a united class necessarily destroys the existing ordering
 
         x = Batch(
             text_int_padded=batch.text_int_padded,
@@ -908,8 +902,6 @@ class Tacotron2(TTSModel):
         output_lengths = inputs.output_lengths
         speaker_ids = inputs.speaker_ids
         embedded_gst = inputs.gst
-        # durations_padded = inputs.durations_padded
-        # max_len = inputs.max_len
 
         input_lengths, output_lengths = input_lengths.data, output_lengths.data
 
@@ -925,15 +917,10 @@ class Tacotron2(TTSModel):
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
-            #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
-
-            # if self.location_specific_attention:
         mel_outputs, gate_predicted, alignments = self.decoder(
             memory=encoder_outputs,
             decoder_inputs=targets,
             memory_lengths=input_lengths,
-            # output_lengths=input_lengths,
-            # output_lengths=output_lengths,
         )
 
         mel_outputs_postnet = self.postnet(mel_outputs)
@@ -950,45 +937,6 @@ class Tacotron2(TTSModel):
 
         output = self.parse_output(output_raw)
         return output
-
-    # def forward(self, inputs):
-    #     (
-    #         input_text,
-    #         input_lengths,
-    #         targets,
-    #         max_len,
-    #         output_lengths,
-    #         speaker_ids,
-    #         embedded_gst,
-    #         *_,
-    #     ) = inputs
-
-    #     input_lengths, output_lengths = input_lengths.data, output_lengths.data
-
-    #     embedded_inputs = self.embedding(input_text).transpose(1, 2)
-    #     embedded_text = self.encoder(embedded_inputs, input_lengths)
-    #     encoder_outputs = embedded_text
-    #     if self.speaker_embedding:
-    #         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-    #         encoder_outputs += self.spkr_lin(embedded_speakers)
-
-    #     if self.gst_lin is not None:
-    #         assert (
-    #             embedded_gst is not None
-    #         ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-    #         encoder_outputs += self.gst_lin(embedded_gst)
-    #     #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
-
-    #     mel_outputs, gate_outputs, alignments = self.decoder(
-    #         encoder_outputs, targets, memory_lengths=input_lengths
-    #     )
-
-    #     mel_outputs_postnet = self.postnet(mel_outputs)
-    #     mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-    #     return self.parse_output(
-    #         [mel_outputs, mel_outputs_postnet, gate_outputs, alignments], output_lengths
-    #     )
 
     @torch.no_grad()
     def inference(self, inputs):
@@ -1010,7 +958,6 @@ class Tacotron2(TTSModel):
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
-        #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         mel_outputs, gate_pred, alignments, mel_lengths = self.decoder.inference(
             encoder_outputs, input_lengths
@@ -1026,34 +973,6 @@ class Tacotron2(TTSModel):
             output_lengths=mel_lengths,
         )
         return self.parse_output(output_raw)
-
-    # @torch.no_grad()
-    # def inference(self, inputs):
-    #     text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
-
-    #     embedded_inputs = self.embedding(text).transpose(1, 2)
-    #     embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-    #     encoder_outputs = embedded_text
-    #     if self.speaker_embedding:
-    #         embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-    #         encoder_outputs += self.spkr_lin(embedded_speakers)
-
-    #     if self.gst_lin is not None:
-    #         assert (
-    #             embedded_gst is not None
-    #         ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-    #         encoder_outputs += self.gst_lin(embedded_gst)
-    #     #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
-    #     memory_lengths = input_lengths
-    #     mel_outputs, gate_outputs, alignments, mel_lengths = self.decoder.inference(
-    #         encoder_outputs, memory_lengths
-    #     )
-    #     mel_outputs_postnet = self.postnet(mel_outputs)
-    #     mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-    #     return self.parse_output(
-    #         [mel_outputs, mel_outputs_postnet, gate_outputs, alignments, mel_lengths]
-    #     )
 
     @torch.no_grad()
     def inference_noattention(self, inputs):

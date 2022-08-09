@@ -65,15 +65,6 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            # (
-            #     text_padded,
-            #     input_lengths,
-            #     mel_padded,
-            #     gate_padded,
-            #     output_lengths,
-            #     speaker_ids,
-            #     *_,
-            # ) = batch
             output_lengths = batch.output_lengths
             print(output_lengths)
             gate_target = batch.gate_target

@@ -33,7 +33,6 @@ class TestTacotron2Model:
         b = list(forward_output._asdict().values())
         c = Counter([a[i] == b[i] for i in range(len(b))])
         assert c[False] == 4
-        # assert len(forward_output) == 4
         # NOTE (Sam): we should assert what this equals
 
         # NOTE (Sam): add inference test
