@@ -4,6 +4,7 @@ from uberduck_ml_dev.trainer.tacotron2 import Tacotron2Trainer
 import json
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 import torch
+from collections import Counter
 
 
 class TestTacotron2Model:
@@ -28,4 +29,11 @@ class TestTacotron2Model:
 
         X, y = model.parse_batch(batch)
         forward_output = model(X)
-        assert len(forward_output) == 4
+        a = list(forward_output._field_defaults.values())
+        b = list(forward_output._asdict().values())
+        c = Counter([a[i] == b[i] for i in range(len(b))])
+        assert c[False] == 4
+        # assert len(forward_output) == 4
+        # NOTE (Sam): we should assert what this equals
+
+        # NOTE (Sam): add inference test

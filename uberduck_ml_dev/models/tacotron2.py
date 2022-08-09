@@ -812,52 +812,55 @@ class Tacotron2(TTSModel):
             print("Not using any style tokens")
 
     def parse_batch(self, batch: Batch):
+        # NOTE (Sam): I don't see any benefit to using namedtuple over dictionary
+        # Supposedly, the idea was that namedtuple enables retention of tuple ordering for backwards compatibility
+        # However, both X and Y contain certain parameters (e.g. mels for teacher forcing).
+        # Thus, we either need to have separate redundant classes, or unite under one batch class
+        # I think a united class is much easier to understand and only slightly less efficient
+        # However, a united class necessarily destroys the existing ordering
 
-        durations_padded = batch.durations_padded
-        text_int_padded = batch.text_int_padded
-        input_lengths = batch.input_lengths
-        mel_padded = batch.mel_padded
-        gate_target = batch.gate_target
-        output_lengths = batch.output_lengths
-        speaker_ids = batch.speaker_ids
-        embedded_gst = batch.gst
-        f0_padded = batch.f0_padded
-        gate_pred = batch.gate_pred
+        x = Batch(
+            text_int_padded=batch.text_int_padded,
+            input_lengths=batch.input_lengths,
+            mel_padded=batch.mel_padded,
+            gate_target=batch.gate_target,
+            output_lengths=batch.output_lengths,
+            speaker_ids=batch.speaker_ids,
+            gst=batch.gst,
+        )
+        y = Batch(
+            mel_padded=batch.mel_padded, gate_target=batch.gate_target
+        )  # NOTE (Sam): should these be a separate classes for X and Y?
 
         if self.cudnn_enabled:
-            text_int_padded = to_gpu(text_int_padded).long()
-            input_lengths = to_gpu(input_lengths).long()
-            mel_padded = to_gpu(mel_padded).float()
-            gate_target = to_gpu(gate_target).float()
-            speaker_ids = to_gpu(speaker_ids).long()
-            output_lengths = to_gpu(output_lengths).long()
-            gate_pred = to_gpu(output_lengths).long()
-            if durations_padded is not None:
-                durations_padded = to_gpu(durations_padded).long()
-            if embedded_gst is not None:
-                embedded_gst = to_gpu(embedded_gst).float()
+            y_gpu = Batch(*[to_gpu(_b) if _b is not None else None for _b in y])
+            x_gpu = Batch(*[to_gpu(_b) if _b is not None else None for _b in x])
+            return (x_gpu, y_gpu)
+        else:
+            return (x, y)
 
-        # max_len = torch.max(input_lengths.data).item()
-        ret_x = Batch(
-            text_int_padded=text_int_padded,
-            input_lengths=input_lengths,
-            mel_padded=mel_padded,
-            gate_pred=gate_pred,
-            output_lengths=output_lengths,
-            speaker_ids=speaker_ids,
-            gst=embedded_gst,
-            durations_padded=durations_padded,
-            f0_padded=f0_padded,
-            # max_len=max_len,
-        )
-        # if self.location_specific_attention:
-        ret_y = Batch(mel_padded=mel_padded, gate_target=gate_target)
-        # if self.non_attentive:
-        #     ret_y = Batch(mel_padded=mel_padded, durations_padded=durations_padded)
+    def parse_output(self, outputs):
+        if self.mask_padding and outputs.output_lengths is not None:
+            mask = ~get_mask_from_lengths(outputs.output_lengths)
+            mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
+            mask = F.pad(mask, (0, outputs.mel_outputs.size(2) - mask.size(2)))
+            mask = mask.permute(1, 0, 2)  # NOTE (Sam): replace with einops
 
-        return (ret_x, ret_y)
+            parsed_outputs = Batch(
+                mel_outputs=outputs.mel_outputs.data.masked_fill_(mask, 0.0),
+                mel_outputs_postnet=outputs.mel_outputs_postnet.data.masked_fill_(
+                    mask, 0.0
+                ),
+                gate_predicted=outputs.gate_predicted.data.masked_fill_(
+                    mask[:, 0, :], 1e3
+                ),
+                alignments=outputs.alignments,
+            )  # NOTE (Sam): named tuples over dict is causing boilerplate code with no benefit
 
-    def parse_output(self, outputs, output_lengths=None):
+        return parsed_outputs
+
+    def parse_output_old(self, outputs, output_lengths=None):
+
         if self.mask_padding and output_lengths is not None:
             mask = ~get_mask_from_lengths(output_lengths)
             mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
@@ -905,7 +908,7 @@ class Tacotron2(TTSModel):
         output_lengths = inputs.output_lengths
         speaker_ids = inputs.speaker_ids
         embedded_gst = inputs.gst
-        durations_padded = inputs.durations_padded
+        # durations_padded = inputs.durations_padded
         # max_len = inputs.max_len
 
         input_lengths, output_lengths = input_lengths.data, output_lengths.data
@@ -925,47 +928,27 @@ class Tacotron2(TTSModel):
             #         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
             # if self.location_specific_attention:
-            mel_outputs, gate_pred, alignments = self.decoder(
-                encoder_outputs=encoder_outputs,
-                decoder_inputs=targets,
-                encoder_output_lengths=input_lengths,
-                # output_lengths=input_lengths,
-                output_lengths=output_lengths,
-            )
-
-        # if self.non_attentive:
-        #     predicted_durations = self.decoder.duration_predictor(
-        #         encoder_outputs, input_lengths.cpu()
-        #     )
-        #     mel_outputs, predicted_durations = self.decoder(
-        #         encoder_outputs=encoder_outputs,
-        #         decoder_inputs=targets,
-        #         # output_lengths=input_lengths,
-        #         output_lengths=output_lengths,
-        #         input_lengths=input_lengths,
-        #         durations=durations_padded,
-        #     )
+        mel_outputs, gate_predicted, alignments = self.decoder(
+            memory=encoder_outputs,
+            decoder_inputs=targets,
+            memory_lengths=input_lengths,
+            # output_lengths=input_lengths,
+            # output_lengths=output_lengths,
+        )
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        if self.location_specific_attention:
-            output_raw = Batch(
-                mel_outputs=mel_outputs,
-                mel_outputs_postnet=mel_outputs_postnet,
-                gate_pred=gate_pred,
-                output_lengths=output_lengths,
-                alignments=alignments,
-            )
+        # if self.location_specific_attention:
+        output_raw = Batch(
+            mel_outputs=mel_outputs,
+            mel_outputs_postnet=mel_outputs_postnet,
+            gate_predicted=gate_predicted,
+            output_lengths=output_lengths,
+            alignments=alignments,
+        )
 
-        # if self.non_attentive:
-        #     output_raw = Batch(
-        #         predicted_durations=predicted_durations,
-        #         mel_outputs=mel_outputs,
-        #         mel_outputs_postnet=mel_outputs_postnet,
-        #     )
-
-        output = self.parse_output(output_raw, output_lengths)
+        output = self.parse_output(output_raw)
         return output
 
     # def forward(self, inputs):
@@ -1087,7 +1070,7 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        return self.parse_output(
+        return self.parse_output_old(
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
         )
 
@@ -1119,6 +1102,6 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        return self.parse_output(
+        return self.parse_output_old(
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
         )
