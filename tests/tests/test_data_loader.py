@@ -111,18 +111,12 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(n_frames_per_step=5, include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            (
-                text_padded,
-                input_lengths,
-                mel_padded,
-                gate_padded,
-                output_lengths,
-                speaker_ids,
-                *_,
-            ) = batch
-            assert output_lengths.item() == 566, output_lengths.item()
-            assert mel_padded.size(2) == 570, print("actual shape: ", mel_padded.shape)
-            assert gate_padded.size(1) == 570, print(
-                "actual shape: ", gate_padded.shape
+
+            assert batch.output_lengths.item() == 566, batch.output_lengths.item()
+            assert batch.mel_padded.size(2) == 570, print(
+                "actual shape: ", batch.mel_padded.shape
+            )
+            assert batch.gate_target.size(1) == 570, print(
+                "actual shape: ", batch.gate_target.shape
             )
             assert len(batch) == 11
