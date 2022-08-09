@@ -29,11 +29,15 @@ class Tacotron2Loss(nn.Module):
 
         super().__init__()
 
-    def forward(self, model_output: List, target: List):
-        mel_target, gate_target = target[0], target[1]
+    def forward(self, model_output: Batch, target: Batch):
+        mel_target, gate_target = target.mel_target, target.gate_target
         mel_target.requires_grad = False
         gate_target.requires_grad = False
-        mel_out, mel_out_postnet, gate_out, _ = model_output
+        mel_out, mel_out_postnet, gate_out = (
+            model_output.mel_outputs,
+            model_output.mel_outputs_postnet,
+            model_output.gate_predicted,
+        )
         mel_loss_batch = nn.MSELoss(reduction="none")(mel_out, mel_target).mean(
             axis=[1, 2]
         ) + nn.MSELoss(reduction="none")(mel_out_postnet, mel_target).mean(axis=[1, 2])
