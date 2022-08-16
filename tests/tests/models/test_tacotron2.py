@@ -1,14 +1,16 @@
+import json
+import random
+
+from einops import rearrange
+import torch
+import numpy as np
+
 from uberduck_ml_dev.data_loader import prepare_input_sequence
 from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
 from uberduck_ml_dev.trainer.tacotron2 import Tacotron2Trainer
-import json
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 from uberduck_ml_dev.models.common import MelSTFT
-from einops import rearrange
-import torch
-import numpy as np
-import random
 
 
 class TestTacotron2Model:
