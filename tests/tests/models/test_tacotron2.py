@@ -84,7 +84,7 @@ class TestTacotron2Model:
 
         torch.random.manual_seed(1234)
         np.random.seed(1234)
-        tf_index = 111
+        tf_index = 111  # NOTE (Sam): this was determined by listening to the output
         nreps = 1
         text = "I, Sam, am a very bad boy."
         lines = [t for t in text.split("\n") if t]
