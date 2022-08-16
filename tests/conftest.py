@@ -1,16 +1,16 @@
 import torch
 import tempfile
-import sys
 import pytest
+import os
+
 import gdown
 from scipy.io import wavfile
+import numpy as np
+import torch
 
 from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
-
-import numpy as np
-
 
 # NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo
 def _load_tacotron_uninitialized(overrides=None):
@@ -40,10 +40,11 @@ def lj_speech_tacotron2():
 
 @pytest.fixture
 def sample_inference_spectrogram():
-    url = "https://drive.google.com/uc?id=1IF8gXYg5x5zh9lkeKBqUg_Fc2pcNu05_"
-    output_file = tempfile.NamedTemporaryFile()
-    gdown.download(url, output_file.name, quiet=False)
-    inference_spectrogram = torch.load(output_file.name)
+    # NOTE (Sam): made in Uberduck container using current test code in test_stft_seed
+    # text = "I, Sam, am a very good boy."
+    inference_spectrogram = torch.load(
+        os.path.join(os.path.dirname(__file__), "fixtures/sample_spectrogram.pt")
+    )
     return inference_spectrogram
 
 
@@ -51,8 +52,8 @@ def sample_inference_spectrogram():
 def sample_inference_tf_spectrogram():
     # NOTE (Sam): made with abov at timestep 111,
     # text = "I, Sam, am a very bad boy."
-    url = "https://drive.google.com/uc?id=1uJkp915fF4N3ozJHZcwPLLDk8k0sEC1E"
-    output_file = tempfile.NamedTemporaryFile()
-    gdown.download(url, output_file.name, quiet=False)
-    inference_spectrogram = torch.load(output_file.name)
+    inference_spectrogram = torch.load(
+        os.path.join(os.path.dirname(__file__), "fixtures/sample_spectrogram_tf.pt")
+    )
+
     return inference_spectrogram
