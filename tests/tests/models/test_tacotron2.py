@@ -35,10 +35,6 @@ class TestTacotron2Model:
         forward_output = model(X)
         assert len(forward_output) == 4
 
-    def test_teacher_forced_inference(self, lj_speech_tacotron2):
-
-        inference = lj_speech_tacotron2.inference_partial_tf
-
     def test_stft_seed(self, sample_inference_spectrogram, lj_speech_tacotron2):
 
         torch.random.manual_seed(1234)
@@ -81,7 +77,7 @@ class TestTacotron2Model:
         self,
         lj_speech_tacotron2,
         sample_inference_spectrogram,
-        sample_tf_inference_spectrogram,
+        sample_inference_tf_spectrogram,
     ):
 
         torch.random.manual_seed(1234)
@@ -101,12 +97,13 @@ class TestTacotron2Model:
         speaker_ids = None
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
         input_ = sequences, input_lengths, speaker_ids, None
+        sample_inference_spectrogram = sample_inference_spectrogram[None, :]
+        print(sample_inference_spectrogram.shape)
         (
             mel_outputs,
             mel_outputs_postnet_tf,
             gate_outputs,
             alignments,
-            mel_lengths,
         ) = lj_speech_tacotron2.inference_partial_tf(
             input_, sample_inference_spectrogram, tf_index
         )
@@ -131,33 +128,35 @@ class TestTacotron2Model:
         )
 
         original_vector = rearrange(
-            sample_inference_spectrogram_beginning.detach().numpy(), "b m t -> (b m t)"
+            sample_inference_spectrogram_beginning, "b m t -> (b m t)"
         )
 
         tf_estimate_vector = rearrange(
-            tf_mel_outputs_postnet_beginning.detach().numpy(), "b m t -> (b m t)"
+            tf_mel_outputs_postnet_beginning, "b m t -> (b m t)"
         )
 
         non_tf_estimate_vector = rearrange(
-            non_tf_mel_outputs_postnet_beginning.detach().numpy(), "b m t -> (b m t)"
+            non_tf_mel_outputs_postnet_beginning, "b m t -> (b m t)"
         )
 
-        rho_beginning = np.corrcoef(
-            original_vector, tf_estimate_vector, non_tf_estimate_vector
+        vectors = np.asarray(
+            [original_vector, tf_estimate_vector, non_tf_estimate_vector]
         )
+        print(vectors.shape)
+        rho_beginning = np.corrcoef(vectors)
 
-        assert rho_beginning[0, 1] > 0.99
-        assert rho_beginning[0, 2] < 0.99
+        assert rho_beginning[0, 1] > 0.98
+        assert rho_beginning[0, 2] < 0.98
 
         tf_estimate_vector = rearrange(
             mel_outputs_postnet_tf.detach().numpy(), "b m t -> (b m t)"
         )
         original_vector = rearrange(
-            sample_inference_spectrogram.detach().numpy(), "m t -> (m t)"
+            sample_inference_tf_spectrogram.detach().numpy(), "b m t -> (b m t)"
         )
 
         rho_total = np.corrcoef(
             tf_estimate_vector,
             original_vector,
-        )[0, 1]
+        )
         assert rho_total[0, 1] > 0.99
