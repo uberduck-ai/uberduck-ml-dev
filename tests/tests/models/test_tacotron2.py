@@ -125,7 +125,6 @@ class TestTacotron2Model:
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
         input_ = sequences, input_lengths, speaker_ids, None
         sample_inference_spectrogram = sample_inference_spectrogram[None, :]
-        print(sample_inference_spectrogram.shape)
         (
             mel_outputs,
             mel_outputs_postnet_tf,
@@ -173,7 +172,6 @@ class TestTacotron2Model:
                 non_tf_estimate_vector_beginning,
             ]
         )
-        print(vectors.shape)
         rho_beginning = np.corrcoef(vectors)
 
         assert rho_beginning[0, 1] > 0.98
@@ -209,6 +207,5 @@ class TestTacotron2Model:
         )
 
         vectors = np.asarray([original_vector_beginning, tf_estimate_vector_beginning])
-        print(vectors.shape)
         rho_beginning = np.corrcoef(vectors)
         assert rho_beginning[0, 1] > 0.98
