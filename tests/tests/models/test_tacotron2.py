@@ -75,6 +75,31 @@ class TestTacotron2Model:
         )[0, 1]
         assert rho > 0.99
 
+        torch.random.manual_seed(1235)
+        np.random.seed(1235)
+        input_ = sequences, input_lengths, speaker_ids, None
+        (
+            mel_outputs,
+            mel_outputs_postnet,
+            gate_outputs,
+            alignments,
+            mel_lengths,
+        ) = lj_speech_tacotron2.inference(input_)
+
+        tf_index = 111  # NOTE (Sam): look at the beginning of the clip since they are different lengths
+        estimated_vector = rearrange(
+            mel_outputs_postnet.detach().numpy()[:, :, :tf_index], "b m t -> (b m t)"
+        )
+        target_vector = rearrange(
+            sample_inference_spectrogram.detach().numpy()[:, :tf_index],
+            "m t -> (m t)",
+        )
+        rho = np.corrcoef(
+            estimated_vector,
+            target_vector,
+        )[0, 1]
+        assert rho < 0.98
+
     def test_tf_inference(
         self,
         lj_speech_tacotron2,
@@ -129,20 +154,24 @@ class TestTacotron2Model:
             sample_inference_spectrogram.detach().numpy()[:, :, :tf_index]
         )
 
-        original_vector = rearrange(
+        original_vector_beginning = rearrange(
             sample_inference_spectrogram_beginning, "b m t -> (b m t)"
         )
 
-        tf_estimate_vector = rearrange(
+        tf_estimate_vector_beginning = rearrange(
             tf_mel_outputs_postnet_beginning, "b m t -> (b m t)"
         )
 
-        non_tf_estimate_vector = rearrange(
+        non_tf_estimate_vector_beginning = rearrange(
             non_tf_mel_outputs_postnet_beginning, "b m t -> (b m t)"
         )
 
         vectors = np.asarray(
-            [original_vector, tf_estimate_vector, non_tf_estimate_vector]
+            [
+                original_vector_beginning,
+                tf_estimate_vector_beginning,
+                non_tf_estimate_vector_beginning,
+            ]
         )
         print(vectors.shape)
         rho_beginning = np.corrcoef(vectors)
@@ -162,3 +191,24 @@ class TestTacotron2Model:
             original_vector,
         )
         assert rho_total[0, 1] > 0.99
+
+        torch.random.manual_seed(1235)
+        np.random.seed(1235)
+        (
+            mel_outputs,
+            mel_outputs_postnet_tf,
+            gate_outputs,
+            alignments,
+        ) = lj_speech_tacotron2.inference_partial_tf(
+            input_, sample_inference_spectrogram, tf_index
+        )
+        assert rho_beginning[0, 1] > 0.98
+
+        tf_estimate_vector_beginning = rearrange(
+            tf_mel_outputs_postnet_beginning, "b m t -> (b m t)"
+        )
+
+        vectors = np.asarray([original_vector_beginning, tf_estimate_vector_beginning])
+        print(vectors.shape)
+        rho_beginning = np.corrcoef(vectors)
+        assert rho_beginning[0, 1] > 0.98
