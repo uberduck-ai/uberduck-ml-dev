@@ -12,6 +12,7 @@ __all__ = [
 ]
 
 # Cell
+from re import M
 from torch import nn
 from .base import TTSModel
 from .common import Attention, Conv1d, LinearNorm, GST
@@ -811,59 +812,25 @@ class Tacotron2(TTSModel):
         else:
             print("Not using any style tokens")
 
-    def parse_batch(self, batch: Batch):
+    def mask_output(self, outputs):
 
-        x = Batch(
-            text_int_padded=batch.text_int_padded,
-            input_lengths=batch.input_lengths,
-            mel_padded=batch.mel_padded,
-            gate_target=batch.gate_target,
-            output_lengths=batch.output_lengths,
-            speaker_ids=batch.speaker_ids,
-            gst=batch.gst,
-        )
-        y = Batch(
-            mel_padded=batch.mel_padded, gate_target=batch.gate_target
-        )  # NOTE (Sam): should these be a separate classes for X and Y?
-
-        if self.cudnn_enabled:
-            y_gpu = Batch(*[to_gpu(_b) if _b is not None else None for _b in y])
-            x_gpu = Batch(*[to_gpu(_b) if _b is not None else None for _b in x])
-            return (x_gpu, y_gpu)
-        else:
-            return (x, y)
-
-    def parse_output(self, outputs):
-        if self.mask_padding and outputs.output_lengths is not None:
-            mask = ~get_mask_from_lengths(outputs.output_lengths)
+        if self.mask_padding and "output_lengths" in outputs.keys():
+            mel_outputs = outputs["mel_outputs"]
+            mask = ~get_mask_from_lengths(outputs["output_lengths"])
             mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
-            mask = F.pad(mask, (0, outputs.mel_outputs.size(2) - mask.size(2)))
+            mask = F.pad(mask, (0, mel_outputs.size(2) - mask.size(2)))
             mask = mask.permute(1, 0, 2)  # NOTE (Sam): replace with einops
 
-            parsed_outputs = Batch(
-                mel_outputs=outputs.mel_outputs.data.masked_fill_(mask, 0.0),
-                mel_outputs_postnet=outputs.mel_outputs_postnet.data.masked_fill_(
-                    mask, 0.0
-                ),
-                gate_predicted=outputs.gate_predicted.data.masked_fill_(
-                    mask[:, 0, :], 1e3
-                ),
-                alignments=outputs.alignments,
-            )  # NOTE (Sam): named tuples over dict is causing boilerplate code with no benefit
+            outputs["mel_outputs"] = outputs["mel_outputs"].data.masked_fill_(mask, 0.0)
+            outputs["mel_outputs_postnet"] = outputs[
+                "mel_outputs_postnet"
+            ].data.masked_fill_(mask, 0.0)
+            # import pdb
 
-        return parsed_outputs
-
-    def parse_output_old(self, outputs, output_lengths=None):
-
-        if self.mask_padding and output_lengths is not None:
-            mask = ~get_mask_from_lengths(output_lengths)
-            mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
-            mask = F.pad(mask, (0, outputs[0].size(2) - mask.size(2)))
-            mask = mask.permute(1, 0, 2)
-
-            outputs[0].data.masked_fill_(mask, 0.0)
-            outputs[1].data.masked_fill_(mask, 0.0)
-            outputs[2].data.masked_fill_(mask[:, 0, :], 1e3)  # gate energies
+            # pdb.set_trace()
+            outputs["gate_predicted"] = (
+                outputs["gate_predicted"].data.masked_fill_(mask[:, 0, :], 1e3),
+            )
 
         return outputs
 
@@ -895,13 +862,21 @@ class Tacotron2(TTSModel):
         )
         return alignments
 
-    def forward(self, inputs: Batch):
-        input_text = inputs.text_int_padded
-        input_lengths = inputs.input_lengths
-        targets = inputs.mel_padded
-        output_lengths = inputs.output_lengths
-        speaker_ids = inputs.speaker_ids
-        embedded_gst = inputs.gst
+    def forward(
+        self,
+        input_text,
+        input_lengths,
+        targets,
+        output_lengths,
+        speaker_ids,
+        embedded_gst,
+    ):
+        # input_text = inputs.text_int_padded
+        # input_lengths = inputs.input_lengths
+        # targets = inputs.mel_padded
+        # output_lengths = inputs.output_lengths
+        # speaker_ids = inputs.speaker_ids
+        # embedded_gst = inputs.gst
 
         input_lengths, output_lengths = input_lengths.data, output_lengths.data
 
@@ -934,18 +909,19 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
             alignments=alignments,
         )
+        # import pdb
 
-        output = self.parse_output(output_raw)
+        # pdb.set_trace()
+        output = self.mask_output(output_raw)
+        # NOTE (Sam): batch class simplifies in particular where returning data
         return output
 
     @torch.no_grad()
-    def inference(self, inputs):
-        text = inputs.text
-        input_lengths = inputs.input_lengths
-        speaker_ids = inputs.speaker_ids
-        embedded_gst = inputs.gst
-        # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
+    def inference(self, text, input_lengths, speaker_ids=None, embedded_gst=None):
 
+        # NOTE (Sam): deprecated pattern is
+        # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
+        # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
@@ -959,7 +935,7 @@ class Tacotron2(TTSModel):
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
 
-        mel_outputs, gate_pred, alignments, mel_lengths = self.decoder.inference(
+        mel_outputs, gate_predicted, alignments, mel_lengths = self.decoder.inference(
             encoder_outputs, input_lengths
         )
         mel_outputs_postnet = self.postnet(mel_outputs)
@@ -968,11 +944,11 @@ class Tacotron2(TTSModel):
         output_raw = Batch(
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
-            gate_pred=gate_pred,
+            gate_predicted=gate_predicted,
             alignments=alignments,
             output_lengths=mel_lengths,
         )
-        return self.parse_output(output_raw)
+        return self.mask_output(output_raw)
 
     @torch.no_grad()
     def inference_noattention(self, inputs):
@@ -983,20 +959,29 @@ class Tacotron2(TTSModel):
 
         encoder_outputs = torch.cat((embedded_text,), dim=2)
 
-        mel_outputs, gate_outputs, alignments = self.decoder.inference_noattention(
+        mel_outputs, gate_predicted, alignments = self.decoder.inference_noattention(
             encoder_outputs, attention_maps
         )
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        return self.parse_output_old(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+        output_raw = Batch(
+            mel_outputs=mel_outputs,
+            mel_outputs_postnet=mel_outputs_postnet,
+            gate_predicted=gate_predicted,
+            alignments=alignments,
         )
+
+        output = self.mask_output(output_raw)
+        return output
 
     @torch.no_grad()
     def inference_partial_tf(
         self,
-        inputs,
+        text,
+        input_lengths,
+        speaker_ids,
+        embedded_gst,
         tf_mel,
         tf_until_idx,
         device="cpu",
@@ -1008,7 +993,8 @@ class Tacotron2(TTSModel):
 
         tf_mel: (B, T, n_mel_channels)
         """
-        text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
+        # NOTE (Sam): deprecated pattern is
+        # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
@@ -1022,13 +1008,19 @@ class Tacotron2(TTSModel):
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
 
-        mel_outputs, gate_outputs, alignments = self.decoder.inference_partial_tf(
+        mel_outputs, gate_predicted, alignments = self.decoder.inference_partial_tf(
             encoder_outputs, tf_mel, tf_until_idx, device
         )
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        return self.parse_output_old(
-            [mel_outputs, mel_outputs_postnet, gate_outputs, alignments]
+        output_raw = Batch(
+            mel_outputs=mel_outputs,
+            mel_outputs_postnet=mel_outputs_postnet,
+            gate_predicted=gate_predicted,
+            alignments=alignments,
         )
+
+        output = self.mask_output(output_raw)
+        return output

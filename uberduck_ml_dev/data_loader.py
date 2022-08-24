@@ -264,9 +264,15 @@ class TextMelDataset(Dataset):
 
 
 class TextMelCollate:
-    def __init__(self, n_frames_per_step: int = 1, include_f0: bool = False):
+    def __init__(
+        self,
+        n_frames_per_step: int = 1,
+        include_f0: bool = False,
+        cudnn_enabled: bool = False,
+    ):
         self.n_frames_per_step = n_frames_per_step
         self.include_f0 = include_f0
+        self.cudnn_enabled = cudnn_enabled
 
     def set_frames_per_step(self, n_frames_per_step):
         """Set n_frames_step.
@@ -333,7 +339,7 @@ class TextMelCollate:
                 np.array([sample["embedded_gst"] for sample in batch])
             )
 
-        model_inputs = Batch(
+        output = Batch(
             text_int_padded=text_padded,
             input_lengths=input_lengths,
             mel_padded=mel_padded,
@@ -342,7 +348,9 @@ class TextMelCollate:
             speaker_ids=speaker_ids,
             gst=embedded_gsts,
         )
-        return model_inputs
+        if self.cudnn_enabled:
+            output = output.to_gpu()
+        return output
 
 
 # Cell

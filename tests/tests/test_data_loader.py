@@ -65,17 +65,15 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            output_lengths = batch.output_lengths
-            print(output_lengths)
-            gate_target = batch.gate_target
-            mel_padded = batch.mel_padded
+            output_lengths = batch["output_lengths"]
+            gate_target = batch["gate_target"]
+            mel_padded = batch["mel_padded"]
             assert output_lengths.item() == 566
-            print("output lengths: ", output_lengths)
             assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
             assert len(batch) == 11
             a = list(batch._field_defaults.values())
-            b = list(batch._asdict().values())
+            b = list(batch.values())
             c = Counter([a[i] == b[i] for i in range(len(b))])
             assert c[False] == 6
 
@@ -103,11 +101,11 @@ class TestTextMelCollation:
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
 
-            assert batch.output_lengths.item() == 566, batch.output_lengths.item()
-            assert batch.mel_padded.size(2) == 570, print(
-                "actual shape: ", batch.mel_padded.shape
+            assert batch["output_lengths"].item() == 566, batch["output_lengths"].item()
+            assert batch["mel_padded"].size(2) == 570, print(
+                "actual shape: ", batch["mel_padded"].shape
             )
-            assert batch.gate_target.size(1) == 570, print(
-                "actual shape: ", batch.gate_target.shape
+            assert batch["gate_target"].size(1) == 570, print(
+                "actual shape: ", batch["gate_target"].shape
             )
             assert len(batch) == 11

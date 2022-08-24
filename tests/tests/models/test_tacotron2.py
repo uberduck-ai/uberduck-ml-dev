@@ -35,7 +35,7 @@ class TestTacotron2Model:
         batch = next(enumerate(train_loader))[1]
 
         X, y = model.parse_batch(batch)
-        forward_output = model(X)
+        forward_output = model(*X)
         a = list(forward_output._field_defaults.values())
         b = list(forward_output._asdict().values())
         c = Counter([a[i] == b[i] for i in range(len(b))])
@@ -56,16 +56,11 @@ class TestTacotron2Model:
             text_cleaner=["english_cleaners"],
         )
         sequences = sequences.repeat(nreps, 1)
-        speaker_ids = None
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
-        input_ = sequences, input_lengths, speaker_ids, None
-        (
-            mel_outputs,
-            mel_outputs_postnet,
-            gate_outputs,
-            alignments,
-            mel_lengths,
-        ) = lj_speech_tacotron2.inference(input_)
+
+        mel_outputs_postnet = lj_speech_tacotron2.inference(sequences, input_lengths)[
+            "mel_outputs_postnet"
+        ]
 
         estimated_vector = rearrange(
             mel_outputs_postnet.detach().numpy(), "b m t -> (b m t)"
@@ -81,14 +76,10 @@ class TestTacotron2Model:
 
         torch.random.manual_seed(1235)
         np.random.seed(1235)
-        input_ = sequences, input_lengths, speaker_ids, None
-        (
-            mel_outputs,
-            mel_outputs_postnet,
-            gate_outputs,
-            alignments,
-            mel_lengths,
-        ) = lj_speech_tacotron2.inference(input_)
+
+        mel_outputs_postnet = lj_speech_tacotron2.inference(sequences, input_lengths)[
+            "mel_outputs_postnet"
+        ]
 
         tf_index = 111  # NOTE (Sam): look at the beginning of the clip since they are different lengths
         estimated_vector = rearrange(
@@ -125,27 +116,25 @@ class TestTacotron2Model:
             text_cleaner=["english_cleaners"],
         )
         sequences = sequences.repeat(nreps, 1)
-        speaker_ids = None
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
-        input_ = sequences, input_lengths, speaker_ids, None
         sample_inference_spectrogram = sample_inference_spectrogram[None, :]
-        (
-            mel_outputs,
-            mel_outputs_postnet_tf,
-            gate_outputs,
-            alignments,
-        ) = lj_speech_tacotron2.inference_partial_tf(
-            input_, sample_inference_spectrogram, tf_index
-        )
 
-        (
-            mel_outputs,
-            mel_outputs_postnet_original,
-            gate_outputs,
-            alignments,
-            mel_lengths,
-        ) = lj_speech_tacotron2.inference(input_)
+        mel_outputs_postnet_tf = lj_speech_tacotron2.inference_partial_tf(
+            text=sequences,
+            input_lengths=input_lengths,
+            speaker_ids=None,
+            embedded_gst=None,
+            tf_mel=sample_inference_spectrogram,
+            tf_until_idx=tf_index,
+        )["mel_outputs_postnet"]
 
+        mel_outputs_postnet_original = lj_speech_tacotron2.inference(
+            text=sequences, input_lengths=input_lengths, speaker_ids=None
+        )["mel_outputs_postnet"]
+
+        # import pdb
+
+        # pdb.set_trace()
         non_tf_mel_outputs_postnet_beginning = (
             mel_outputs_postnet_original.detach().numpy()[:, :, :tf_index]
         )
@@ -202,7 +191,12 @@ class TestTacotron2Model:
             gate_outputs,
             alignments,
         ) = lj_speech_tacotron2.inference_partial_tf(
-            input_, sample_inference_spectrogram, tf_index
+            text=sequences,
+            input_lengths=input_lengths,
+            speaker_ids=None,
+            embedded_gst=None,
+            tf_mel=sample_inference_spectrogram,
+            tf_until_idx=tf_index,
         )
         assert rho_beginning[0, 1] > 0.98
 

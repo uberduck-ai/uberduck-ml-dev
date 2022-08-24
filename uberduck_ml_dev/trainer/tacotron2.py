@@ -263,15 +263,14 @@ class Tacotron2Trainer(TTSTrainer):
                 )
                 speaker_id_tensor = speaker_id_tensor.cuda()
 
-            input_ = Batch(
+            model.eval()
+
+            _, mel, gate, attn, lengths = model.inference(
                 text=utterance,
                 input_lengths=input_lengths,
                 speaker_ids=torch.LongTensor([speaker_id]).cuda(),
                 gst=gst_embedding,
             )
-            model.eval()
-
-            _, mel, gate, attn, lengths = model.inference(input_)
 
             model.train()
             try:
@@ -337,13 +336,11 @@ class Tacotron2Trainer(TTSTrainer):
                 scalar=mlv + glv,
             )
         # Generate the sample from a random item from the last y_pred batch.
-        mel_target, gate_target = y
-        _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
+        mel_out_postnet, gate_outputs, alignments = list(y_pred.values())
         alignment_metrics = get_alignment_metrics(alignments)
         alignment_diagonalness = alignment_metrics["diagonalness"]
         alignment_max = alignment_metrics["max"]
-
-        sample_idx = randint(0, mel_out_postnet.size(0) - 1)
+        sample_idx = randint(0, self.batch_size)
         audio = self.sample(mel=mel_out_postnet[sample_idx])
 
         self.log(
@@ -362,7 +359,7 @@ class Tacotron2Trainer(TTSTrainer):
             "MelTarget/val",
             self.global_step,
             image=save_figure_to_numpy(
-                plot_spectrogram(mel_target[sample_idx].data.cpu())
+                plot_spectrogram(y["mel_target"][sample_idx].data.cpu())
             ),
         )
         self.log(
@@ -370,13 +367,13 @@ class Tacotron2Trainer(TTSTrainer):
             self.global_step,
             image=save_figure_to_numpy(
                 plot_gate_outputs(
-                    gate_targets=gate_target[sample_idx].data.cpu(),
+                    gate_targets=y["gate_target"][sample_idx].data.cpu(),
                     gate_outputs=gate_outputs[sample_idx].data.cpu(),
                 )
             ),
         )
-        input_length = X.input_lengths[sample_idx].item()
-        output_length = X.output_lengths[sample_idx].item()
+        input_length = X["input_lengths"][sample_idx].item()
+        output_length = X["output_lengths"][sample_idx].item()
         self.log(
             "Attention/val",
             self.global_step,
@@ -401,7 +398,9 @@ class Tacotron2Trainer(TTSTrainer):
             debug_dataset_size=self.batch_size,
         )
         collate_fn = TextMelCollate(
-            n_frames_per_step=n_frames_per_step, include_f0=include_f0
+            n_frames_per_step=n_frames_per_step,
+            include_f0=include_f0,
+            cudnn_enabled=self.cudnn_enabled,
         )
         sampler = None
         if self.distributed_run:
@@ -583,16 +582,21 @@ class Tacotron2Trainer(TTSTrainer):
                 batch_size=self.batch_size,
                 collate_fn=collate_fn,
             )
-            for batch in val_loader:
-                total_steps += 1
-                if self.distributed_run:
-                    X, y = model.module.parse_batch(batch)
-                else:
-                    X, y = model.parse_batch(batch)
-                speakers_val.append(X.speaker_ids)
-                y_pred = model(X)
+            for total_steps, batch in enumerate(val_loader):
+
+                model_input = batch.subset(
+                    ["text", "input_lengths", "speaker_ids", "embedded_gst"]
+                )
+                model_output = model(
+                    text=model_input["text"],
+                    input_lengths=model_input["input_lengths"],
+                    speaker_ids=model_input["speaker_ids"],
+                    embedded_gst=model_input["embedded_gst"],
+                )
+                target = batch.subset(["gate_target", "mel_padded"])
                 mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
-                    y_pred, y
+                    model_output=model_output,
+                    target=target,
                 )
                 if self.distributed_run:
                     reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
@@ -623,17 +627,18 @@ class Tacotron2Trainer(TTSTrainer):
             mean_loss = total_loss / total_steps
             total_mel_loss_val = torch.hstack(total_mel_loss_val)
             total_gate_loss_val = torch.hstack(total_gate_loss_val)
+            speakers_val.append(batch["speaker_ids"])
             speakers_val = torch.hstack(speakers_val)
             self.log_validation(
-                X,
-                y_pred,
-                y,
-                mean_loss,
-                mean_mel_loss,
-                mean_gate_loss,
-                total_mel_loss_val,
-                total_gate_loss_val,
-                speakers_val,
+                X=model_input,
+                ypred=model_output,
+                y=target,
+                mean_loss=mean_loss,
+                mean_mel_loss=mean_mel_loss,
+                mean_gate_loss=mean_gate_loss,
+                total_mel_loss_val=total_mel_loss_val,
+                total_gate_loss_val=total_gate_loss_val,
+                speakers_val=speakers_val,
             )
 
         model.train()
