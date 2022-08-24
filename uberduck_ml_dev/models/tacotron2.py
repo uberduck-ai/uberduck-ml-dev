@@ -999,6 +999,7 @@ class Tacotron2(TTSModel):
         inputs,
         tf_mel,
         tf_until_idx,
+        device="cpu",
     ):
         """Run inference with partial teacher forcing.
 
@@ -1007,15 +1008,22 @@ class Tacotron2(TTSModel):
 
         tf_mel: (B, T, n_mel_channels)
         """
-        text, input_lengths, *_ = inputs
+        text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
         embedded_inputs = self.embedding(text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-        encoder_outputs = torch.cat((embedded_text,), dim=2)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
+
+        if self.gst_lin is not None:
+            assert (
+                embedded_gst is not None
+            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
+            encoder_outputs += self.gst_lin(embedded_gst)
 
         mel_outputs, gate_outputs, alignments = self.decoder.inference_partial_tf(
-            encoder_outputs,
-            tf_mel,
-            tf_until_idx,
+            encoder_outputs, tf_mel, tf_until_idx, device
         )
 
         mel_outputs_postnet = self.postnet(mel_outputs)
