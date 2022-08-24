@@ -42,22 +42,3 @@ class Batch(Dict):
 
         batch_gpu = Batch(**{k: to_gpu(v) for k, v in self.items()})
         return batch_gpu
-
-    # NOTE (Sam): Dict doesn't seem to have this method so have to write it.
-    # NamedTuple does have it however
-    def _field_defaults(self):
-
-        _field_defaults = dict(
-            text_int_padded=None,
-            input_lengths=None,
-            mel_padded=None,
-            gate_target=None,
-            output_lengths=None,
-            speaker_ids=None,
-            gst=None,
-            mel_outputs=None,
-            mel_outputs_postnet=None,
-            gate_predicted=None,
-            alignments=None,
-        )
-        return _field_defaults

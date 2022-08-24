@@ -33,13 +33,28 @@ class TestTacotron2Model:
             collate_fn,
         ) = trainer.initialize_loader()
         batch = next(enumerate(train_loader))[1]
+        # NOTE (Sam): call subsets directly in function arguments
+        model_input = batch.subset(
+            [
+                "text_int_padded",
+                "input_lengths",
+                "speaker_ids",
+                "gst",
+                "mel_padded",
+                "output_lengths",
+            ]
+        )
+        model_output = model(
+            input_text=model_input["text_int_padded"],
+            input_lengths=model_input["input_lengths"],
+            speaker_ids=model_input["speaker_ids"],
+            embedded_gst=model_input["gst"],
+            targets=model_input["mel_padded"],
+            output_lengths=model_input["output_lengths"],
+        )
 
-        X, y = model.parse_batch(batch)
-        forward_output = model(*X)
-        a = list(forward_output._field_defaults.values())
-        b = list(forward_output._asdict().values())
-        c = Counter([a[i] == b[i] for i in range(len(b))])
-        assert c[False] == 4
+        # 'mel_outputs', 'mel_outputs_postnet', 'gate_predicted', 'output_lengths', 'alignments'
+        assert len(model_output) == 5
 
     def test_stft_seed(self, sample_inference_spectrogram, lj_speech_tacotron2):
 

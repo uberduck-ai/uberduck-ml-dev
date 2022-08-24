@@ -584,14 +584,24 @@ class Tacotron2Trainer(TTSTrainer):
             )
             for total_steps, batch in enumerate(val_loader):
 
+                # NOTE (Sam): call subsets directly in function arguments
                 model_input = batch.subset(
-                    ["text", "input_lengths", "speaker_ids", "embedded_gst"]
+                    [
+                        "text_int_padded",
+                        "input_lengths",
+                        "speaker_ids",
+                        "gst",
+                        "mel_padded",
+                        "output_lengths",
+                    ]
                 )
                 model_output = model(
-                    text=model_input["text"],
+                    text=model_input["text_int_padded"],
                     input_lengths=model_input["input_lengths"],
                     speaker_ids=model_input["speaker_ids"],
-                    embedded_gst=model_input["embedded_gst"],
+                    embedded_gst=model_input["gst"],
+                    targets=model_input["mel_padded"],
+                    output_lengths=model_input["output_lengths"],
                 )
                 target = batch.subset(["gate_target", "mel_padded"])
                 mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
