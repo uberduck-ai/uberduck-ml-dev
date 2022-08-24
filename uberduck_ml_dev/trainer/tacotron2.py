@@ -458,31 +458,49 @@ class Tacotron2Trainer(TTSTrainer):
                 previous_start_time = start_time
                 start_time = time.perf_counter()
                 self.global_step += 1
+                # NOTE (Sam): model.module.zero_grad() needed for distributed run?
                 model.zero_grad()
-                if self.distributed_run:
-                    X, y = model.module.parse_batch(batch)
-                else:
-                    X, y = model.parse_batch(batch)
-                if self.fp16_run:
-                    with autocast():
-                        y_pred = model(X)
 
-                        (
-                            mel_loss,
-                            gate_loss,
-                            mel_loss_batch,
-                            gate_loss_batch,
-                        ) = criterion(y_pred, y)
-                        loss = mel_loss + gate_loss
-                        loss_batch = mel_loss_batch + gate_loss_batch
-                else:
-                    y_pred = model(X)
-                    mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
-                        y_pred, y
-                    )
-                    loss = mel_loss + gate_loss
-                    loss_batch = mel_loss_batch + gate_loss_batch
+                # NOTE (Sam): Could call subsets directly in function arguments since model_input is only reused in logging
+                model_input = batch.subset(
+                    [
+                        "text_int_padded",
+                        "input_lengths",
+                        "speaker_ids",
+                        "gst",
+                        "mel_padded",
+                        "output_lengths",
+                    ]
+                )
 
+                # if self.fp16_run:
+                #     with autocast():
+                #         y_pred = model(X)
+
+                #         (
+                #             mel_loss,
+                #             gate_loss,
+                #             mel_loss_batch,
+                #             gate_loss_batch,
+                #         ) = criterion(y_pred, y)
+                #         loss = mel_loss + gate_loss
+                #         loss_batch = mel_loss_batch + gate_loss_batch
+                # else:
+                model_output = model(
+                    text=model_input["text_int_padded"],
+                    input_lengths=model_input["input_lengths"],
+                    speaker_ids=model_input["speaker_ids"],
+                    embedded_gst=model_input["gst"],
+                    targets=model_input["mel_padded"],
+                    output_lengths=model_input["output_lengths"],
+                )
+                target = batch.subset(["gate_target", "mel_padded"])
+                mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
+                    model_output=model_output, target=target
+                )
+                loss = mel_loss + gate_loss
+
+                # NOTE (Sam): put this code in a function
                 if self.distributed_run:
                     reduced_mel_loss = reduce_tensor(mel_loss, self.world_size).item()
                     reduced_gate_loss = reduce_tensor(gate_loss, self.world_size).item()
@@ -499,36 +517,36 @@ class Tacotron2Trainer(TTSTrainer):
                     reduced_mel_loss_batch = mel_loss_batch.detach()
 
                 reduced_loss = reduced_mel_loss + reduced_gate_loss
-                if self.fp16_run:
-                    scaler.scale(loss).backward()
-                    scaler.unscale_(optimizer)
-                    grad_norm = torch.nn.utils.clip_grad_norm(
-                        model.parameters(), self.grad_clip_thresh
-                    )
-                    scaler.step(optimizer)
-                    scaler.update()
-                else:
-                    loss.backward()
-                    grad_norm = torch.nn.utils.clip_grad_norm(
-                        model.parameters(), self.grad_clip_thresh
-                    )
-                    optimizer.step()
+                # if self.fp16_run:
+                #     scaler.scale(loss).backward()
+                #     scaler.unscale_(optimizer)
+                #     grad_norm = torch.nn.utils.clip_grad_norm(
+                #         model.parameters(), self.grad_clip_thresh
+                #     )
+                #     scaler.step(optimizer)
+                #     scaler.update()
+                # else:
+                loss.backward()
+                grad_norm = torch.nn.utils.clip_grad_norm(
+                    model.parameters(), self.grad_clip_thresh
+                )
+                optimizer.step()
+                ##
+
                 step_duration_seconds = time.perf_counter() - start_time
-                log_start = time.time()
                 self.log_training(
                     model,
-                    X,
-                    y_pred,
-                    y,
-                    reduced_loss,
-                    reduced_mel_loss,
-                    reduced_gate_loss,
-                    reduced_mel_loss_batch,
-                    reduced_gate_loss_batch,
-                    grad_norm,
-                    step_duration_seconds,
+                    X=model_input,
+                    ypred=model_output,
+                    y=target,
+                    mean_loss=reduced_loss,
+                    mean_mel_loss=reduced_mel_loss,
+                    mean_gate_loss=reduced_gate_loss,
+                    total_mel_loss_val=reduced_mel_loss_batch,
+                    total_gate_loss_val=reduced_gate_loss_batch,
+                    grad_norm=grad_norm,
+                    step_duration_seconds=step_duration_seconds,
                 )
-                log_stop = time.time()
                 log_str = f"epoch: {epoch}/{self.epochs} | batch: {batch_idx}/{len(train_loader)} | loss: {reduced_mel_loss:.2f} | mel: {reduced_loss:.2f} | gate: {reduced_gate_loss:.3f} | t: {start_time - previous_start_time:.2f}s | w: {(time.perf_counter() - train_start_time)/(60*60):.2f}h"
                 if self.distributed_run:
                     log_str += f" | rank: {self.rank}"
@@ -584,7 +602,7 @@ class Tacotron2Trainer(TTSTrainer):
             )
             for total_steps, batch in enumerate(val_loader):
 
-                # NOTE (Sam): call subsets directly in function arguments
+                # NOTE (Sam): Could call subsets directly in function arguments since model_input is only reused in logging
                 model_input = batch.subset(
                     [
                         "text_int_padded",
@@ -639,6 +657,7 @@ class Tacotron2Trainer(TTSTrainer):
             total_gate_loss_val = torch.hstack(total_gate_loss_val)
             speakers_val.append(batch["speaker_ids"])
             speakers_val = torch.hstack(speakers_val)
+            # NOTE (Sam): This may have a more parsimonious input
             self.log_validation(
                 X=model_input,
                 ypred=model_output,
