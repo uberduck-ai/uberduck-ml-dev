@@ -21,3 +21,9 @@ class TestTrainer:
         mel = torch.load("tests/fixtures/stevejobs-1.pt")
         audio = trainer.sample(mel)
         assert audio.size(0) == 1
+
+
+class TestTacotron2Trainer:
+    def test_gradient_step(self, lj_speech_tacotron2):
+
+        torch.random.seed(1234)

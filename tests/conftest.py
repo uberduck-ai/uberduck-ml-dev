@@ -10,6 +10,7 @@ import torch
 
 from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
+from uberduck_ml_dev.trainer.tacotron2 import Tacotron2Trainer
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 
 # NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo
@@ -57,3 +58,25 @@ def sample_inference_tf_spectrogram():
     )
 
     return inference_spectrogram
+
+
+@pytest.fixture
+def lj_trainer_mini():
+
+    # NOTE (Sam): not the same as the Lightning trainer paradigm
+    params = dict(
+        audiopaths_and_text=os.path.join(
+            os.path.dirname(__file__), "fixtures/ljtest/list.txt"
+        ),
+        checkpoint_name="test",
+        checkpoint_path="test_checkpoint",
+        epochs=1,
+        # NOTE (Sam): these should be defaults
+        # mel_fmax=TACOTRON2_DEFAULTS,
+        # mel_fmin=0,
+        # n_mel_channels=80,
+        # text_cleaners=0,
+        # pos_weight=0,
+    )
+
+    trainer = Tacotron2Trainer(**params)
