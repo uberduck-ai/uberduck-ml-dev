@@ -6,6 +6,7 @@
       <li>
          <span><a href="#🦆-Uberduck-TTS---" data-toc-modified-id="🦆-Uberduck-TTS----1"><span class="toc-item-num">1&nbsp;&nbsp;</span>🦆 Uberduck TTS <img src="https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev" alt=""></a></span>
          <ul class="toc-item">
+            <li><span><a href="#Overview" data-toc-modified-id="Overview-1.0"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Overview</a></span></li>
             <li><span><a href="#Installation" data-toc-modified-id="Installation-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Installation</a></span></li>
             <li>
                <span><a href="#Development" data-toc-modified-id="Development-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Development</a></span>
@@ -18,7 +19,6 @@
                   <li><span><a href="#🔧-Troubleshooting-Tips" data-toc-modified-id="🔧-Troubleshooting-Tips-1.3.1"><span class="toc-item-num">1.3.1&nbsp;&nbsp;</span>🔧 Troubleshooting Tips</a></span></li>
                </ul>
             </li>
-            <li><span><a href="#Overview" data-toc-modified-id="Overview-1.4"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Overview</a></span></li>
          </ul>
       </li>
    </ul>
