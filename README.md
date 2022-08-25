@@ -11,12 +11,10 @@
             <li>
                <span><a href="#Development" data-toc-modified-id="Development-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Development</a></span>
                <ul class="toc-item">
-                  <li><span><a href="#🚩-Testing" data-toc-modified-id="🚩-Testing-1.2.1"><span class="toc-item-num">1.2.1&nbsp;&nbsp;</span>🚩 Testing</a></span></li>
+                  <li><span><a href="#🚩-Testing" data-toc-modified-id="🚩-Testing-1.2.0"><span class="toc-item-num">1.2.0&nbsp;&nbsp;</span>🚩 Testing</a></span></li>
                </ul>
-            </li>
-            <li>
                <ul class="toc-item">
-                  <li><span><a href="#🔧-Troubleshooting-Tips" data-toc-modified-id="🔧-Troubleshooting-Tips-1.3.1"><span class="toc-item-num">1.3.1&nbsp;&nbsp;</span>🔧 Troubleshooting Tips</a></span></li>
+                  <li><span><a href="#🔧-Troubleshooting-Tips" data-toc-modified-id="🔧-Troubleshooting-Tips-1.2.1"><span class="toc-item-num">1.2.1&nbsp;&nbsp;</span>🔧 Troubleshooting Tips</a></span></li>
                </ul>
             </li>
          </ul>
