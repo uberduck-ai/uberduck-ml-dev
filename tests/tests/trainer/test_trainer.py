@@ -24,6 +24,12 @@ class TestTrainer:
 
 
 class TestTacotron2Trainer:
-    def test_gradient_step(self, lj_speech_tacotron2):
+    def test_gradient_step(self, lj_trainer):
 
-        torch.random.seed(1234)
+        torch.manual_seed(1234)
+        lj_trainer.train()
+
+        # NOTE (Sam): this number was taken from master on 8/24/22.
+        # Since folks are training on master right now, it is a reasonable benchmark
+        loss_target = 0.2
+        assert torch.isclose(lj_trainer.loss, loss_target)

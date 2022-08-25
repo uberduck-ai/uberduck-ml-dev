@@ -87,6 +87,7 @@ def lj_trainer(lj_speech_tacotron2_file):
         checkpoint_path="test_checkpoint",
         epochs=1,
         log_dir="/Users/samsonkoelle",
+        epochs_per_checkpoint=10,
     )
     config.update(params)
     hparams = HParams(**config)
