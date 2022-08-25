@@ -10,7 +10,10 @@ import torch
 
 from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
-from uberduck_ml_dev.trainer.tacotron2 import Tacotron2Trainer
+from uberduck_ml_dev.trainer.tacotron2 import (
+    Tacotron2Trainer,
+    DEFAULTS as TACOTRON2_TRAINER_DEFAULTS,
+)
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 
 # NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo
@@ -22,18 +25,24 @@ def _load_tacotron_uninitialized(overrides=None):
     return Tacotron2(hparams)
 
 
-@pytest.fixture
-def lj_speech_tacotron2():
-
-    device = "cpu"
+@pytest.fixture(scope="session")
+def lj_speech_tacotron2_file():
     # NOTE (Sam): A canonical LJ statedict used in our warm starting notebook
     url = "https://drive.google.com/uc?id=1qgEwtL53oFsdllM14FRZncgnARnAGInO"
     output_file = tempfile.NamedTemporaryFile()
     gdown.download(url, output_file.name, quiet=False)
+    return output_file
+
+
+@pytest.fixture
+def lj_speech_tacotron2(lj_speech_tacotron2_file):
+
+    # NOTE (Sam): this override should no longer be necessary
+    device = "cpu"
     config_overrides = {}
     config_overrides["cudnn_enabled"] = device != "cpu"
     _model = _load_tacotron_uninitialized(config_overrides)
-    checkpoint = torch.load(output_file.name, map_location=device)
+    checkpoint = torch.load(lj_speech_tacotron2_file.name, map_location=device)
     _model.from_pretrained(model_dict=checkpoint["state_dict"], device=device)
 
     return _model
@@ -60,23 +69,28 @@ def sample_inference_tf_spectrogram():
     return inference_spectrogram
 
 
-@pytest.fixture
-def lj_trainer_mini():
+@pytest.fixture()
+def lj_trainer(lj_speech_tacotron2_file):
 
     # NOTE (Sam): not the same as the Lightning trainer paradigm
+    config = TACOTRON2_TRAINER_DEFAULTS.values()
     params = dict(
-        audiopaths_and_text=os.path.join(
+        ignore_layers=None,
+        warm_start_name=lj_speech_tacotron2_file.name,
+        training_audiopaths_and_text=os.path.join(
+            os.path.dirname(__file__), "fixtures/ljtest/list.txt"
+        ),
+        val_audiopaths_and_text=os.path.join(
             os.path.dirname(__file__), "fixtures/ljtest/list.txt"
         ),
         checkpoint_name="test",
         checkpoint_path="test_checkpoint",
         epochs=1,
-        # NOTE (Sam): these should be defaults
-        # mel_fmax=TACOTRON2_DEFAULTS,
-        # mel_fmin=0,
-        # n_mel_channels=80,
-        # text_cleaners=0,
-        # pos_weight=0,
+        log_dir="/Users/samsonkoelle",
     )
+    config.update(params)
+    hparams = HParams(**config)
 
-    trainer = Tacotron2Trainer(**params)
+    trainer = Tacotron2Trainer(hparams, rank=0, world_size=1)
+
+    return trainer
