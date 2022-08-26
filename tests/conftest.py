@@ -87,6 +87,8 @@ def lj_trainer(lj_speech_tacotron2_file):
         debug=True,
         batch_size=4,
         learning_rate=1e-4,
+        # NOTE (Sam): this effects the reduction in loss in the gradient descent,
+        # so we need a separate test of validation and logging code
         is_validate=False,
     )
     config.update(params)
