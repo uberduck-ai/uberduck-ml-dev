@@ -18,17 +18,16 @@ from ..vocoders.hifigan import HiFiGanGenerator
 from ..models.base import DEFAULTS as MODEL_DEFAULTS
 from ..vendor.tfcompat.hparam import HParams
 
-# Note (Sam): keeping TTS specific parameters out of here actually - NeMo uses TTMel and a pure base trainer class is nice
-# This shall be the pure trainer class
+# Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class
 class TTSTrainer:
 
-    # Note (Sam): rewriting with explicit hparams for clarity
-    # Note (Sam): should migrate to Lightning
+    # Note (Sam): rewriting with explicit hparams for clarity.
+    # Note (Sam): should migrate to Lightning.
     def __init__(self, hparams, rank=None, world_size=None, device=None):
         print("TTSTrainer start", time.perf_counter())
         torch.backends.cudnn_enabled = hparams.cudnn_enabled
 
-        # NOTE (Sam): all hparams should be added to initializations and this next line removed
+        # NOTE (Sam): all hparams should be added to initializations and this next line removed.
         self.hparams = hparams
         self.global_step = 0
         self.rank = rank
@@ -50,7 +49,7 @@ class TTSTrainer:
         self.steps_per_sample = hparams.steps_per_sample
         self.cudnn_enabled = hparams.cudnn_enabled
 
-        # Note (Sam): these might be deprecated
+        # Note (Sam): these might be deprecated.
         self.distributed_run = hparams.distributed_run
         self.fp16_run = hparams.fp16_run
 
@@ -66,7 +65,7 @@ class TTSTrainer:
         if not hasattr(self, "debug"):
             self.debug = False
         if self.debug:
-            # NOTE (Sam): added a simple list representation of the loss for training tests
+            # NOTE (Sam): a simple list representation of the loss for training tests.
             self.loss = []
             print("Running in debug mode with hparams:")
             pprint(hparams.values())

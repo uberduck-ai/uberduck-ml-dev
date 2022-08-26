@@ -63,7 +63,7 @@ class Tacotron2Loss(nn.Module):
 
 class Tacotron2Trainer(TTSTrainer):
 
-    # NOTE (Sam): make explicit and mandatory - self.hparams arguments added in super().__init__ should be made explicit
+    # NOTE (Sam): make arguments explicit incl. self.hparams arguments added in super().__init__.
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -104,8 +104,6 @@ class Tacotron2Trainer(TTSTrainer):
 
         if not self.sample_inference_speaker_ids:
             self.sample_inference_speaker_ids = list(range(self.n_speakers))
-
-        # pass
 
     def log_training(
         self,
@@ -408,7 +406,6 @@ class Tacotron2Trainer(TTSTrainer):
         return train_set, val_set, train_loader, sampler, collate_fn
 
     def train(self):
-        from datetime import datetime
 
         train_start_time = time.perf_counter()
         print("start train", train_start_time)
@@ -429,7 +426,7 @@ class Tacotron2Trainer(TTSTrainer):
         )
         start_epoch = 0
 
-        # NOTE (Sam): distributed_run and fp16_run code likely deprecated, non-functional, and to be removed and replaced
+        # NOTE (Sam): distributed_run and fp16_run code likely deprecated, non-functional, and to be removed and replaced.
         if self.warm_start_name:
             if self.distributed_run:
                 module, optimizer, start_epoch = self.warm_start(

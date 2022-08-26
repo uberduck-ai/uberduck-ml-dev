@@ -16,7 +16,7 @@ from uberduck_ml_dev.trainer.tacotron2 import (
 )
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 
-# NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo
+# NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo.
 def _load_tacotron_uninitialized(overrides=None):
     overrides = overrides or {}
     defaults = dict(**TACOTRON2_DEFAULTS.values())
@@ -27,7 +27,7 @@ def _load_tacotron_uninitialized(overrides=None):
 
 @pytest.fixture(scope="session")
 def lj_speech_tacotron2_file():
-    # NOTE (Sam): A canonical LJ statedict used in our warm starting notebook
+    # NOTE (Sam): A canonical LJ statedict used in our warm starting notebook.
     url = "https://drive.google.com/uc?id=1qgEwtL53oFsdllM14FRZncgnARnAGInO"
     output_file = tempfile.NamedTemporaryFile()
     gdown.download(url, output_file.name, quiet=False)
@@ -37,7 +37,7 @@ def lj_speech_tacotron2_file():
 @pytest.fixture
 def lj_speech_tacotron2(lj_speech_tacotron2_file):
 
-    # NOTE (Sam): this override should no longer be necessary
+    # NOTE (Sam): this override should no longer be necessary.
     device = "cpu"
     config_overrides = {}
     config_overrides["cudnn_enabled"] = device != "cpu"
@@ -50,8 +50,7 @@ def lj_speech_tacotron2(lj_speech_tacotron2_file):
 
 @pytest.fixture
 def sample_inference_spectrogram():
-    # NOTE (Sam): made in Uberduck container using current test code in test_stft_seed
-    # text = "I, Sam, am a very good boy."
+    # NOTE (Sam): made in Uberduck container using current test code in test_stft_seed.
     inference_spectrogram = torch.load(
         os.path.join(os.path.dirname(__file__), "fixtures/sample_spectrogram.pt")
     )
@@ -60,8 +59,7 @@ def sample_inference_spectrogram():
 
 @pytest.fixture
 def sample_inference_tf_spectrogram():
-    # NOTE (Sam): made with abov at timestep 111,
-    # text = "I, Sam, am a very bad boy."
+    # NOTE (Sam): made with above at timestep 111 and text = "I, Sam, am a very bad boy."
     inference_spectrogram = torch.load(
         os.path.join(os.path.dirname(__file__), "fixtures/sample_spectrogram_tf.pt")
     )
@@ -72,8 +70,7 @@ def sample_inference_tf_spectrogram():
 @pytest.fixture()
 def lj_trainer(lj_speech_tacotron2_file):
 
-    # NOTE (Sam): not the same as the Lightning trainer paradigm
-    # NOTE (Sam): would be nicer to specify trainer here and test-specific parameters (e.g. data in test itself)
+    # NOTE (Sam): It may be nicer to specify trainer here and test-specific parameters (e.g. data) in test itself.
     config = TACOTRON2_TRAINER_DEFAULTS.values()
     params = dict(
         warm_start_name=lj_speech_tacotron2_file.name,
