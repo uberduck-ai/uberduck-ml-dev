@@ -86,7 +86,7 @@ class TestTacotron2Model:
             mel_lengths,
         ) = lj_speech_tacotron2.inference(input_)
 
-        tf_index = 111  # NOTE (Sam): look at the beginning of the clip since they are different lengths
+        tf_index = 111  # NOTE (Sam): look at the beginning of the clip since they are different lengths.
         estimated_vector = rearrange(
             mel_outputs_postnet.detach().numpy()[:, :, :tf_index], "b m t -> (b m t)"
         )
