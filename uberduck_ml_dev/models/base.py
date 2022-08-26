@@ -70,6 +70,6 @@ from ..vendor.tfcompat.hparam import HParams
 DEFAULTS = HParams(
     p_arpabet=1.0,
     seed=1234,
-    # NOTE (Sam): make sure users change their configurations for cudnn_enabled = True
+    # NOTE (Sam): make sure users change their configurations for cudnn_enabled = True.
     cudnn_enabled=False,
 )

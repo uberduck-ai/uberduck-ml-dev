@@ -35,7 +35,7 @@ class TestTacotron2Model:
             collate_fn,
         ) = trainer.initialize_loader()
         batch = next(enumerate(train_loader))[1]
-        # NOTE (Sam): could call subsets directly in function arguments
+        # NOTE (Sam): could call subsets directly in function arguments.
         model_input = batch.subset(
             [
                 "text_int_padded",
@@ -121,7 +121,7 @@ class TestTacotron2Model:
 
         torch.random.manual_seed(1234)
         np.random.seed(1234)
-        tf_index = 111  # NOTE (Sam): this was determined by listening to the output
+        tf_index = 111  # NOTE (Sam): this was determined by listening to the output.
         nreps = 1
         text = "I, Sam, am a very bad boy."
         lines = [t for t in text.split("\n") if t]
