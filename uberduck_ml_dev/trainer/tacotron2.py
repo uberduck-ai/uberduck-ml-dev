@@ -45,9 +45,6 @@ class Tacotron2Loss(nn.Module):
 
     # NOTE (Sam): make function inputs explicit
     def forward(self, model_output: Batch, target: Batch):
-        import pdb
-
-        pdb.set_trace()
         mel_target, gate_target = target["mel_padded"], target["gate_target"]
         mel_target.requires_grad = False
         gate_target.requires_grad = False
@@ -139,7 +136,7 @@ class Tacotron2Trainer(TTSTrainer):
             scalar=step_duration_seconds,
         )
 
-        batch_levels = X.speaker_ids
+        batch_levels = X["speaker_ids"]
         batch_levels_unique = torch.unique(batch_levels)
         for l in batch_levels_unique:
             mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
@@ -161,8 +158,10 @@ class Tacotron2Trainer(TTSTrainer):
             )
 
         if self.global_step % self.steps_per_sample == 0:
-            _, mel_out_postnet, gate_outputs, alignments, *_ = y_pred
-            mel_target, gate_target = y
+            mel_out_postnet, gate_outputs, alignments = y_pred.subset(
+                ["mel_out_postnet", "gate_outputs", "alignments"]
+            ).values()
+            mel_target, gate_target = y.subset(["mel_padded", "gate_target"])
             alignment_metrics = get_alignment_metrics(alignments)
             alignment_diagonalness = alignment_metrics["diagonalness"]
             alignment_max = alignment_metrics["max"]
@@ -199,8 +198,8 @@ class Tacotron2Trainer(TTSTrainer):
                     )
                 ),
             )
-            input_length = X.input_lengths[sample_idx].item()
-            output_length = X.output_lengths[sample_idx].item()
+            input_length = X["input_lengths"][sample_idx].item()
+            output_length = X["output_lengths"][sample_idx].item()
             self.log(
                 "Attention/train",
                 self.global_step,
@@ -333,7 +332,7 @@ class Tacotron2Trainer(TTSTrainer):
                 scalar=mlv + glv,
             )
         # Generate the sample from a random item from the last y_pred batch.
-        mel_out_postnet, gate_outputs, alignments = list(y_pred.values())
+        mel_out_postnet, gate_outputs, alignments = y_pred.values()
         alignment_metrics = get_alignment_metrics(alignments)
         alignment_diagonalness = alignment_metrics["diagonalness"]
         alignment_max = alignment_metrics["max"]
@@ -501,9 +500,6 @@ class Tacotron2Trainer(TTSTrainer):
                     reduced_mel_loss_batch = mel_loss_batch.detach()
 
                 reduced_loss = reduced_mel_loss + reduced_gate_loss
-                import pdb
-
-                pdb.set_trace()
                 loss.backward()
                 grad_norm = torch.nn.utils.clip_grad_norm(
                     model.parameters(), self.grad_clip_thresh
@@ -511,16 +507,17 @@ class Tacotron2Trainer(TTSTrainer):
                 optimizer.step()
 
                 step_duration_seconds = time.perf_counter() - start_time
+                # NOTE (Sam): need to unify names to match forward
                 self.log_training(
                     model,
                     X=model_input,
-                    ypred=model_output,
+                    y_pred=model_output,
                     y=target,
-                    mean_loss=reduced_loss,
-                    mean_mel_loss=reduced_mel_loss,
-                    mean_gate_loss=reduced_gate_loss,
-                    total_mel_loss_val=reduced_mel_loss_batch,
-                    total_gate_loss_val=reduced_gate_loss_batch,
+                    loss=reduced_loss,
+                    mel_loss=reduced_mel_loss,
+                    gate_loss=reduced_gate_loss,
+                    mel_loss_batch=reduced_mel_loss_batch,
+                    gate_loss_batch=reduced_gate_loss_batch,
                     grad_norm=grad_norm,
                     step_duration_seconds=step_duration_seconds,
                 )
@@ -640,7 +637,7 @@ class Tacotron2Trainer(TTSTrainer):
             # NOTE (Sam): This may have a more parsimonious input
             self.log_validation(
                 X=model_input,
-                ypred=model_output,
+                y_pred=model_output,
                 y=target,
                 mean_loss=mean_loss,
                 mean_mel_loss=mean_mel_loss,

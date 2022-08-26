@@ -809,13 +809,9 @@ class Tacotron2(TTSModel):
             mask = F.pad(mask, (0, mel_outputs.size(2) - mask.size(2)))
             mask = mask.permute(1, 0, 2)  # NOTE (Sam): replace with einops
 
-            outputs["mel_outputs"] = outputs["mel_outputs"].data.masked_fill_(mask, 0.0)
-            outputs["mel_outputs_postnet"] = outputs[
-                "mel_outputs_postnet"
-            ].data.masked_fill_(mask, 0.0)
-            outputs["gate_predicted"] = outputs["gate_predicted"].data.masked_fill_(
-                mask[:, 0, :], 1e3
-            )
+            outputs["mel_outputs"].data.masked_fill_(mask, 0.0)
+            outputs["mel_outputs_postnet"].data.masked_fill_(mask, 0.0)
+            outputs["gate_predicted"].data.masked_fill_(mask[:, 0, :], 1e3)
 
         return outputs
 
@@ -893,9 +889,6 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
             alignments=alignments,
         )
-        import pdb
-
-        pdb.set_trace()
         output = self.mask_output(output_raw)
         # NOTE (Sam): batch class simplifies in particular where returning data
         return output
