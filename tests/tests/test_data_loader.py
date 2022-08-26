@@ -72,10 +72,6 @@ class TestTextMelCollation:
             assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
             assert len(batch) == 7
-            # a = list(batch._field_defaults.values())
-            # b = list(batch.values())
-            # c = Counter([a[i] == b[i] for i in range(len(b))])
-            # assert c[False] == 6
 
     def test_batch_dimensions_partial(self):
 

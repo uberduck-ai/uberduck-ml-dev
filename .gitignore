@@ -6,6 +6,7 @@ docker/secrets/gcloud_key.json
 docker/secrets/*
 nbs/test/fixtures/models/*
 nbs/test/fixtures/results/*
+test_checkpoint/*
 
 *.bak
 .gitattributes

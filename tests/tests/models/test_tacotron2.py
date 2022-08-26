@@ -22,7 +22,6 @@ class TestTacotron2Model:
         with open("tests/fixtures/ljtest/taco2_lj2lj.json") as f:
             config.update(json.load(f))
         hparams = HParams(**config)
-        # hparams.speaker_embedding_dim = 1
         model = Tacotron2(hparams)
         if torch.cuda.is_available() and hparams.cudnn_enabled:
             model.cuda()

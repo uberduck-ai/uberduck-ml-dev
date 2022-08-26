@@ -7,12 +7,6 @@ from ..utils.utils import to_gpu
 
 class Batch(Dict):
     # NOTE (Sam): isn't gate target redundant to output length
-    # NOTE (Sam): I don't see any benefit to using namedtuple over dictionary
-    # Supposedly, the idea was that namedtuple enables retention of tuple ordering for backwards compatibility
-    # However, both X and Y contain certain parameters (e.g. mels for teacher forcing).
-    # Thus, we either need to have separate redundant classes, or unite under one batch class
-    # I think a united class is much easier to understand and only slightly less efficient
-    # However, a united class necessarily destroys the existing ordering
 
     text_int_padded: Optional[torch.LongTensor] = None
     input_lengths: Optional[torch.LongTensor] = None

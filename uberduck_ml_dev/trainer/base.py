@@ -18,7 +18,7 @@ from ..vocoders.hifigan import HiFiGanGenerator
 from ..models.base import DEFAULTS as MODEL_DEFAULTS
 from ..vendor.tfcompat.hparam import HParams
 
-# Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class
+# Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class.
 class TTSTrainer:
 
     # Note (Sam): rewriting with explicit hparams for clarity.

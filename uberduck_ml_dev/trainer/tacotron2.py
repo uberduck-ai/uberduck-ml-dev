@@ -34,6 +34,7 @@ from .base import TTSTrainer
 from ..data_loader import TextMelDataset, TextMelCollate
 
 
+# NOTE (Sam): This should get its own file, and loss should get its own class.
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
         if pos_weight is not None:
@@ -43,7 +44,7 @@ class Tacotron2Loss(nn.Module):
 
         super().__init__()
 
-    # NOTE (Sam): make function inputs explicit
+    # NOTE (Sam): making function inputs explicit makes less sense in situations like this with obvious subcategories.
     def forward(self, model_output: Batch, target: Batch):
         mel_target, gate_target = target["mel_padded"], target["gate_target"]
         mel_target.requires_grad = False
@@ -459,7 +460,7 @@ class Tacotron2Trainer(TTSTrainer):
                 # NOTE (Sam): model.module.zero_grad() needed for distributed run?
                 model.zero_grad()
 
-                # NOTE (Sam): Could call subsets directly in function arguments since model_input is only reused in logging
+                # NOTE (Sam): Could call subsets directly in function arguments since model_input is only reused in logging.
                 model_input = batch.subset(
                     [
                         "text_int_padded",
@@ -634,7 +635,7 @@ class Tacotron2Trainer(TTSTrainer):
             mean_loss = total_loss / total_steps
             total_mel_loss_val = torch.hstack(total_mel_loss_val)
             total_gate_loss_val = torch.hstack(total_gate_loss_val)
-            # NOTE (Sam): minor - why are speaker_ids 0 when has_speaker_embedding = False
+            # NOTE (Sam): minor - why are speaker_ids 0 when has_speaker_embedding = False?
             speakers_val.append(batch["speaker_ids"])
             speakers_val = torch.hstack(speakers_val)
             self.log_validation(

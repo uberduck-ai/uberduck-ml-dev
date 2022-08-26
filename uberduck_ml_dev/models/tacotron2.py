@@ -852,12 +852,6 @@ class Tacotron2(TTSModel):
         speaker_ids,
         embedded_gst,
     ):
-        # input_text = inputs.text_int_padded
-        # input_lengths = inputs.input_lengths
-        # targets = inputs.mel_padded
-        # output_lengths = inputs.output_lengths
-        # speaker_ids = inputs.speaker_ids
-        # embedded_gst = inputs.gst
 
         input_lengths, output_lengths = input_lengths.data, output_lengths.data
 
@@ -881,7 +875,6 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        # if self.location_specific_attention:
         output_raw = Batch(
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
@@ -890,15 +883,13 @@ class Tacotron2(TTSModel):
             alignments=alignments,
         )
         output = self.mask_output(output_raw)
-        # NOTE (Sam): batch class simplifies in particular where returning data
+        # NOTE (Sam): batch class simplifies in particular where returning data.
         return output
 
     @torch.no_grad()
     def inference(self, input_text, input_lengths, speaker_ids=None, embedded_gst=None):
 
-        # NOTE (Sam): deprecated pattern is
-        # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
-        # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here
+        # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
@@ -928,6 +919,7 @@ class Tacotron2(TTSModel):
         return self.mask_output(output_raw)
 
     @torch.no_grad()
+    # NOTE (Sam): this seems broken but unused.
     def inference_noattention(self, inputs):
         """Run inference conditioned on an attention map."""
         text, input_lengths, speaker_ids, attention_maps = inputs
@@ -970,8 +962,6 @@ class Tacotron2(TTSModel):
 
         tf_mel: (B, T, n_mel_channels)
         """
-        # NOTE (Sam): deprecated pattern is
-        # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
