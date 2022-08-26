@@ -71,6 +71,7 @@ class Tacotron2Trainer(TTSTrainer):
         # but the current TTSTrainer is en route to just be Trainer so I haven't added them yet.
         self.training_audiopaths_and_text = self.hparams.training_audiopaths_and_text
         self.val_audiopaths_and_text = self.hparams.val_audiopaths_and_text
+        self.symbol_set = self.hparams.symbol_set
         self.mel_fmax = self.hparams.mel_fmax
         self.mel_fmin = self.hparams.mel_fmin
         self.n_mel_channels = self.hparams.n_mel_channels

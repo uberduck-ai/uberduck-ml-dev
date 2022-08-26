@@ -35,7 +35,6 @@ class TTSTrainer:
         self.world_size = world_size
         self.log_dir = hparams.log_dir
         self.seed = hparams.seed
-        self.symbol_set = hparams.symbol_set
         self.checkpoint_name = hparams.checkpoint_name
         self.checkpoint_path = hparams.checkpoint_path
         self.epochs = hparams.epochs
@@ -194,6 +193,12 @@ DEFAULTS = HParams(
     sample_inference_speaker_ids=None,
     is_validate=True,
     learning_rate=1e-3,
+    epochs=10,
+    epochs_per_checkpoint=10,
+    debug=False,
+    warm_start_name=None,
+    ignore_layers=None,
+    distributed_run=False,
 )
 
 config = DEFAULTS.values()

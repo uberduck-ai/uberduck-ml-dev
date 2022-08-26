@@ -2,23 +2,26 @@ from uberduck_ml_dev.trainer.base import TTSTrainer
 import torch
 import math
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
+from uberduck_ml_dev.trainer.base import DEFAULTS as TRAINER_DEFAULTS
 
 
 class TestTrainer:
     def test_trainer_base(self):
-        hp = HParams(
-            foo="bar",
-            baz=123,
-            checkpoint_path="this/is/a/test",
+
+        config = TRAINER_DEFAULTS.values()
+
+        params = dict(
+            checkpoint_name="test",
+            checkpoint_path="test_checkpoint",
             cudnn_enabled=True,
             log_dir="this/is/a/test",
-            seed=1234,
-            symbol_set="default",
         )
-        trainer = TTSTrainer(hp)
-        assert trainer.hparams == hp
-        assert trainer.foo == "bar"
-        assert trainer.baz == 123
+        config.update(params)
+        hparams = HParams(**config)
+        trainer = TTSTrainer(hparams)
+        assert trainer.hparams == hparams
+
+        assert trainer.cudnn_enabled == True
         mel = torch.load("tests/fixtures/stevejobs-1.pt")
         audio = trainer.sample(mel)
         assert audio.size(0) == 1
