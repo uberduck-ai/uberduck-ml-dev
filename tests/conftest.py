@@ -87,6 +87,7 @@ def lj_trainer(lj_speech_tacotron2_file):
         debug=True,
         batch_size=4,
         learning_rate=1e-4,
+        is_validate=False,
     )
     config.update(params)
     hparams = HParams(**config)
