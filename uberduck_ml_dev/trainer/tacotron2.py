@@ -159,7 +159,7 @@ class Tacotron2Trainer(TTSTrainer):
 
         if self.global_step % self.steps_per_sample == 0:
             mel_out_postnet, gate_outputs, alignments = y_pred.subset(
-                ["mel_out_postnet", "gate_outputs", "alignments"]
+                ["mel_outputs_postnet", "gate_predicted", "alignments"]
             ).values()
             mel_target, gate_target = y.subset(["mel_padded", "gate_target"])
             alignment_metrics = get_alignment_metrics(alignments)
@@ -332,7 +332,9 @@ class Tacotron2Trainer(TTSTrainer):
                 scalar=mlv + glv,
             )
         # Generate the sample from a random item from the last y_pred batch.
-        mel_out_postnet, gate_outputs, alignments = y_pred.values()
+        mel_out_postnet, gate_outputs, alignments = y_pred.subset(
+            ["mel_outputs_postnet", "gate_predicted", "alignments"]
+        ).values()
         alignment_metrics = get_alignment_metrics(alignments)
         alignment_diagonalness = alignment_metrics["diagonalness"]
         alignment_max = alignment_metrics["max"]
@@ -355,7 +357,7 @@ class Tacotron2Trainer(TTSTrainer):
             "MelTarget/val",
             self.global_step,
             image=save_figure_to_numpy(
-                plot_spectrogram(y["mel_target"][sample_idx].data.cpu())
+                plot_spectrogram(y["mel_padded"][sample_idx].data.cpu())
             ),
         )
         self.log(
@@ -537,10 +539,8 @@ class Tacotron2Trainer(TTSTrainer):
                     global_step=self.global_step,
                 )
 
-            # There's no need to validate in debug mode since we're not really training.
-            if self.debug:
-                self.loss.append(reduced_loss)
-                continue
+            # NOTE (Zach): There's no need to validate in debug mode since we're not really training.
+            # NOTE (Sam): What if I want to debug the validator?
             if self.is_validate:
                 self.validate(
                     model=model,
@@ -548,10 +548,12 @@ class Tacotron2Trainer(TTSTrainer):
                     collate_fn=collate_fn,
                     criterion=criterion,
                 )
+            if self.debug:
+                self.loss.append(reduced_loss)
+                continue
 
     def validate(self, **kwargs):
         val_start_time = time.perf_counter()
-
         model = kwargs["model"]
         val_set = kwargs["val_set"]
         collate_fn = kwargs["collate_fn"]
@@ -564,7 +566,6 @@ class Tacotron2Trainer(TTSTrainer):
             total_mel_loss_val,
             total_gate_loss_val,
         ) = (0, 0, 0, 0, 0)
-        total_steps = 0
         model.eval()
         speakers_val = []
         total_mel_loss_val = []
@@ -577,7 +578,7 @@ class Tacotron2Trainer(TTSTrainer):
                 batch_size=self.batch_size,
                 collate_fn=collate_fn,
             )
-            for total_steps, batch in enumerate(val_loader):
+            for step_counter, batch in enumerate(val_loader):
 
                 # NOTE (Sam): Could call subsets directly in function arguments since model_input is only reused in logging
                 model_input = batch.subset(
@@ -627,14 +628,15 @@ class Tacotron2Trainer(TTSTrainer):
                 total_gate_loss += reduced_gate_loss
                 total_loss += reduced_val_loss
 
+            total_steps = step_counter + 1
             mean_mel_loss = total_mel_loss / total_steps
             mean_gate_loss = total_gate_loss / total_steps
             mean_loss = total_loss / total_steps
             total_mel_loss_val = torch.hstack(total_mel_loss_val)
             total_gate_loss_val = torch.hstack(total_gate_loss_val)
+            # NOTE (Sam): minor - why are speaker_ids 0 when has_speaker_embedding = False
             speakers_val.append(batch["speaker_ids"])
             speakers_val = torch.hstack(speakers_val)
-            # NOTE (Sam): This may have a more parsimonious input
             self.log_validation(
                 X=model_input,
                 y_pred=model_output,
@@ -642,8 +644,8 @@ class Tacotron2Trainer(TTSTrainer):
                 mean_loss=mean_loss,
                 mean_mel_loss=mean_mel_loss,
                 mean_gate_loss=mean_gate_loss,
-                total_mel_loss_val=total_mel_loss_val,
-                total_gate_loss_val=total_gate_loss_val,
+                mel_loss_val=total_mel_loss_val,
+                gate_loss_val=total_gate_loss_val,
                 speakers_val=speakers_val,
             )
 

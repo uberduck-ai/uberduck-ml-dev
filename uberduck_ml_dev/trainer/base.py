@@ -48,8 +48,9 @@ class TTSTrainer:
         self.grad_clip_thresh = hparams.grad_clip_thresh
         self.steps_per_sample = hparams.steps_per_sample
         self.cudnn_enabled = hparams.cudnn_enabled
+        self.is_validate = hparams.is_validate
 
-        # Note (Sam): these might be deprecated.
+        # NOTE (Sam): these are deprecated.
         self.distributed_run = hparams.distributed_run
         self.fp16_run = hparams.fp16_run
 
