@@ -73,21 +73,25 @@ def sample_inference_tf_spectrogram():
 def lj_trainer(lj_speech_tacotron2_file):
 
     # NOTE (Sam): not the same as the Lightning trainer paradigm
+    # NOTE (Sam): would be nicer to specify trainer here and test-specific parameters (e.g. data in test itself)
     config = TACOTRON2_TRAINER_DEFAULTS.values()
     params = dict(
         ignore_layers=None,
         warm_start_name=lj_speech_tacotron2_file.name,
         training_audiopaths_and_text=os.path.join(
-            os.path.dirname(__file__), "fixtures/ljtest/list.txt"
+            os.path.dirname(__file__), "fixtures/ljtest/list_small.txt"
         ),
         val_audiopaths_and_text=os.path.join(
-            os.path.dirname(__file__), "fixtures/ljtest/list.txt"
+            os.path.dirname(__file__), "fixtures/ljtest/list_small.txt"
         ),
         checkpoint_name="test",
         checkpoint_path="test_checkpoint",
-        epochs=1,
+        epochs=2,
         log_dir="/Users/samsonkoelle",
         epochs_per_checkpoint=10,
+        debug=True,
+        batch_size=4,
+        learning_rate=1e-4,
     )
     config.update(params)
     hparams = HParams(**config)

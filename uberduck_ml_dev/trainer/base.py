@@ -15,30 +15,46 @@ import time
 
 from ..models.common import MelSTFT
 from ..vocoders.hifigan import HiFiGanGenerator
+from ..models.base import DEFAULTS as MODEL_DEFAULTS
+from ..vendor.tfcompat.hparam import HParams
 
-
+# Note (Sam): keeping TTS specific parameters out of here actually - NeMo uses TTMel and a pure base trainer class is nice
+# This shall be the pure trainer class
 class TTSTrainer:
-    # Note (Sam): rewrite with explicit hparams for clarity
-    # Note (Sam): keeping TTS specific parameters out of here actually - NeMo uses TTMel and a pure base trainer class is nice
+
+    # Note (Sam): rewriting with explicit hparams for clarity
     # Note (Sam): should migrate to Lightning
     def __init__(self, hparams, rank=None, world_size=None, device=None):
         print("TTSTrainer start", time.perf_counter())
-        self.hparams = hparams
-        for k, v in hparams.values().items():
-            setattr(self, k, v)
-
         torch.backends.cudnn_enabled = hparams.cudnn_enabled
+
+        # NOTE (Sam): all hparams should be added to initializations and this next line removed
+        self.hparams = hparams
         self.global_step = 0
         self.rank = rank
         self.world_size = world_size
         self.log_dir = hparams.log_dir
         self.seed = hparams.seed
         self.symbol_set = hparams.symbol_set
-
         self.checkpoint_name = hparams.checkpoint_name
         self.checkpoint_path = hparams.checkpoint_path
         self.epochs = hparams.epochs
         self.epochs_per_checkpoint = hparams.epochs_per_checkpoint
+        self.learning_rate = hparams.learning_rate
+        self.debug = hparams.debug
+        self.batch_size = hparams.batch_size
+        self.sample_inference_speaker_ids = hparams.sample_inference_speaker_ids
+        self.weight_decay = hparams.weight_decay
+        self.warm_start_name = hparams.warm_start_name
+        self.ignore_layers = hparams.ignore_layers
+        self.grad_clip_thresh = hparams.grad_clip_thresh
+        self.steps_per_sample = hparams.steps_per_sample
+        self.cudnn_enabled = hparams.cudnn_enabled
+
+        # Note (Sam): these might be deprecated
+        self.distributed_run = hparams.distributed_run
+        self.fp16_run = hparams.fp16_run
+
         torch.manual_seed(self.seed)
 
         if device:
@@ -51,6 +67,8 @@ class TTSTrainer:
         if not hasattr(self, "debug"):
             self.debug = False
         if self.debug:
+            # NOTE (Sam): added a simple list representation of the loss for training tests
+            self.loss = []
             print("Running in debug mode with hparams:")
             pprint(hparams.values())
         else:
@@ -158,19 +176,15 @@ class TTSTrainer:
         raise NotImplemented
 
 
-# Cell
-from ..models.base import DEFAULTS as MODEL_DEFAULTS
-from ..vendor.tfcompat.hparam import HParams
-
 DEFAULTS = HParams(
     grad_clip_thresh=1.0,
-    reduction_window_schedule=[
-        {"until_step": 10000, "batch_size": 16, "n_frames_per_step": 1},
-        {"until_step": 50000, "batch_size": 16, "n_frames_per_step": 1},
-        {"until_step": 60000, "batch_size": 16, "n_frames_per_step": 1},
-        {"until_step": 70000, "batch_size": 16, "n_frames_per_step": 1},
-        {"until_step": None, "batch_size": 16, "n_frames_per_step": 1},
-    ],
+    # reduction_window_schedule=[
+    #     {"until_step": 10000, "batch_size": 16, "n_frames_per_step": 1},
+    #     {"until_step": 50000, "batch_size": 16, "n_frames_per_step": 1},
+    #     {"until_step": 60000, "batch_size": 16, "n_frames_per_step": 1},
+    #     {"until_step": 70000, "batch_size": 16, "n_frames_per_step": 1},
+    #     {"until_step": None, "batch_size": 16, "n_frames_per_step": 1},
+    # ],
     batch_size=16,
     decay_start=15000,
     decay_rate=8000,
