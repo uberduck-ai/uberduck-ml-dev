@@ -135,7 +135,7 @@ class TestTacotron2Model:
         sample_inference_spectrogram = sample_inference_spectrogram[None, :]
 
         mel_outputs_postnet_tf = lj_speech_tacotron2.inference_partial_tf(
-            text=sequences,
+            input_text=sequences,
             input_lengths=input_lengths,
             speaker_ids=None,
             embedded_gst=None,
@@ -144,12 +144,9 @@ class TestTacotron2Model:
         )["mel_outputs_postnet"]
 
         mel_outputs_postnet_original = lj_speech_tacotron2.inference(
-            text=sequences, input_lengths=input_lengths, speaker_ids=None
+            input_text=sequences, input_lengths=input_lengths, speaker_ids=None
         )["mel_outputs_postnet"]
 
-        # import pdb
-
-        # pdb.set_trace()
         non_tf_mel_outputs_postnet_beginning = (
             mel_outputs_postnet_original.detach().numpy()[:, :, :tf_index]
         )
@@ -206,7 +203,7 @@ class TestTacotron2Model:
             gate_outputs,
             alignments,
         ) = lj_speech_tacotron2.inference_partial_tf(
-            text=sequences,
+            input_text=sequences,
             input_lengths=input_lengths,
             speaker_ids=None,
             embedded_gst=None,

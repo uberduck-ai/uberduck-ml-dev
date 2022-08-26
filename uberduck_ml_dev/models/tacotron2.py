@@ -813,11 +813,8 @@ class Tacotron2(TTSModel):
             outputs["mel_outputs_postnet"] = outputs[
                 "mel_outputs_postnet"
             ].data.masked_fill_(mask, 0.0)
-            # import pdb
-
-            # pdb.set_trace()
-            outputs["gate_predicted"] = (
-                outputs["gate_predicted"].data.masked_fill_(mask[:, 0, :], 1e3),
+            outputs["gate_predicted"] = outputs["gate_predicted"].data.masked_fill_(
+                mask[:, 0, :], 1e3
             )
 
         return outputs
@@ -885,7 +882,6 @@ class Tacotron2(TTSModel):
             decoder_inputs=targets,
             memory_lengths=input_lengths,
         )
-
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
@@ -897,20 +893,20 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
             alignments=alignments,
         )
-        # import pdb
+        import pdb
 
-        # pdb.set_trace()
+        pdb.set_trace()
         output = self.mask_output(output_raw)
         # NOTE (Sam): batch class simplifies in particular where returning data
         return output
 
     @torch.no_grad()
-    def inference(self, text, input_lengths, speaker_ids=None, embedded_gst=None):
+    def inference(self, input_text, input_lengths, speaker_ids=None, embedded_gst=None):
 
         # NOTE (Sam): deprecated pattern is
         # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
         # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here
-        embedded_inputs = self.embedding(text).transpose(1, 2)
+        embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
         if self.speaker_embedding:
@@ -966,7 +962,7 @@ class Tacotron2(TTSModel):
     @torch.no_grad()
     def inference_partial_tf(
         self,
-        text,
+        input_text,
         input_lengths,
         speaker_ids,
         embedded_gst,
@@ -983,7 +979,7 @@ class Tacotron2(TTSModel):
         """
         # NOTE (Sam): deprecated pattern is
         # text, input_lengths, speaker_ids, embedded_gst, *_ = inputs
-        embedded_inputs = self.embedding(text).transpose(1, 2)
+        embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
         if self.speaker_embedding:

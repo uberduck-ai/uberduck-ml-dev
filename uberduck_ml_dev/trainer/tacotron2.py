@@ -43,14 +43,18 @@ class Tacotron2Loss(nn.Module):
 
         super().__init__()
 
+    # NOTE (Sam): make function inputs explicit
     def forward(self, model_output: Batch, target: Batch):
-        mel_target, gate_target = target.mel_target, target.gate_target
+        import pdb
+
+        pdb.set_trace()
+        mel_target, gate_target = target["mel_padded"], target["gate_target"]
         mel_target.requires_grad = False
         gate_target.requires_grad = False
         mel_out, mel_out_postnet, gate_out = (
-            model_output.mel_outputs,
-            model_output.mel_outputs_postnet,
-            model_output.gate_predicted,
+            model_output["mel_outputs"],
+            model_output["mel_outputs_postnet"],
+            model_output["gate_predicted"],
         )
         mel_loss_batch = nn.MSELoss(reduction="none")(mel_out, mel_target).mean(
             axis=[1, 2]
@@ -466,21 +470,8 @@ class Tacotron2Trainer(TTSTrainer):
                     ]
                 )
 
-                # if self.fp16_run:
-                #     with autocast():
-                #         y_pred = model(X)
-
-                #         (
-                #             mel_loss,
-                #             gate_loss,
-                #             mel_loss_batch,
-                #             gate_loss_batch,
-                #         ) = criterion(y_pred, y)
-                #         loss = mel_loss + gate_loss
-                #         loss_batch = mel_loss_batch + gate_loss_batch
-                # else:
                 model_output = model(
-                    text=model_input["text_int_padded"],
+                    input_text=model_input["text_int_padded"],
                     input_lengths=model_input["input_lengths"],
                     speaker_ids=model_input["speaker_ids"],
                     embedded_gst=model_input["gst"],
@@ -510,21 +501,14 @@ class Tacotron2Trainer(TTSTrainer):
                     reduced_mel_loss_batch = mel_loss_batch.detach()
 
                 reduced_loss = reduced_mel_loss + reduced_gate_loss
-                # if self.fp16_run:
-                #     scaler.scale(loss).backward()
-                #     scaler.unscale_(optimizer)
-                #     grad_norm = torch.nn.utils.clip_grad_norm(
-                #         model.parameters(), self.grad_clip_thresh
-                #     )
-                #     scaler.step(optimizer)
-                #     scaler.update()
-                # else:
+                import pdb
+
+                pdb.set_trace()
                 loss.backward()
                 grad_norm = torch.nn.utils.clip_grad_norm(
                     model.parameters(), self.grad_clip_thresh
                 )
                 optimizer.step()
-                ##
 
                 step_duration_seconds = time.perf_counter() - start_time
                 self.log_training(
@@ -610,7 +594,7 @@ class Tacotron2Trainer(TTSTrainer):
                     ]
                 )
                 model_output = model(
-                    text=model_input["text_int_padded"],
+                    input_text=model_input["text_int_padded"],
                     input_lengths=model_input["input_lengths"],
                     speaker_ids=model_input["speaker_ids"],
                     embedded_gst=model_input["gst"],
