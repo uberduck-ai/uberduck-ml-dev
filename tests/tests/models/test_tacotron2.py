@@ -1,29 +1,32 @@
 import json
 import random
+from collections import Counter
 
+import torch
 from einops import rearrange
 import torch
 import numpy as np
 
 from uberduck_ml_dev.data_loader import prepare_input_sequence
-from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
-from uberduck_ml_dev.trainer.tacotron2 import Tacotron2Trainer
+from uberduck_ml_dev.trainer.tacotron2 import (
+    Tacotron2Trainer,
+    DEFAULTS as TACOTRON2_TRAINER_DEFAULTS,
+)
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
-import torch
-from collections import Counter
 
 
 class TestTacotron2Model:
     def test_tacotron2_model(self):
-        config = TACOTRON2_DEFAULTS.values()
+        config = TACOTRON2_TRAINER_DEFAULTS.values()
         with open("tests/fixtures/ljtest/taco2_lj2lj.json") as f:
             config.update(json.load(f))
         hparams = HParams(**config)
-        hparams.speaker_embedding_dim = 1
+        # hparams.speaker_embedding_dim = 1
         model = Tacotron2(hparams)
         if torch.cuda.is_available() and hparams.cudnn_enabled:
             model.cuda()
+
         trainer = Tacotron2Trainer(hparams, rank=0, world_size=0)
         (
             train_set,
@@ -33,7 +36,7 @@ class TestTacotron2Model:
             collate_fn,
         ) = trainer.initialize_loader()
         batch = next(enumerate(train_loader))[1]
-        # NOTE (Sam): call subsets directly in function arguments
+        # NOTE (Sam): could call subsets directly in function arguments
         model_input = batch.subset(
             [
                 "text_int_padded",
