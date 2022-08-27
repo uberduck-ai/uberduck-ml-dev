@@ -91,6 +91,7 @@ class Tacotron2Trainer(TTSTrainer):
         self.hop_length = self.hparams.hop_length
         self.win_length = self.hparams.win_length
         self.max_wav_value = self.hparams.max_wav_value
+        self.sample_inference_text = self.hparams.sample_inference_text
 
         if self.hparams.get("gst_type") == "torchmoji":
             assert self.hparams.get(
@@ -162,7 +163,7 @@ class Tacotron2Trainer(TTSTrainer):
             mel_out_postnet, gate_outputs, alignments = y_pred.subset(
                 ["mel_outputs_postnet", "gate_predicted", "alignments"]
             ).values()
-            mel_target, gate_target = y.subset(["mel_padded", "gate_target"])
+            mel_target, gate_target = y.subset(["mel_padded", "gate_target"]).values()
             alignment_metrics = get_alignment_metrics(alignments)
             alignment_diagonalness = alignment_metrics["diagonalness"]
             alignment_max = alignment_metrics["max"]
@@ -262,37 +263,44 @@ class Tacotron2Trainer(TTSTrainer):
 
             model.eval()
 
-            _, mel, gate, attn, lengths = model.inference(
-                text=utterance,
+            sample_inference = model.inference(
+                input_text=utterance,
                 input_lengths=input_lengths,
-                speaker_ids=torch.LongTensor([speaker_id]).cuda(),
-                gst=gst_embedding,
+                speaker_ids=speaker_id_tensor,
+                embedded_gst=gst_embedding,
             )
-
             model.train()
             try:
-                audio = self.sample(mel[0])
+                audio = self.sample(sample_inference["mel_outputs_postnet"][0])
                 self.log(f"SampleInference/{speaker_id}", self.global_step, audio=audio)
             except Exception as e:
                 print(f"Exception raised while doing sample inference: {e}")
-                print("Mel shape: ", mel[0].shape)
+                print("Mel shape: ", sample_inference["mel_outputs_postnet"][0].shape)
             self.log(
                 f"Attention/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(
-                    plot_attention(attn[0].data.cpu().transpose(0, 1))
+                    plot_attention(
+                        sample_inference["alignments"][0].data.cpu().transpose(0, 1)
+                    )
                 ),
             )
             self.log(
                 f"MelPredicted/{speaker_id}/sample_inference",
                 self.global_step,
-                image=save_figure_to_numpy(plot_spectrogram(mel[0].data.cpu())),
+                image=save_figure_to_numpy(
+                    plot_spectrogram(
+                        sample_inference["mel_outputs_postnet"][0].data.cpu()
+                    )
+                ),
             )
             self.log(
                 f"Gate/{speaker_id}/sample_inference",
                 self.global_step,
                 image=save_figure_to_numpy(
-                    plot_gate_outputs(gate_outputs=gate[0].data.cpu())
+                    plot_gate_outputs(
+                        gate_outputs=sample_inference["gate_predicted"][0].data.cpu()
+                    )
                 ),
             )
 
@@ -687,4 +695,5 @@ class Tacotron2Trainer(TTSTrainer):
 
 config = TRAINER_DEFAULTS.values()
 config.update(TACOTRON2_DEFAULTS.values())
+config.update({"sample_inference_text": "Duck party on aisle 6."})
 DEFAULTS = HParams(**config)
