@@ -578,7 +578,10 @@ class Tacotron2Trainer(TTSTrainer):
                 shuffle=False,
                 batch_size=self.batch_size,
                 collate_fn=collate_fn,
+                num_workers=self.num_workers,
+                pin_memory=self.pin_memory,
             )
+            # NOTE (Sam): train loop should be in base trainer
             for step_counter, batch in enumerate(val_loader):
 
                 # NOTE (Sam): Could call subsets directly in function arguments since model_input is only reused in logging

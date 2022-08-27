@@ -49,6 +49,8 @@ class TTSTrainer:
         self.steps_per_sample = hparams.steps_per_sample
         self.cudnn_enabled = hparams.cudnn_enabled
         self.is_validate = hparams.is_validate
+        self.num_workers = hparams.num_workers
+        self.pin_memory = hparams.pin_memory
 
         # NOTE (Sam): these are deprecated.
         self.distributed_run = hparams.distributed_run
@@ -199,6 +201,8 @@ DEFAULTS = HParams(
     warm_start_name=None,
     ignore_layers=None,
     distributed_run=False,
+    num_workers=1,
+    pin_memory=True,
 )
 
 config = DEFAULTS.values()
