@@ -1,4 +1,5 @@
 from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset, oversample
+from collections import Counter
 from torch.utils.data import DataLoader
 
 
@@ -64,19 +65,11 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            (
-                text_padded,
-                input_lengths,
-                mel_padded,
-                gate_padded,
-                output_lengths,
-                speaker_ids,
-                *_,
-            ) = batch
-            assert output_lengths.item() == 566, print(
-                "output lengths: ", output_lengths
-            )
-            assert gate_padded.size(1) == 566
+            output_lengths = batch["output_lengths"]
+            gate_target = batch["gate_target"]
+            mel_padded = batch["mel_padded"]
+            assert output_lengths.item() == 566
+            assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
             assert len(batch) == 7
 
@@ -103,18 +96,12 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate(n_frames_per_step=5, include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            (
-                text_padded,
-                input_lengths,
-                mel_padded,
-                gate_padded,
-                output_lengths,
-                speaker_ids,
-                *_,
-            ) = batch
-            assert output_lengths.item() == 566, output_lengths.item()
-            assert mel_padded.size(2) == 570, print("actual shape: ", mel_padded.shape)
-            assert gate_padded.size(1) == 570, print(
-                "actual shape: ", gate_padded.shape
+
+            assert batch["output_lengths"].item() == 566, batch["output_lengths"].item()
+            assert batch["mel_padded"].size(2) == 570, print(
+                "actual shape: ", batch["mel_padded"].shape
+            )
+            assert batch["gate_target"].size(1) == 570, print(
+                "actual shape: ", batch["gate_target"].shape
             )
             assert len(batch) == 7

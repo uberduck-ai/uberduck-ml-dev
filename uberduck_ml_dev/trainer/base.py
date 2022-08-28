@@ -18,7 +18,7 @@ from ..vocoders.hifigan import HiFiGanGenerator
 from ..models.base import DEFAULTS as MODEL_DEFAULTS
 from ..vendor.tfcompat.hparam import HParams
 
-# Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class
+# Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class.
 class TTSTrainer:
 
     # Note (Sam): rewriting with explicit hparams for clarity.
@@ -48,8 +48,11 @@ class TTSTrainer:
         self.grad_clip_thresh = hparams.grad_clip_thresh
         self.steps_per_sample = hparams.steps_per_sample
         self.cudnn_enabled = hparams.cudnn_enabled
+        self.is_validate = hparams.is_validate
+        self.num_workers = hparams.num_workers
+        self.pin_memory = hparams.pin_memory
 
-        # Note (Sam): these might be deprecated.
+        # NOTE (Sam): these are deprecated.
         self.distributed_run = hparams.distributed_run
         self.fp16_run = hparams.fp16_run
 
@@ -198,6 +201,8 @@ DEFAULTS = HParams(
     warm_start_name=None,
     ignore_layers=None,
     distributed_run=False,
+    num_workers=1,
+    pin_memory=True,
 )
 
 config = DEFAULTS.values()
