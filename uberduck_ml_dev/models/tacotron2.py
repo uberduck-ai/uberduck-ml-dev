@@ -19,7 +19,7 @@ from .components.attention import Attention
 from ..text.symbols import symbols
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
-from ..data.batch import Batch, Bitch
+from ..data.batch import Batch
 
 import numpy as np
 import torch
