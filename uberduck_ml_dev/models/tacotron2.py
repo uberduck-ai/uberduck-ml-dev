@@ -1029,5 +1029,5 @@ class Tacotron2ForwardIsInfer(Tacotron2):
         self.encoder = EncoderForwardIsInfer(hparams)
         self.decoder = DecoderForwardIsInfer(hparams)
 
-    def forward(self, text, input_lengths, speaker_ids, embedded_gst):
-        return self.inference(text, input_lengths, speaker_ids, embedded_gst)
+    def forward(self, input_text, input_lengths, speaker_ids, embedded_gst):
+        return self.inference(input_text, input_lengths, speaker_ids, embedded_gst)
