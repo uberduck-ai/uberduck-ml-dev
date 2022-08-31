@@ -22,8 +22,10 @@ class TestTacotron2Model:
         with open("tests/fixtures/ljtest/taco2_lj2lj.json") as f:
             config.update(json.load(f))
         hparams = HParams(**config)
+        if torch.cuda.is_available():
+            hparams.cudnn_enabled = True
         model = Tacotron2(hparams)
-        if torch.cuda.is_available() and hparams.cudnn_enabled:
+        if torch.cuda.is_available():
             model.cuda()
 
         trainer = Tacotron2Trainer(hparams, rank=0, world_size=0)
