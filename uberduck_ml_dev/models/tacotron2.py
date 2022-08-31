@@ -742,11 +742,13 @@ DEFAULTS = HParams(
     n_speakers=1,
     speaker_embedding_dim=128,
     # reference encoder
-    with_gst=True,
     ref_enc_filters=[32, 32, 64, 64, 128, 128],
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
+    # NOTE (Sam): these bool parameters are maybe necessary since torchscript requires torch.Tensor input types so passing None is not allowed.
+    with_gst=False,
+    has_speaker_embedding=False,
     filter_length=1024,
     hop_length=256,
     include_f0=False,
@@ -761,7 +763,6 @@ DEFAULTS = HParams(
     mel_fmin=0,
     n_frames_per_step_initial=1,
     win_length=1024,
-    has_speaker_embedding=False,
     gst_type=None,
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
@@ -920,15 +921,26 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        output_raw = Batch(
+        (
+            output_lengths,
+            mel_outputs,
+            mel_outputs_postnet,
+            gate_predicted,
+        ) = self.mask_output(
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
             gate_predicted=gate_predicted,
             output_lengths=output_lengths,
-            alignments=alignments,
         )
-        output = self.mask_output(output_raw)
-        # NOTE (Sam): batch class simplifies in particular where returning data.
+
+        # NOTE (Sam): batch class in inference methods breaks torchscript
+        output = dict(
+            mel_outputs=mel_outputs,
+            mel_outputs_postnet=mel_outputs_postnet,
+            gate_predicted=gate_predicted,
+            alignments=alignments,
+            output_lengths=output_lengths,
+        )
         return output
 
     @torch.no_grad()
@@ -982,31 +994,43 @@ class Tacotron2(TTSModel):
         )
         return output
 
-    @torch.no_grad()
-    # NOTE (Sam): this seems broken but unused.
-    def inference_noattention(self, inputs):
-        """Run inference conditioned on an attention map."""
-        text, input_lengths, speaker_ids, attention_maps = inputs
-        embedded_inputs = self.embedding(text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
+    # @torch.no_grad()
+    # # NOTE (Sam): this seems broken but unused.
+    # def inference_noattention(self, inputs):
+    #     """Run inference conditioned on an attention map."""
+    #     text, input_lengths, speaker_ids, attention_maps = inputs
+    #     embedded_inputs = self.embedding(text).transpose(1, 2)
+    #     embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
 
-        encoder_outputs = torch.cat((embedded_text,), dim=2)
+    #     encoder_outputs = torch.cat((embedded_text,), dim=2)
 
-        mel_outputs, gate_predicted, alignments = self.decoder.inference_noattention(
-            encoder_outputs, attention_maps
-        )
-        mel_outputs_postnet = self.postnet(mel_outputs)
-        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+    #     mel_outputs, gate_predicted, alignments = self.decoder.inference_noattention(
+    #         encoder_outputs, attention_maps
+    #     )
+    #     mel_outputs_postnet = self.postnet(mel_outputs)
+    #     mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        output_raw = Batch(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            alignments=alignments,
-        )
+    #     (
+    #         output_lengths,
+    #         mel_outputs,
+    #         mel_outputs_postnet,
+    #         gate_predicted,
+    #     ) = self.mask_output(
+    #         mel_outputs=mel_outputs,
+    #         mel_outputs_postnet=mel_outputs_postnet,
+    #         gate_predicted=gate_predicted,
+    #         output_lengths=mel_lengths,
+    #     )
 
-        output = self.mask_output(output_raw)
-        return output
+    #     # NOTE (Sam): batch class in inference methods breaks torchscript
+    #     output = dict(
+    #         mel_outputs=mel_outputs,
+    #         mel_outputs_postnet=mel_outputs_postnet,
+    #         gate_predicted=gate_predicted,
+    #         alignments=alignments,
+    #         output_lengths=output_lengths,
+    #     )
+    #     return output
 
     @torch.no_grad()
     def inference_partial_tf(
@@ -1046,12 +1070,12 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        output_raw = Batch(
+        # NOTE (Sam): no mask_output call since output_lengths is not given or predicted
+        output = Batch(
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
             gate_predicted=gate_predicted,
             alignments=alignments,
         )
 
-        output = self.mask_output(output_raw)
         return output
