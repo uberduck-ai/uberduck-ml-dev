@@ -44,7 +44,6 @@ class Decoder(nn.Module):
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.p_teacher_forcing = hparams.p_teacher_forcing
         self.cudnn_enabled = hparams.cudnn_enabled
-        # self.attention_weights = torch.tensor([])
         self.attention_hidden = torch.tensor([])
         self.attention_cell = torch.tensor([])
         self.decoder_hidden = torch.tensor([])
@@ -436,7 +435,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if torch.cuda.is_available() and self.cudnn_enabled:
+        if self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         for i in range(len(attention_map)):
@@ -474,7 +473,7 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        if device == "cuda" and torch.cuda.is_available() and self.cudnn_enabled:
+        if device == "cuda" and self.cudnn_enabled:
             decoder_inputs = decoder_inputs.cuda()
 
         B = memory.size(0)
@@ -491,7 +490,7 @@ class Decoder(nn.Module):
         mel_outputs = torch.empty(
             B, 0, self.n_frames_per_step_current * self.n_mel_channels
         )
-        if device == "cuda" and torch.cuda.is_available() and self.cudnn_enabled:
+        if device == "cuda" and self.cudnn_enabled:
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
 

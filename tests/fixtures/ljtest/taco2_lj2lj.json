@@ -2,7 +2,7 @@
   "batch_size": 16,
   "checkpoint_name": null,
   "checkpoint_path": "tests/fixtures/results/checkpoints",
-  "cudnn_enabled": true,
+  "cudnn_enabled": false,
   "dataset_path": "./dataset",
   "debug": false,
   "distributed_run": false,
