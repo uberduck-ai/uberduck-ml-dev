@@ -160,15 +160,12 @@ class Tacotron2Trainer(TTSTrainer):
             )
 
         if self.global_step % self.steps_per_sample == 0:
-            mel_out_postnet, gate_outputs, alignments = y_pred.subset(
-                ["mel_outputs_postnet", "gate_predicted", "alignments"]
-            ).values()
             mel_target, gate_target = y.subset(["mel_padded", "gate_target"]).values()
-            alignment_metrics = get_alignment_metrics(alignments)
+            alignment_metrics = get_alignment_metrics(y_pred["alignments"])
             alignment_diagonalness = alignment_metrics["diagonalness"]
             alignment_max = alignment_metrics["max"]
-            sample_idx = randint(0, mel_out_postnet.size(0) - 1)
-            audio = self.sample(mel=mel_out_postnet[sample_idx])
+            sample_idx = randint(0, y_pred["mel_outputs_postnet"].size(0) - 1)
+            audio = self.sample(mel=y_pred["mel_outputs_postnet"][sample_idx])
             self.log(
                 "AlignmentDiagonalness/train",
                 self.global_step,
@@ -180,7 +177,9 @@ class Tacotron2Trainer(TTSTrainer):
                 "MelPredicted/train",
                 self.global_step,
                 image=save_figure_to_numpy(
-                    plot_spectrogram(mel_out_postnet[sample_idx].data.cpu())
+                    plot_spectrogram(
+                        y_pred["mel_outputs_postnet"][sample_idx].data.cpu()
+                    )
                 ),
             )
             self.log(
@@ -196,7 +195,7 @@ class Tacotron2Trainer(TTSTrainer):
                 image=save_figure_to_numpy(
                     plot_gate_outputs(
                         gate_targets=gate_target[sample_idx].data.cpu(),
-                        gate_outputs=gate_outputs[sample_idx].data.cpu(),
+                        gate_outputs=y_pred["gate_predicted"][sample_idx].data.cpu(),
                     )
                 ),
             )
@@ -207,7 +206,7 @@ class Tacotron2Trainer(TTSTrainer):
                 self.global_step,
                 image=save_figure_to_numpy(
                     plot_attention(
-                        alignments[sample_idx].data.cpu().transpose(0, 1),
+                        y_pred["alignments"][sample_idx].data.cpu().transpose(0, 1),
                         encoder_length=input_length,
                         decoder_length=output_length,
                     )
@@ -341,14 +340,11 @@ class Tacotron2Trainer(TTSTrainer):
                 scalar=mlv + glv,
             )
         # Generate the sample from a random item from the last y_pred batch.
-        mel_out_postnet, gate_outputs, alignments = y_pred.subset(
-            ["mel_outputs_postnet", "gate_predicted", "alignments"]
-        ).values()
-        alignment_metrics = get_alignment_metrics(alignments)
+        alignment_metrics = get_alignment_metrics(y_pred["alignments"])
         alignment_diagonalness = alignment_metrics["diagonalness"]
         alignment_max = alignment_metrics["max"]
         sample_idx = randint(0, self.batch_size)
-        audio = self.sample(mel=mel_out_postnet[sample_idx])
+        audio = self.sample(mel=y_pred["mel_outputs_postnet"][sample_idx])
 
         self.log(
             "AlignmentDiagonalness/val", self.global_step, scalar=alignment_diagonalness
@@ -359,7 +355,7 @@ class Tacotron2Trainer(TTSTrainer):
             "MelPredicted/val",
             self.global_step,
             image=save_figure_to_numpy(
-                plot_spectrogram(mel_out_postnet[sample_idx].data.cpu())
+                plot_spectrogram(y_pred["mel_outputs_postnet"][sample_idx].data.cpu())
             ),
         )
         self.log(
@@ -375,7 +371,7 @@ class Tacotron2Trainer(TTSTrainer):
             image=save_figure_to_numpy(
                 plot_gate_outputs(
                     gate_targets=y["gate_target"][sample_idx].data.cpu(),
-                    gate_outputs=gate_outputs[sample_idx].data.cpu(),
+                    gate_outputs=y_pred["gate_predicted"][sample_idx].data.cpu(),
                 )
             ),
         )
@@ -386,7 +382,7 @@ class Tacotron2Trainer(TTSTrainer):
             self.global_step,
             image=save_figure_to_numpy(
                 plot_attention(
-                    alignments[sample_idx].data.cpu().transpose(0, 1),
+                    y_pred["alignments"][sample_idx].data.cpu().transpose(0, 1),
                     encoder_length=input_length,
                     decoder_length=output_length,
                 )
