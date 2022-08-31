@@ -122,26 +122,13 @@ class Decoder(nn.Module):
         B = memory.size(0)
         MAX_TIME = memory.size(1)
 
-        # self.attention_hidden = Variable(
-        #     memory.data.new(B, self.attention_rnn_dim).zero_()
-        # )
         self.attention_hidden = memory.data.new_zeros(B, self.attention_rnn_dim)
-        # self.attention_cell = Variable(
-        #     memory.data.new(B, self.attention_rnn_dim).zero_()
-        # )
         self.attention_cell = memory.data.new_zeros(B, self.attention_rnn_dim)
 
-        # self.decoder_hidden = Variable(memory.data.new(B, self.decoder_rnn_dim).zero_())
         self.decoder_hidden = memory.data.new_zeros(B, self.decoder_rnn_dim)
-        # self.decoder_cell = Variable(memory.data.new(B, self.decoder_rnn_dim).zero_())
         self.decoder_cell = memory.data.new_zeros(B, self.decoder_rnn_dim)
-        # self.attention_weights = Variable(memory.data.new(B, MAX_TIME).zero_())
         self.attention_weights = memory.data.new_zeros(B, MAX_TIME)
-        # self.attention_weights_cum = Variable(memory.data.new(B, MAX_TIME).zero_())
         self.attention_weights_cum = memory.data.new_zeros(B, MAX_TIME)
-        # self.attention_context = Variable(
-        #     memory.data.new(B, self.encoder_embedding_dim).zero_()
-        # )
         self.attention_context = memory.data.new_zeros(B, self.encoder_embedding_dim)
 
         self.memory = memory
@@ -163,8 +150,6 @@ class Decoder(nn.Module):
 
         decoder_inputs = decoder_inputs.transpose(1, 2)
         decoder_inputs = decoder_inputs.contiguous()
-        # print(decoder_inputs.shape, 'dec_in')
-        # print(decoder_inputs.size(0), int(decoder_inputs.size(1)), self.n_frames_per_step_current)
         decoder_inputs = decoder_inputs.view(
             decoder_inputs.size(0),
             int(decoder_inputs.size(1) / self.n_frames_per_step_current),
@@ -991,44 +976,6 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
         )
         return output
-
-    # @torch.no_grad()
-    # # NOTE (Sam): this seems broken but unused.
-    # def inference_noattention(self, inputs):
-    #     """Run inference conditioned on an attention map."""
-    #     text, input_lengths, speaker_ids, attention_maps = inputs
-    #     embedded_inputs = self.embedding(text).transpose(1, 2)
-    #     embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-
-    #     encoder_outputs = torch.cat((embedded_text,), dim=2)
-
-    #     mel_outputs, gate_predicted, alignments = self.decoder.inference_noattention(
-    #         encoder_outputs, attention_maps
-    #     )
-    #     mel_outputs_postnet = self.postnet(mel_outputs)
-    #     mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-    #     (
-    #         output_lengths,
-    #         mel_outputs,
-    #         mel_outputs_postnet,
-    #         gate_predicted,
-    #     ) = self.mask_output(
-    #         mel_outputs=mel_outputs,
-    #         mel_outputs_postnet=mel_outputs_postnet,
-    #         gate_predicted=gate_predicted,
-    #         output_lengths=mel_lengths,
-    #     )
-
-    #     # NOTE (Sam): batch class in inference methods breaks torchscript
-    #     output = dict(
-    #         mel_outputs=mel_outputs,
-    #         mel_outputs_postnet=mel_outputs_postnet,
-    #         gate_predicted=gate_predicted,
-    #         alignments=alignments,
-    #         output_lengths=output_lengths,
-    #     )
-    #     return output
 
     @torch.no_grad()
     def inference_partial_tf(
