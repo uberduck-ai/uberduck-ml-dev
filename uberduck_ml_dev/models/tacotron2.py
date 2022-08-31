@@ -814,20 +814,6 @@ class Tacotron2(TTSModel):
         else:
             print("Not using any style tokens")
 
-    # def mask_output(self, outputs):
-
-    #     if self.mask_padding and "output_lengths" in outputs.keys():
-    #         mel_outputs = outputs["mel_outputs"]
-    #         mask = ~get_mask_from_lengths(outputs["output_lengths"])
-    #         mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
-    #         mask = F.pad(mask, (0, mel_outputs.size(2) - mask.size(2)))
-    #         mask = mask.permute(1, 0, 2)  # NOTE (Sam): replace with einops
-
-    #         outputs["mel_outputs"].data.masked_fill_(mask, 0.0)
-    #         outputs["mel_outputs_postnet"].data.masked_fill_(mask, 0.0)
-    #         outputs["gate_predicted"].data.masked_fill_(mask[:, 0, :], 1e3)
-
-    #     return outputs
     def mask_output(
         self, output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
     ):
