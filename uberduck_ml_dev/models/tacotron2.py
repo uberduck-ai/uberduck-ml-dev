@@ -1010,3 +1010,24 @@ class Tacotron2(TTSModel):
         )
 
         return output
+
+
+class EncoderForwardIsInfer(Encoder):
+    def forward(self, x, input_lengths):
+        return self.inference(x, input_lengths)
+
+
+class DecoderForwardIsInfer(Decoder):
+    def forward(self, memory, memory_lengths):
+        return self.inference(memory, memory_lengths)
+
+
+class Tacotron2ForwardIsInfer(Tacotron2):
+    def __init__(self, hparams):
+        super().__init__(hparams)
+
+        self.encoder = EncoderForwardIsInfer(hparams)
+        self.decoder = DecoderForwardIsInfer(hparams)
+
+    def forward(self, input_text, input_lengths, speaker_ids, embedded_gst):
+        return self.inference(input_text, input_lengths, speaker_ids, embedded_gst)
