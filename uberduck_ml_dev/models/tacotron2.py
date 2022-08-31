@@ -746,7 +746,6 @@ DEFAULTS = HParams(
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
-    # NOTE (Sam): these bool parameters are maybe necessary since torchscript requires torch.Tensor input types so passing None is not allowed.
     with_gst=False,
     has_speaker_embedding=False,
     filter_length=1024,
@@ -948,8 +947,8 @@ class Tacotron2(TTSModel):
         self,
         input_text,
         input_lengths,
-        speaker_ids: Optional[torch.LongTensor],
-        embedded_gst: Optional[torch.LongTensor],
+        speaker_ids: Optional[torch.LongTensor] = None,
+        embedded_gst: Optional[torch.LongTensor] = None,
     ):
 
         # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
