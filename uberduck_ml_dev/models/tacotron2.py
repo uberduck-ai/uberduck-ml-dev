@@ -106,7 +106,6 @@ class Decoder(nn.Module):
         decoder_input: all zeros frames
         """
         B = memory.size(0)
-        # decoder_input = Variable(memory.data.new(B, self.n_mel_channels).zero_())
         decoder_input = memory.data.new_zeros(B, self.n_mel_channels)
         return decoder_input
 
@@ -758,7 +757,11 @@ config = DEFAULTS.values()
 config.update(MODEL_DEFAULTS.values())
 DEFAULTS = HParams(**config)
 
-# Cell
+# NOTE (Sam): this is a hack that enables torchscipt compilation with n_speakers = 1 and has_speaker_embedding=True
+class ZeroNetwork(nn.Module):
+    def forward(self, x):
+
+        return torch.zeros_like(x)
 
 
 class Tacotron2(TTSModel):
@@ -791,14 +794,15 @@ class Tacotron2(TTSModel):
             )
         else:
             self.speaker_embedding = None
+
+        # NOTE (Sam): it is not totally clear to me this should be split - what if we want to optimize position within the speaker_embedding_dim?
+        # What is the role of has_speaker_embedding?
         if self.n_speakers > 1:
             self.spkr_lin = nn.Linear(
                 self.speaker_embedding_dim, self.encoder_embedding_dim
             )
         else:
-            self.spkr_lin = lambda a: torch.zeros(
-                self.encoder_embedding_dim, device=a.device
-            )
+            self.spkr_lin = ZeroNetwork()
 
         self.gst_init(hparams)
 
@@ -830,7 +834,7 @@ class Tacotron2(TTSModel):
 
         return output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
 
-    # @torch.no_grad()
+    @torch.no_grad()
     def get_alignment(self, inputs):
         (
             input_text,
@@ -849,7 +853,9 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         if self.speaker_embedding is not None:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
+            # NOTE (Sam): this requires more careful thought.
+            if self.n_speakers > 1:
+                encoder_outputs += self.spkr_lin(embedded_speakers)
 
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
@@ -875,7 +881,9 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         if self.speaker_embedding is not None:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
+            # NOTE (Sam): this requires more careful thought
+            if self.n_speakers > 1:
+                encoder_outputs += self.spkr_lin(embedded_speakers)
 
         if self.gst_lin is not None:
             assert (
@@ -913,13 +921,7 @@ class Tacotron2(TTSModel):
         return output
 
     @torch.no_grad()
-    def inference(
-        self,
-        input_text,
-        input_lengths,
-        speaker_ids: Optional[torch.LongTensor] = None,
-        embedded_gst: Optional[torch.LongTensor] = None,
-    ):
+    def inference(self, input_text, input_lengths, speaker_ids, embedded_gst):
 
         # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
@@ -927,7 +929,9 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         if self.speaker_embedding is not None:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
+            # NOTE (Sam): this requires more careful thought
+            if self.n_speakers > 1:
+                encoder_outputs += self.spkr_lin(embedded_speakers)
 
         if self.gst_lin is not None:
             assert (
@@ -986,7 +990,8 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         if self.speaker_embedding:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
+            if self.n_speakers > 1:
+                encoder_outputs += self.spkr_lin(embedded_speakers)
 
         if self.gst_lin is not None:
             assert (
@@ -1012,6 +1017,7 @@ class Tacotron2(TTSModel):
         return output
 
 
+# NOTE (Sam): for torchscipt compilation
 class EncoderForwardIsInfer(Encoder):
     def forward(self, x, input_lengths):
         return self.inference(x, input_lengths)
@@ -1029,5 +1035,11 @@ class Tacotron2ForwardIsInfer(Tacotron2):
         self.encoder = EncoderForwardIsInfer(hparams)
         self.decoder = DecoderForwardIsInfer(hparams)
 
-    def forward(self, input_text, input_lengths, speaker_ids, embedded_gst):
+    def forward(
+        self,
+        input_text,
+        input_lengths,
+        speaker_ids,
+        embedded_gst,
+    ):
         return self.inference(input_text, input_lengths, speaker_ids, embedded_gst)
