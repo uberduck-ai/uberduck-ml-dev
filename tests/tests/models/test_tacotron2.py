@@ -77,9 +77,9 @@ class TestTacotron2Model:
         sequences = sequences.repeat(nreps, 1)
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
 
-        mel_outputs_postnet = lj_speech_tacotron2.inference(sequences, input_lengths)[
-            "mel_outputs_postnet"
-        ]
+        mel_outputs_postnet = lj_speech_tacotron2.inference(
+            sequences, input_lengths, None, None
+        )["mel_outputs_postnet"]
 
         estimated_vector = rearrange(
             mel_outputs_postnet.detach().numpy(), "b m t -> (b m t)"
@@ -96,9 +96,9 @@ class TestTacotron2Model:
         torch.random.manual_seed(1235)
         np.random.seed(1235)
 
-        mel_outputs_postnet = lj_speech_tacotron2.inference(sequences, input_lengths)[
-            "mel_outputs_postnet"
-        ]
+        mel_outputs_postnet = lj_speech_tacotron2.inference(
+            sequences, input_lengths, None, None
+        )["mel_outputs_postnet"]
 
         tf_index = 111  # NOTE (Sam): look at the beginning of the clip since they are different lengths.
         estimated_vector = rearrange(
@@ -148,7 +148,10 @@ class TestTacotron2Model:
         )["mel_outputs_postnet"]
 
         mel_outputs_postnet_original = lj_speech_tacotron2.inference(
-            input_text=sequences, input_lengths=input_lengths, speaker_ids=None
+            input_text=sequences,
+            input_lengths=input_lengths,
+            speaker_ids=None,
+            embedded_gst=None,
         )["mel_outputs_postnet"]
 
         non_tf_mel_outputs_postnet_beginning = (
