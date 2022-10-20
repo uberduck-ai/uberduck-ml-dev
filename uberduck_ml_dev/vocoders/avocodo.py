@@ -9,6 +9,7 @@ __all__ = ['HiFiGanGenerator', 'ResBlock1', 'ResBlock2', 'Generator', 'Discrimin
 """ from https://github.com/rishikksh20/Avocodo-pytorch """
 
 import torch
+import json
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
@@ -181,7 +182,7 @@ class Generator(torch.nn.Module):
         x = self.conv_post(x)
         x = torch.tanh(x)
 
-        return x, x2, x1
+        return x
 
     def remove_weight_norm(self):
         print('Removing weight norm...')
