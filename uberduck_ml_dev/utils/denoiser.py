@@ -51,7 +51,16 @@ class Denoiser(torch.nn.Module):
 
         self.register_buffer("bias_spec", bias_spec[:, :, 0][:, :, None])
 
-    def forward(self, audio, strength=0.1):
+    def forward(self, audio, strength=10):
+        """
+        Strength is the amount of bias you want to be removed from the final audio.
+        Note: A higher strength may remove too much information in the original audio.
+        
+        
+        :param audio: Audio data
+        :param strength: Amount of bias removal. Recommended range 10 - 50
+        """
+        
         audio_spec, audio_angles = self.stft.transform(audio.cpu())
         audio_spec_denoised = audio_spec - self.bias_spec * strength
         audio_spec_denoised = torch.clamp(audio_spec_denoised, 0.0)
