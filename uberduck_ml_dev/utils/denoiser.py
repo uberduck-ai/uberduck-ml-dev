@@ -56,9 +56,10 @@ class Denoiser(torch.nn.Module):
         Strength is the amount of bias you want to be removed from the final audio.
         Note: A higher strength may remove too much information in the original audio.
         
-        
         :param audio: Audio data
         :param strength: Amount of bias removal. Recommended range 10 - 50
+        :return: Denoised audio
+        :rtype: tensor
         """
         
         audio_spec, audio_angles = self.stft.transform(audio.cpu())
