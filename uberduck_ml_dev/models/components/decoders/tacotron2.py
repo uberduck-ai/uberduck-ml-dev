@@ -9,6 +9,7 @@ from ...common import LinearNorm
 from ..attention import Attention
 from ..prenet import Prenet
 from ....utils.utils import get_mask_from_lengths
+from einops import rearrange
 
 
 class Decoder(nn.Module):
@@ -117,6 +118,7 @@ class Decoder(nn.Module):
         self.processed_memory = self.attention_layer.memory_layer(memory)
         self.mask = mask
 
+    #   NOTE (Sam): spaghetti code - comment this out after removing dependency in partial_tf index
     def parse_decoder_inputs(self, decoder_inputs):
         """Prepares decoder inputs, i.e. mel outputs
         PARAMS
@@ -251,10 +253,14 @@ class Decoder(nn.Module):
         alignments: sequence of attention weights from the decoder
         """
         B = memory.size(0)
-        decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
-        decoder_inputs = decoder_inputs.reshape(
-            -1, decoder_inputs.size(1), self.n_mel_channels
-        )
+        decoder_inputs = rearrange(
+            decoder_inputs, "b m t -> t b m"
+        )  # n_frames_per_step not used anymore
+        # decoder_inputs.contiguous()
+        # decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
+        # decoder_inputs = decoder_inputs.reshape(
+        #     -1, decoder_inputs.size(1), self.n_mel_channels
+        # )
         decoder_input = self.get_go_frame(memory).unsqueeze(0)
         decoder_inputs = torch.cat((decoder_input, decoder_inputs), dim=0)
         decoder_inputs = self.prenet(decoder_inputs)
@@ -279,8 +285,7 @@ class Decoder(nn.Module):
                     mel_outputs.size(1) * self.n_frames_per_step_current
                 ]
 
-                to_concat = (teacher_forced_frame,)
-                decoder_input = torch.cat(to_concat, dim=1)
+                decoder_input = teacher_forced_frame
             else:
 
                 # NOTE(zach): we may need to concat these as we go to ensure that
@@ -349,8 +354,9 @@ class Decoder(nn.Module):
         )
 
         while True:
-            to_cat = (self.prenet(decoder_input),)
-            decoder_input = torch.cat(to_cat, dim=1)
+            # to_cat = (self.prenet(decoder_input),)
+            # decoder_input = torch.cat(to_cat, dim=1)
+            decoder_input = self.prenet(decoder_input)
             mel_output, gate_output, alignment = self.decode(decoder_input, None)
             mel_output = mel_output[
                 :, 0 : self.n_mel_channels * self.n_frames_per_step_current
@@ -467,14 +473,16 @@ class Decoder(nn.Module):
                     mel_outputs.size(1) * self.n_frames_per_step_current
                 ]
 
-                to_concat = (teacher_forced_frame,)
-                decoder_input = torch.cat(to_concat, dim=1)
+                decoder_input = teacher_forced_frame
             else:
 
-                to_concat = (
-                    self.prenet(mel_outputs[:, -1, -1 * self.n_mel_channels :]),
+                # to_concat = (
+                #     self.prenet(mel_outputs[:, -1, -1 * self.n_mel_channels :]),
+                # )
+                # decoder_input = torch.cat(to_concat, dim=1)
+                decoder_input = self.prenet(
+                    mel_outputs[:, -1, -1 * self.n_mel_channels :]
                 )
-                decoder_input = torch.cat(to_concat, dim=1)
             mel_output, gate_output, attention_weights = self.decode(
                 decoder_input, None
             )
