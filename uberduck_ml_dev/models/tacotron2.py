@@ -288,6 +288,42 @@ class Tacotron2(TTSModel):
         )
         return output
 
+    def inference_double_tf(
+        self,
+        input_text,
+        input_lengths,
+        speaker_ids,
+        embedded_gst,
+        mel_template,
+        mel_start_index,
+        mel_stop_index,
+    ):
+        # NOTE (Sam): forward, inference_partial_tf, and inference are special cases of this function so they should be removed.
+        embedded_inputs = self.embedding(input_text).transpose(1, 2)
+        embedded_text = self.encoder(embedded_inputs, input_lengths)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding is not None:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            # NOTE (Sam): this requires more careful thought
+            if self.n_speakers > 1:
+                encoder_outputs += self.spkr_lin(embedded_speakers)
+
+        if self.gst_lin is not None:
+            assert (
+                embedded_gst is not None
+            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
+            encoder_outputs += self.gst_lin(embedded_gst)
+
+        output = self.decoder.inference_double_tf(
+            memory=encoder_outputs,
+            decoder_inputs=mel_template,
+            memory_lengths=input_lengths,
+            mel_start_index=mel_start_index,
+            mel_stop_index=mel_stop_index,
+        )
+
+        return output
+
     @torch.no_grad()
     def inference_partial_tf(
         self,

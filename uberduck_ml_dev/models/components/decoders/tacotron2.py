@@ -425,6 +425,40 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
+    def inference_double_tf(
+        self, memory, decoder_inputs, memory_lengths, mel_start_index, mel_stop_index
+    ):
+        # NOTE (Sam): forward, inference_partial_tf, and inference are special cases of this function so they should be removed.
+        decoder_inputs = rearrange(decoder_inputs, "b m t -> t b m")
+        decoder_input = self.get_go_frame(memory).unsqueeze(0)
+
+        self.initialize_decoder_states(
+            memory, mask=~get_mask_from_lengths(memory_lengths)
+        )
+
+        mel_outputs, gate_outputs, alignments = [], [], []
+
+        i = 0
+        while len(mel_outputs) < decoder_inputs.size(0) - 1:
+
+            if i >= mel_start_index and i < mel_stop_index:
+                decoder_input = self.prenet(mel_outputs[len(mel_outputs) - 1])
+            else:
+                decoder_input = self.prenet(decoder_inputs[len(mel_outputs), :, :])
+            mel_output, gate_output, attention_weights = self.decode(
+                decoder_input, None
+            )
+            mel_outputs += [mel_output.squeeze(1)]
+            gate_outputs += [gate_output.squeeze(1)]
+            alignments += [attention_weights]
+            i += 1
+
+        mel_outputs = torch.stack(mel_outputs).transpose(0, 1).contiguous()
+        mel_outputs = mel_outputs.view(mel_outputs.size(0), -1, self.n_mel_channels)
+        mel_outputs = mel_outputs.transpose(1, 2)
+
+        return mel_outputs, torch.vstack(alignments)  # , gate_outputs
+
     def inference_partial_tf(self, memory, decoder_inputs, tf_until_idx, device="cpu"):
         """Decoder inference with teacher-forcing up until tf_until_idx
         PARAMS
