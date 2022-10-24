@@ -75,6 +75,7 @@ class TTSTrainer:
         else:
             print("Initializing trainer with hparams:")
             pprint(hparams.values())
+        # NOTE (Sam): I think we should add warm starting to the init
 
     def init_distributed(self):
         if not self.distributed_run:

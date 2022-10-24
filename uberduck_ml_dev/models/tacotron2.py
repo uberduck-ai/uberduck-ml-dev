@@ -321,7 +321,10 @@ class Tacotron2(TTSModel):
             encoder_outputs += self.gst_lin(embedded_gst)
 
         mel_outputs, gate_predicted, alignments = self.decoder.inference_partial_tf(
-            encoder_outputs, tf_mel, tf_until_idx, device
+            memory=encoder_outputs,
+            decoder_inputs=tf_mel,
+            tf_until_idx=tf_until_idx,
+            device=device,
         )
 
         mel_outputs_postnet = self.postnet(mel_outputs)
