@@ -314,8 +314,7 @@ class Tacotron2(TTSModel):
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
 
-        output = self.inference_double_tf(
-            self=self.decoder,
+        output = self.decoder.inference_double_tf(
             memory=encoder_outputs,
             decoder_inputs=mel_template,
             memory_lengths=input_lengths,
