@@ -256,11 +256,6 @@ class Decoder(nn.Module):
         decoder_inputs = rearrange(
             decoder_inputs, "b m t -> t b m"
         )  # n_frames_per_step not used anymore
-        # decoder_inputs.contiguous()
-        # decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
-        # decoder_inputs = decoder_inputs.reshape(
-        #     -1, decoder_inputs.size(1), self.n_mel_channels
-        # )
         decoder_input = self.get_go_frame(memory).unsqueeze(0)
         decoder_inputs = torch.cat((decoder_input, decoder_inputs), dim=0)
         decoder_inputs = self.prenet(decoder_inputs)
@@ -354,8 +349,6 @@ class Decoder(nn.Module):
         )
 
         while True:
-            # to_cat = (self.prenet(decoder_input),)
-            # decoder_input = torch.cat(to_cat, dim=1)
             decoder_input = self.prenet(decoder_input)
             mel_output, gate_output, alignment = self.decode(decoder_input, None)
             mel_output = mel_output[
@@ -476,10 +469,6 @@ class Decoder(nn.Module):
                 decoder_input = teacher_forced_frame
             else:
 
-                # to_concat = (
-                #     self.prenet(mel_outputs[:, -1, -1 * self.n_mel_channels :]),
-                # )
-                # decoder_input = torch.cat(to_concat, dim=1)
                 decoder_input = self.prenet(
                     mel_outputs[:, -1, -1 * self.n_mel_channels :]
                 )
