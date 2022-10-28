@@ -314,7 +314,7 @@ class Tacotron2(TTSModel):
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
 
-        output = self.decoder.inference_double_tf(
+        mel_outputs, gate_outputs, alignments = self.decoder.inference_double_tf(
             memory=encoder_outputs,
             decoder_inputs=mel_template,
             memory_lengths=input_lengths,
@@ -322,6 +322,16 @@ class Tacotron2(TTSModel):
             mel_stop_index=mel_stop_index,
         )
 
+        mel_outputs_postnet = self.postnet(mel_outputs)
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+
+        # NOTE (Sam): do we need masking here?
+        output = dict(
+            mel_outputs_postnet=mel_outputs_postnet,
+            mel_outputs=mel_outputs,
+            gate_outputs=gate_outputs,
+            alignments=alignments,
+        )
         return output
 
     @torch.no_grad()
