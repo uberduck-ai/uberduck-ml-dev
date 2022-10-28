@@ -457,7 +457,8 @@ class Decoder(nn.Module):
         mel_outputs = mel_outputs.view(mel_outputs.size(0), -1, self.n_mel_channels)
         mel_outputs = mel_outputs.transpose(1, 2)
 
-        return mel_outputs, torch.vstack(alignments)  # , gate_outputs
+        # NOTE (Sam): consider using parse_decoder_outputs
+        return mel_outputs, torch.vstack(gate_outputs), torch.vstack(alignments)
 
     def inference_partial_tf(self, memory, decoder_inputs, tf_until_idx, device="cpu"):
         """Decoder inference with teacher-forcing up until tf_until_idx
