@@ -4,7 +4,7 @@ from random import randint
 import time
 from typing import List
 from random import choice
-import time
+from math import e as EulerNumber
 
 import torch
 from torch import nn
@@ -92,6 +92,9 @@ class Tacotron2Trainer(TTSTrainer):
         self.win_length = self.hparams.win_length
         self.max_wav_value = self.hparams.max_wav_value
         self.sample_inference_text = self.hparams.sample_inference_text
+        self.lr_decay_start = self.hparams.lr_decay_start
+        self.lr_decay_rate = self.hparams.lr_decay_rate
+        self.lr_decay_min = self.hparams.lr_decay_min
 
         if self.hparams.get("gst_type") == "torchmoji":
             assert self.hparams.get(
@@ -461,6 +464,15 @@ class Tacotron2Trainer(TTSTrainer):
                 sampler.set_epoch(epoch)
             for batch_idx, batch in enumerate(train_loader):
                 self.global_step += 1
+                
+                # Learning Rate decay, can be disabled if lr_decay_start is == 0 or None
+                if (self.global_step > self.lr_decay_start) and (self.lr_decay_start not in [0, None]):
+                    learning_rate = (self.learning_rate * (EulerNumber ** (-self.global_step / self.lr_decay_rate)))
+                    learning_rate = max(self.lr_decay_min, learning_rate)
+                    self.learning_rate = learning_rate
+                    for param_group in optimizer.param_groups:
+                        param_group['lr'] = learning_rate
+                        
                 # NOTE (Sam): model.module.zero_grad() needed for distributed run?
                 model.zero_grad()
 
