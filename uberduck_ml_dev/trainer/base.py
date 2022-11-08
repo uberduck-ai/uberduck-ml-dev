@@ -51,6 +51,9 @@ class TTSTrainer:
         self.is_validate = hparams.is_validate
         self.num_workers = hparams.num_workers
         self.pin_memory = hparams.pin_memory
+        self.lr_decay_start = hparams.lr_decay_start
+        self.lr_decay_rate = hparams.lr_decay_rate
+        self.lr_decay_min = hparams.lr_decay_min
 
         # NOTE (Sam): these are deprecated.
         self.distributed_run = hparams.distributed_run
@@ -204,6 +207,9 @@ DEFAULTS = HParams(
     distributed_run=False,
     num_workers=1,
     pin_memory=True,
+    lr_decay_start=15000,
+    lr_decay_rate=216000,
+    lr_decay_min=1e-5
 )
 
 config = DEFAULTS.values()
