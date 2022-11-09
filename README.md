@@ -54,10 +54,23 @@ TODO
 #### Tacotron2 Inference
 
 1. No GST
+
 TODO
 
 2. Using Torchmoji as GST
-   1. 
+
+   First, download torchmoji weights to your local filesystem from [here](https://github.com/huggingface/torchMoji). Then:
+   
+   ```python
+   from uberduck_ml_dev.models.torchmoji import TorchMojiInterface
+   
+   torchmoji_model = TorchMojiInterface("path/to/vocab.json", "path/to/torchmoji_weights.bin")
+   
+   gsts = torch.tensor(torchmoji_model.encode_texts(["Getting paper is my favorite part."]))
+   gsts_repeated = gsts.repeat(1, 1).unsqueeze(1)
+   # sequences, input_lengths, speaker_ids instantiation not shown here.
+   output = tacotron2.inference(sequences, input_lengths, speaker_ids, gsts_repeated)
+   ```
 
 ## Development
 
