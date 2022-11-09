@@ -43,6 +43,22 @@ source activate uberduck-ml-dev
 pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 ```
 
+## Usage
+
+### Training
+
+TODO
+
+### Inference
+
+#### Tacotron2 Inference
+
+1. No GST
+TODO
+
+2. Using Torchmoji as GST
+   1. 
+
 ## Development
 
 To start contributing, install the required development dependencies in a virtual environment:
