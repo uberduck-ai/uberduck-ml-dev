@@ -67,7 +67,7 @@ TODO
    
    torchmoji_model = TorchMojiInterface("path/to/vocab.json", "path/to/torchmoji_weights.bin")
    
-   gsts = torch.tensor(torchmoji_model.encode_texts(["Getting paper is my favorite part."]))
+   gsts = torch.tensor(torchmoji_model.encode_texts(["This is a test."]))
    gsts_repeated = gsts.repeat(1, 1).unsqueeze(1)
    # sequences, input_lengths, speaker_ids instantiation not shown here.
    output = tacotron2.inference(sequences, input_lengths, speaker_ids, gsts_repeated)
