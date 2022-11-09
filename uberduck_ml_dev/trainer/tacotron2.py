@@ -4,7 +4,7 @@ from random import randint
 import time
 from typing import List
 from random import choice
-from math import e as EulerNumber
+import numpy as np
 
 import torch
 from torch import nn
@@ -467,7 +467,7 @@ class Tacotron2Trainer(TTSTrainer):
                 
                 # Learning Rate decay, can be disabled if lr_decay_start is == 0 or None
                 if (self.global_step > self.lr_decay_start) and (self.lr_decay_start not in [0, None]):
-                    learning_rate = (self.learning_rate * (EulerNumber ** (-self.global_step / self.lr_decay_rate)))
+                    learning_rate = (self.learning_rate * (np.exp(-self.global_step / self.lr_decay_rate)))
                     learning_rate = max(self.lr_decay_min, learning_rate)
                     self.learning_rate = learning_rate
                     for param_group in optimizer.param_groups:
