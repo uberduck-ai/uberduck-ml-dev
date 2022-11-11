@@ -25,7 +25,7 @@ from ..models.common import STFT
 
 
 class Denoiser(torch.nn.Module):
-    """ WaveGlow denoiser, adapted for HiFi-GAN """
+    """WaveGlow denoiser, adapted for HiFi-GAN"""
 
     def __init__(
         self, hifigan, filter_length=1024, n_overlap=4, win_length=1024, mode="zeros"
@@ -46,7 +46,11 @@ class Denoiser(torch.nn.Module):
             raise Exception("Mode {} if not supported".format(mode))
 
         with torch.no_grad():
-            bias_audio = hifigan.vocoder.forward(mel_input.to(hifigan.device)).view(1, -1).float()
+            bias_audio = (
+                hifigan.vocoder.forward(mel_input.to(hifigan.device))
+                .view(1, -1)
+                .float()
+            )
             bias_spec, _ = self.stft.transform(bias_audio.cpu())
 
         self.register_buffer("bias_spec", bias_spec[:, :, 0][:, :, None])
@@ -55,13 +59,13 @@ class Denoiser(torch.nn.Module):
         """
         Strength is the amount of bias you want to be removed from the final audio.
         Note: A higher strength may remove too much information in the original audio.
-        
+
         :param audio: Audio data
         :param strength: Amount of bias removal. Recommended range 10 - 50
         :return: Denoised audio
         :rtype: tensor
         """
-        
+
         audio_spec, audio_angles = self.stft.transform(audio.cpu())
         audio_spec_denoised = audio_spec - self.bias_spec * strength
         audio_spec_denoised = torch.clamp(audio_spec_denoised, 0.0)
