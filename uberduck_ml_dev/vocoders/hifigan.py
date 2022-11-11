@@ -1,7 +1,22 @@
-__all__ = ['HiFiGanGenerator', 'ResBlock1', 'ResBlock2', 'Generator', 'DiscriminatorP', 'MultiPeriodDiscriminator',
-           'DiscriminatorS', 'MultiScaleDiscriminator', 'feature_loss', 'discriminator_loss', 'generator_loss',
-           'LRELU_SLOPE', 'AttrDict', 'build_env', 'init_weights', 'apply_weight_norm', 'get_padding']
-
+__all__ = [
+    "HiFiGanGenerator",
+    "ResBlock1",
+    "ResBlock2",
+    "Generator",
+    "DiscriminatorP",
+    "MultiPeriodDiscriminator",
+    "DiscriminatorS",
+    "MultiScaleDiscriminator",
+    "feature_loss",
+    "discriminator_loss",
+    "generator_loss",
+    "LRELU_SLOPE",
+    "AttrDict",
+    "build_env",
+    "init_weights",
+    "apply_weight_norm",
+    "get_padding",
+]
 
 
 """ from https://github.com/jik876/hifi-gan """
@@ -17,8 +32,6 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
-
-
 
 
 class HiFiGanGenerator(nn.Module):
@@ -60,7 +73,6 @@ class HiFiGanGenerator(nn.Module):
             * max_wav_value
         ).astype(np.int16)
         return audio
-
 
 
 LRELU_SLOPE = 0.1
@@ -460,7 +472,6 @@ def generator_loss(disc_outputs):
     return loss, gen_losses
 
 
-
 import os
 import shutil
 
@@ -476,7 +487,6 @@ def build_env(config, config_name, path):
     if config != t_path:
         os.makedirs(path, exist_ok=True)
         shutil.copyfile(config, os.path.join(path, config_name))
-
 
 
 from torch.nn.utils import weight_norm

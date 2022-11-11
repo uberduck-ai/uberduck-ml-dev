@@ -1,6 +1,12 @@
-__all__ = ['piecewise_rational_quadratic_transform', 'searchsorted', 'unconstrained_rational_quadratic_spline',
-           'rational_quadratic_spline', 'DEFAULT_MIN_BIN_WIDTH', 'DEFAULT_MIN_BIN_HEIGHT', 'DEFAULT_MIN_DERIVATIVE']
-
+__all__ = [
+    "piecewise_rational_quadratic_transform",
+    "searchsorted",
+    "unconstrained_rational_quadratic_spline",
+    "rational_quadratic_spline",
+    "DEFAULT_MIN_BIN_WIDTH",
+    "DEFAULT_MIN_BIN_HEIGHT",
+    "DEFAULT_MIN_DERIVATIVE",
+]
 
 
 import torch

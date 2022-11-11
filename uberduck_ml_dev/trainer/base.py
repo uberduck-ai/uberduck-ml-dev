@@ -207,7 +207,7 @@ DEFAULTS = HParams(
     pin_memory=True,
     lr_decay_start=15000,
     lr_decay_rate=216000,
-    lr_decay_min=1e-5
+    lr_decay_min=1e-5,
 )
 
 config = DEFAULTS.values()

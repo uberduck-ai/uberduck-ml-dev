@@ -1,7 +1,8 @@
-__all__ = ['parse_args']
+__all__ = ["parse_args"]
 
 import argparse
 import sys
+
 
 def parse_args(args):
     parser = argparse.ArgumentParser()

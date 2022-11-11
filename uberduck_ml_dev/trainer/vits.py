@@ -1,4 +1,10 @@
-__all__ = ['feature_loss', 'discriminator_loss', 'generator_loss', 'kl_loss', 'VITSTrainer']
+__all__ = [
+    "feature_loss",
+    "discriminator_loss",
+    "generator_loss",
+    "kl_loss",
+    "VITSTrainer",
+]
 
 
 import json
@@ -39,8 +45,6 @@ from ..data_loader import (
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.plot import save_figure_to_numpy, plot_spectrogram
 from ..utils.utils import slice_segments, clip_grad_value_
-
-
 
 
 def feature_loss(fmap_r, fmap_g):
@@ -98,8 +102,6 @@ def kl_loss(z_p, logs_q, m_p, logs_p, z_mask):
     kl = torch.sum(kl * z_mask)
     l = kl / torch.sum(z_mask)
     return l
-
-
 
 
 class VITSTrainer(TTSTrainer):

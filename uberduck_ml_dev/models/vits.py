@@ -1,6 +1,16 @@
-__all__ = ['DEFAULTS', 'StochasticDurationPredictor', 'DurationPredictor', 'TextEncoder', 'ResidualCouplingBlock',
-           'PosteriorEncoder', 'Generator', 'DiscriminatorP', 'DiscriminatorS', 'MultiPeriodDiscriminator',
-           'SynthesizerTrn']
+__all__ = [
+    "DEFAULTS",
+    "StochasticDurationPredictor",
+    "DurationPredictor",
+    "TextEncoder",
+    "ResidualCouplingBlock",
+    "PosteriorEncoder",
+    "Generator",
+    "DiscriminatorP",
+    "DiscriminatorS",
+    "MultiPeriodDiscriminator",
+    "SynthesizerTrn",
+]
 
 
 from ..vendor.tfcompat.hparam import HParams

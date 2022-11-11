@@ -1,5 +1,4 @@
-__all__ = ['run', 'parse_args']
-
+__all__ = ["run", "parse_args"]
 
 
 import argparse
@@ -39,7 +38,6 @@ def parse_args(args):
     parser.add_argument("--top-db", type=int)
     parser.set_defaults(backup=True, top_db=20)
     return parser.parse_args(args)
-
 
 
 try:

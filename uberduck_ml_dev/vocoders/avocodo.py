@@ -1,7 +1,22 @@
-__all__ = ['HiFiGanGenerator', 'ResBlock1', 'ResBlock2', 'Generator', 'DiscriminatorP', 'MultiPeriodDiscriminator',
-           'DiscriminatorS', 'MultiScaleDiscriminator', 'feature_loss', 'discriminator_loss', 'generator_loss',
-           'LRELU_SLOPE', 'AttrDict', 'build_env', 'init_weights', 'apply_weight_norm', 'get_padding']
-
+__all__ = [
+    "HiFiGanGenerator",
+    "ResBlock1",
+    "ResBlock2",
+    "Generator",
+    "DiscriminatorP",
+    "MultiPeriodDiscriminator",
+    "DiscriminatorS",
+    "MultiScaleDiscriminator",
+    "feature_loss",
+    "discriminator_loss",
+    "generator_loss",
+    "LRELU_SLOPE",
+    "AttrDict",
+    "build_env",
+    "init_weights",
+    "apply_weight_norm",
+    "get_padding",
+]
 
 
 """ from https://github.com/rishikksh20/Avocodo-pytorch """
@@ -64,24 +79,76 @@ class ResBlock1(torch.nn.Module):
     def __init__(self, h, channels, kernel_size=3, dilation=(1, 3, 5)):
         super(ResBlock1, self).__init__()
         self.h = h
-        self.convs1 = nn.ModuleList([
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
-                               padding=get_padding(kernel_size, dilation[0]))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[1],
-                               padding=get_padding(kernel_size, dilation[1]))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[2],
-                               padding=get_padding(kernel_size, dilation[2])))
-        ])
+        self.convs1 = nn.ModuleList(
+            [
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=dilation[0],
+                        padding=get_padding(kernel_size, dilation[0]),
+                    )
+                ),
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=dilation[1],
+                        padding=get_padding(kernel_size, dilation[1]),
+                    )
+                ),
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=dilation[2],
+                        padding=get_padding(kernel_size, dilation[2]),
+                    )
+                ),
+            ]
+        )
         self.convs1.apply(init_weights)
 
-        self.convs2 = nn.ModuleList([
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=1,
-                               padding=get_padding(kernel_size, 1))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=1,
-                               padding=get_padding(kernel_size, 1))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=1,
-                               padding=get_padding(kernel_size, 1)))
-        ])
+        self.convs2 = nn.ModuleList(
+            [
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=1,
+                        padding=get_padding(kernel_size, 1),
+                    )
+                ),
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=1,
+                        padding=get_padding(kernel_size, 1),
+                    )
+                ),
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=1,
+                        padding=get_padding(kernel_size, 1),
+                    )
+                ),
+            ]
+        )
         self.convs2.apply(init_weights)
 
     def forward(self, x):
@@ -104,12 +171,30 @@ class ResBlock2(torch.nn.Module):
     def __init__(self, h, channels, kernel_size=3, dilation=(1, 3)):
         super(ResBlock2, self).__init__()
         self.h = h
-        self.convs = nn.ModuleList([
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
-                               padding=get_padding(kernel_size, dilation[0]))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[1],
-                               padding=get_padding(kernel_size, dilation[1])))
-        ])
+        self.convs = nn.ModuleList(
+            [
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=dilation[0],
+                        padding=get_padding(kernel_size, dilation[0]),
+                    )
+                ),
+                weight_norm(
+                    Conv1d(
+                        channels,
+                        channels,
+                        kernel_size,
+                        1,
+                        dilation=dilation[1],
+                        padding=get_padding(kernel_size, dilation[1]),
+                    )
+                ),
+            ]
+        )
         self.convs.apply(init_weights)
 
     def forward(self, x):
@@ -130,19 +215,31 @@ class Generator(torch.nn.Module):
         self.h = h
         self.num_kernels = len(h.resblock_kernel_sizes)
         self.num_upsamples = len(h.upsample_rates)
-        self.conv_pre = weight_norm(Conv1d(h.num_mels, h.upsample_initial_channel, 7, 1, padding=3))
-        resblock = ResBlock1 if h.resblock == '1' else ResBlock2
+        self.conv_pre = weight_norm(
+            Conv1d(h.num_mels, h.upsample_initial_channel, 7, 1, padding=3)
+        )
+        resblock = ResBlock1 if h.resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
-            self.ups.append(weight_norm(
-                ConvTranspose1d(h.upsample_initial_channel // (2 ** i), h.upsample_initial_channel // (2 ** (i + 1)),
-                                k, u, padding=(k - u) // 2)))
+            self.ups.append(
+                weight_norm(
+                    ConvTranspose1d(
+                        h.upsample_initial_channel // (2**i),
+                        h.upsample_initial_channel // (2 ** (i + 1)),
+                        k,
+                        u,
+                        padding=(k - u) // 2,
+                    )
+                )
+            )
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
             ch = h.upsample_initial_channel // (2 ** (i + 1))
-            for j, (k, d) in enumerate(zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)):
+            for j, (k, d) in enumerate(
+                zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
+            ):
                 self.resblocks.append(resblock(h, ch, k, d))
 
         self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
@@ -150,8 +247,12 @@ class Generator(torch.nn.Module):
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
-        self.out_proj_x1 = weight_norm(Conv1d(h.upsample_initial_channel // 4, 1, 7, 1, padding=3))
-        self.out_proj_x2 = weight_norm(Conv1d(h.upsample_initial_channel // 8, 1, 7, 1, padding=3))
+        self.out_proj_x1 = weight_norm(
+            Conv1d(h.upsample_initial_channel // 4, 1, 7, 1, padding=3)
+        )
+        self.out_proj_x2 = weight_norm(
+            Conv1d(h.upsample_initial_channel // 8, 1, 7, 1, padding=3)
+        )
 
     def forward(self, x):
 
@@ -182,7 +283,7 @@ class Generator(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        print('Removing weight norm...')
+        print("Removing weight norm...")
         for l in self.ups:
             remove_weight_norm(l)
         for l in self.resblocks:
@@ -196,13 +297,47 @@ class DiscriminatorP(torch.nn.Module):
         super(DiscriminatorP, self).__init__()
         self.period = period
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
-        self.convs = nn.ModuleList([
-            norm_f(Conv2d(1, 32, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(32, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(128, 512, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(512, 1024, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(1024, 1024, (kernel_size, 1), 1, padding=(2, 0))),
-        ])
+        self.convs = nn.ModuleList(
+            [
+                norm_f(
+                    Conv2d(
+                        1,
+                        32,
+                        (kernel_size, 1),
+                        (stride, 1),
+                        padding=(get_padding(5, 1), 0),
+                    )
+                ),
+                norm_f(
+                    Conv2d(
+                        32,
+                        128,
+                        (kernel_size, 1),
+                        (stride, 1),
+                        padding=(get_padding(5, 1), 0),
+                    )
+                ),
+                norm_f(
+                    Conv2d(
+                        128,
+                        512,
+                        (kernel_size, 1),
+                        (stride, 1),
+                        padding=(get_padding(5, 1), 0),
+                    )
+                ),
+                norm_f(
+                    Conv2d(
+                        512,
+                        1024,
+                        (kernel_size, 1),
+                        (stride, 1),
+                        padding=(get_padding(5, 1), 0),
+                    )
+                ),
+                norm_f(Conv2d(1024, 1024, (kernel_size, 1), 1, padding=(2, 0))),
+            ]
+        )
         self.conv_post = norm_f(Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
 
     def forward(self, x):
@@ -230,13 +365,15 @@ class DiscriminatorP(torch.nn.Module):
 class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self):
         super(MultiPeriodDiscriminator, self).__init__()
-        self.discriminators = nn.ModuleList([
-            DiscriminatorP(2),
-            DiscriminatorP(3),
-            DiscriminatorP(5),
-            DiscriminatorP(7),
-            DiscriminatorP(11),
-        ])
+        self.discriminators = nn.ModuleList(
+            [
+                DiscriminatorP(2),
+                DiscriminatorP(3),
+                DiscriminatorP(5),
+                DiscriminatorP(7),
+                DiscriminatorP(11),
+            ]
+        )
 
     def forward(self, y, y_hat):
         y_d_rs = []
@@ -258,15 +395,17 @@ class DiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
         super(DiscriminatorS, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
-        self.convs = nn.ModuleList([
-            norm_f(Conv1d(1, 128, 15, 1, padding=7)),
-            norm_f(Conv1d(128, 128, 41, 2, groups=4, padding=20)),
-            norm_f(Conv1d(128, 256, 41, 2, groups=16, padding=20)),
-            norm_f(Conv1d(256, 512, 41, 4, groups=16, padding=20)),
-            norm_f(Conv1d(512, 1024, 41, 4, groups=16, padding=20)),
-            norm_f(Conv1d(1024, 1024, 41, 1, groups=16, padding=20)),
-            norm_f(Conv1d(1024, 1024, 5, 1, padding=2)),
-        ])
+        self.convs = nn.ModuleList(
+            [
+                norm_f(Conv1d(1, 128, 15, 1, padding=7)),
+                norm_f(Conv1d(128, 128, 41, 2, groups=4, padding=20)),
+                norm_f(Conv1d(128, 256, 41, 2, groups=16, padding=20)),
+                norm_f(Conv1d(256, 512, 41, 4, groups=16, padding=20)),
+                norm_f(Conv1d(512, 1024, 41, 4, groups=16, padding=20)),
+                norm_f(Conv1d(1024, 1024, 41, 1, groups=16, padding=20)),
+                norm_f(Conv1d(1024, 1024, 5, 1, padding=2)),
+            ]
+        )
         self.conv_post = norm_f(Conv1d(1024, 1, 3, 1, padding=1))
 
     def forward(self, x):
@@ -285,15 +424,16 @@ class DiscriminatorS(torch.nn.Module):
 class MultiScaleDiscriminator(torch.nn.Module):
     def __init__(self):
         super(MultiScaleDiscriminator, self).__init__()
-        self.discriminators = nn.ModuleList([
-            DiscriminatorS(use_spectral_norm=True),
-            DiscriminatorS(),
-            DiscriminatorS(),
-        ])
-        self.meanpools = nn.ModuleList([
-            AvgPool1d(4, 2, padding=2),
-            AvgPool1d(4, 2, padding=2)
-        ])
+        self.discriminators = nn.ModuleList(
+            [
+                DiscriminatorS(use_spectral_norm=True),
+                DiscriminatorS(),
+                DiscriminatorS(),
+            ]
+        )
+        self.meanpools = nn.ModuleList(
+            [AvgPool1d(4, 2, padding=2), AvgPool1d(4, 2, padding=2)]
+        )
 
     def forward(self, y, y_hat):
         y_d_rs = []
@@ -315,12 +455,17 @@ class MultiScaleDiscriminator(torch.nn.Module):
 
 
 class MultiCoMBDiscriminator(torch.nn.Module):
-
     def __init__(self, kernels, channels, groups, strides):
         super(MultiCoMBDiscriminator, self).__init__()
-        self.combd_1 = CoMBD(filters=channels, kernels=kernels[0], groups=groups, strides=strides)
-        self.combd_2 = CoMBD(filters=channels, kernels=kernels[1], groups=groups, strides=strides)
-        self.combd_3 = CoMBD(filters=channels, kernels=kernels[2], groups=groups, strides=strides)
+        self.combd_1 = CoMBD(
+            filters=channels, kernels=kernels[0], groups=groups, strides=strides
+        )
+        self.combd_2 = CoMBD(
+            filters=channels, kernels=kernels[1], groups=groups, strides=strides
+        )
+        self.combd_3 = CoMBD(
+            filters=channels, kernels=kernels[2], groups=groups, strides=strides
+        )
 
         self.pqmf_2 = PQMF(N=2, taps=256, cutoff=0.25, beta=10.0)
         self.pqmf_4 = PQMF(N=4, taps=192, cutoff=0.13, beta=10.0)
@@ -361,10 +506,6 @@ class MultiCoMBDiscriminator(torch.nn.Module):
         y_hat.append(p1_hat_)
         fmap_hat.append(p1_fmap_hat_)
 
-
-
-
-
         p2, p2_fmap = self.combd_2(x2_)
         y.append(p2)
         fmap.append(p2_fmap)
@@ -383,28 +524,60 @@ class MultiCoMBDiscriminator(torch.nn.Module):
 
         return y, y_hat, fmap, fmap_hat
 
-class MultiSubBandDiscriminator(torch.nn.Module):
 
-    def __init__(self, tkernels, fkernel, tchannels, fchannels, tstrides, fstride, tdilations, fdilations, tsubband,
-                 n, m, freq_init_ch):
+class MultiSubBandDiscriminator(torch.nn.Module):
+    def __init__(
+        self,
+        tkernels,
+        fkernel,
+        tchannels,
+        fchannels,
+        tstrides,
+        fstride,
+        tdilations,
+        fdilations,
+        tsubband,
+        n,
+        m,
+        freq_init_ch,
+    ):
 
         super(MultiSubBandDiscriminator, self).__init__()
 
-        self.fsbd = SubBandDiscriminator(init_channel=freq_init_ch, channels=fchannels, kernel=fkernel,
-                                         strides=fstride, dilations=fdilations)
+        self.fsbd = SubBandDiscriminator(
+            init_channel=freq_init_ch,
+            channels=fchannels,
+            kernel=fkernel,
+            strides=fstride,
+            dilations=fdilations,
+        )
 
         self.tsubband1 = tsubband[0]
-        self.tsbd1 = SubBandDiscriminator(init_channel=self.tsubband1, channels=tchannels, kernel=tkernels[0],
-                                          strides=tstrides[0], dilations=tdilations[0])
+        self.tsbd1 = SubBandDiscriminator(
+            init_channel=self.tsubband1,
+            channels=tchannels,
+            kernel=tkernels[0],
+            strides=tstrides[0],
+            dilations=tdilations[0],
+        )
 
         self.tsubband2 = tsubband[1]
-        self.tsbd2 = SubBandDiscriminator(init_channel=self.tsubband2, channels=tchannels, kernel=tkernels[1],
-                                          strides=tstrides[1], dilations=tdilations[1])
+        self.tsbd2 = SubBandDiscriminator(
+            init_channel=self.tsubband2,
+            channels=tchannels,
+            kernel=tkernels[1],
+            strides=tstrides[1],
+            dilations=tdilations[1],
+        )
 
         self.tsubband3 = tsubband[2]
-        self.tsbd3 = SubBandDiscriminator(init_channel=self.tsubband3, channels=tchannels, kernel=tkernels[2],
-                                          strides=tstrides[2], dilations=tdilations[2])
-
+        self.tsbd3 = SubBandDiscriminator(
+            init_channel=self.tsubband3,
+            channels=tchannels,
+            kernel=tkernels[2],
+            strides=tstrides[2],
+            dilations=tdilations[2],
+        )
 
         self.pqmf_n = PQMF(N=n, taps=256, cutoff=0.03, beta=10.0)
         self.pqmf_m = PQMF(N=m, taps=256, cutoff=0.1, beta=9.0)
@@ -419,22 +592,22 @@ class MultiSubBandDiscriminator(torch.nn.Module):
         xn = self.pqmf_n(x)
         xn_hat = self.pqmf_n(x_hat)
 
-        q3, feat_q3 = self.tsbd3(xn[:, :self.tsubband3, :])
-        q3_hat, feat_q3_hat = self.tsbd3(xn_hat[:, :self.tsubband3, :])
+        q3, feat_q3 = self.tsbd3(xn[:, : self.tsubband3, :])
+        q3_hat, feat_q3_hat = self.tsbd3(xn_hat[:, : self.tsubband3, :])
         y.append(q3)
         y_hat.append(q3_hat)
         fmap.append(feat_q3)
         fmap_hat.append(feat_q3_hat)
 
-        q2, feat_q2 = self.tsbd2(xn[:, :self.tsubband2, :])
-        q2_hat, feat_q2_hat = self.tsbd2(xn_hat[:, :self.tsubband2, :])
+        q2, feat_q2 = self.tsbd2(xn[:, : self.tsubband2, :])
+        q2_hat, feat_q2_hat = self.tsbd2(xn_hat[:, : self.tsubband2, :])
         y.append(q2)
         y_hat.append(q2_hat)
         fmap.append(feat_q2)
         fmap_hat.append(feat_q2_hat)
 
-        q1, feat_q1 = self.tsbd1(xn[:, :self.tsubband1, :])
-        q1_hat, feat_q1_hat = self.tsbd1(xn_hat[:, :self.tsubband1, :])
+        q1, feat_q1 = self.tsbd1(xn[:, : self.tsubband1, :])
+        q1_hat, feat_q1_hat = self.tsbd1(xn_hat[:, : self.tsubband1, :])
         y.append(q1)
         y_hat.append(q1_hat)
         fmap.append(feat_q1)
@@ -472,8 +645,8 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
     g_losses = []
     for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
         r_loss = torch.mean((1 - dr) ** 2)
-        g_loss = torch.mean(dg ** 2)
-        loss += (r_loss + g_loss)
+        g_loss = torch.mean(dg**2)
+        loss += r_loss + g_loss
         r_losses.append(r_loss.item())
         g_losses.append(g_loss.item())
 
@@ -489,18 +662,23 @@ def generator_loss(disc_outputs):
         loss += l
 
     return loss, gen_losses
-  
+
+
 #
 
-class CoMBD(torch.nn.Module):
 
+class CoMBD(torch.nn.Module):
     def __init__(self, filters, kernels, groups, strides, use_spectral_norm=False):
         super(CoMBD, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = nn.ModuleList()
         init_channel = 1
         for i, (f, k, g, s) in enumerate(zip(filters, kernels, groups, strides)):
-            self.convs.append(norm_f(Conv1d(init_channel, f, k, s, padding=get_padding(k, 1), groups=g)))
+            self.convs.append(
+                norm_f(
+                    Conv1d(init_channel, f, k, s, padding=get_padding(k, 1), groups=g)
+                )
+            )
             init_channel = f
         self.conv_post = norm_f(Conv1d(filters[-1], 1, 3, 1, padding=get_padding(3, 1)))
 
@@ -511,23 +689,36 @@ class CoMBD(torch.nn.Module):
             x = F.leaky_relu(x, 0.1)
             fmap.append(x)
         x = self.conv_post(x)
-        #fmap.append(x)
+        # fmap.append(x)
         x = torch.flatten(x, 1, -1)
         return x, fmap
 
 
 class MDC(torch.nn.Module):
-
-    def __init__(self, in_channel, channel, kernel, stride, dilations, use_spectral_norm=False):
+    def __init__(
+        self, in_channel, channel, kernel, stride, dilations, use_spectral_norm=False
+    ):
         super(MDC, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = torch.nn.ModuleList()
         self.num_dilations = len(dilations)
         for d in dilations:
-            self.convs.append(norm_f(Conv1d(in_channel, channel, kernel, stride=1, padding=get_padding(kernel, d),
-                                            dilation=d)))
+            self.convs.append(
+                norm_f(
+                    Conv1d(
+                        in_channel,
+                        channel,
+                        kernel,
+                        stride=1,
+                        padding=get_padding(kernel, d),
+                        dilation=d,
+                    )
+                )
+            )
 
-        self.conv_out = norm_f(Conv1d(channel, channel, 3, stride=stride, padding=get_padding(3, 1)))
+        self.conv_out = norm_f(
+            Conv1d(channel, channel, 3, stride=stride, padding=get_padding(3, 1))
+        )
 
     def forward(self, x):
         xs = None
@@ -545,8 +736,15 @@ class MDC(torch.nn.Module):
 
 
 class SubBandDiscriminator(torch.nn.Module):
-
-    def __init__(self, init_channel, channels, kernel, strides, dilations, use_spectral_norm=False):
+    def __init__(
+        self,
+        init_channel,
+        channels,
+        kernel,
+        strides,
+        dilations,
+        use_spectral_norm=False,
+    ):
         super(SubBandDiscriminator, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
 
@@ -564,12 +762,10 @@ class SubBandDiscriminator(torch.nn.Module):
             x = l(x)
             fmap.append(x)
         x = self.conv_post(x)
-        #fmap.append(x)
+        # fmap.append(x)
         x = torch.flatten(x, 1, -1)
 
         return x, fmap
-
-
 
 
 # adapted from
@@ -583,14 +779,16 @@ class PQMF(torch.nn.Module):
         self.cutoff = cutoff
         self.beta = beta
 
-        QMF = sig.firwin(taps + 1, cutoff, window=('kaiser', beta))
+        QMF = sig.firwin(taps + 1, cutoff, window=("kaiser", beta))
         H = np.zeros((N, len(QMF)))
         G = np.zeros((N, len(QMF)))
         for k in range(N):
-            constant_factor = (2 * k + 1) * (np.pi /
-                                             (2 * N)) * (np.arange(taps + 1) -
-                                                         ((taps - 1) / 2))  # TODO: (taps - 1) -> taps
-            phase = (-1)**k * np.pi / 4
+            constant_factor = (
+                (2 * k + 1)
+                * (np.pi / (2 * N))
+                * (np.arange(taps + 1) - ((taps - 1) / 2))
+            )  # TODO: (taps - 1) -> taps
+            phase = (-1) ** k * np.pi / 4
             H[k] = 2 * QMF * np.cos(constant_factor + phase)
 
             G[k] = 2 * QMF * np.cos(constant_factor - phase)
@@ -616,12 +814,9 @@ class PQMF(torch.nn.Module):
         return F.conv1d(x, self.H, padding=self.taps // 2, stride=self.N)
 
     def synthesis(self, x):
-        x = F.conv_transpose1d(x,
-                               self.updown_filter * self.N,
-                               stride=self.N)
+        x = F.conv_transpose1d(x, self.updown_filter * self.N, stride=self.N)
         x = F.conv1d(x, self.G, padding=self.taps // 2)
         return x
-
 
 
 import os
@@ -639,7 +834,6 @@ def build_env(config, config_name, path):
     if config != t_path:
         os.makedirs(path, exist_ok=True)
         shutil.copyfile(config, os.path.join(path, config_name))
-
 
 
 from torch.nn.utils import weight_norm

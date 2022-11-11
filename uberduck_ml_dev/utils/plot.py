@@ -1,5 +1,11 @@
-__all__ = ['save_figure_to_numpy', 'plot_tensor', 'plot_spectrogram', 'plot_attention', 'plot_attention_phonemes',
-           'plot_gate_outputs']
+__all__ = [
+    "save_figure_to_numpy",
+    "plot_tensor",
+    "plot_spectrogram",
+    "plot_attention",
+    "plot_attention_phonemes",
+    "plot_gate_outputs",
+]
 
 
 import numpy as np
@@ -38,8 +44,6 @@ def plot_spectrogram(mel):
     plt.imshow(mel, aspect="auto", origin="lower", interpolation="none", cmap="inferno")
     figure.canvas.draw()
     return figure
-
-
 
 
 def plot_attention(attention, encoder_length=None, decoder_length=None):

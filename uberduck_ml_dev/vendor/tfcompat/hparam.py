@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-__all__ = ['parse_values', 'HParams', 'PARAM_RE']
+__all__ = ["parse_values", "HParams", "PARAM_RE"]
 
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
@@ -21,9 +21,9 @@ __all__ = ['parse_values', 'HParams', 'PARAM_RE']
 # limitations under the License.
 # ==============================================================================
 """Hyperparameter values."""
-#nbdev_comment from __future__ import absolute_import
-#nbdev_comment from __future__ import division
-#nbdev_comment from __future__ import print_function
+# nbdev_comment from __future__ import absolute_import
+# nbdev_comment from __future__ import division
+# nbdev_comment from __future__ import print_function
 
 # export
 import json

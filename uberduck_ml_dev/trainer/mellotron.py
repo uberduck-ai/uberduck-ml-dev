@@ -1,4 +1,4 @@
-__all__ = ['MellotronTrainer']
+__all__ = ["MellotronTrainer"]
 
 
 import os

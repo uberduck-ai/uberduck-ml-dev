@@ -1,8 +1,25 @@
-__all__ = ['mel_to_audio', 'differenceFunction', 'cumulativeMeanNormalizedDifferenceFunction', 'getPitch',
-           'compute_yin', 'convert_to_wav', 'match_target_amplitude', 'modify_leading_silence',
-           'normalize_audio_segment', 'normalize_audio', 'trim_audio', 'MAX_WAV_INT16', 'load_wav_to_torch',
-           'overlay_mono', 'overlay_stereo', 'mono_to_stereo', 'stereo_to_mono', 'resample', 'get_audio_max',
-           'to_int16']
+__all__ = [
+    "mel_to_audio",
+    "differenceFunction",
+    "cumulativeMeanNormalizedDifferenceFunction",
+    "getPitch",
+    "compute_yin",
+    "convert_to_wav",
+    "match_target_amplitude",
+    "modify_leading_silence",
+    "normalize_audio_segment",
+    "normalize_audio",
+    "trim_audio",
+    "MAX_WAV_INT16",
+    "load_wav_to_torch",
+    "overlay_mono",
+    "overlay_stereo",
+    "mono_to_stereo",
+    "stereo_to_mono",
+    "resample",
+    "get_audio_max",
+    "to_int16",
+]
 
 
 """
@@ -209,7 +226,6 @@ def convert_to_wav(filename, output, sr=22050):
     return output
 
 
-
 import librosa
 from pydub import AudioSegment, silence
 from scipy.io.wavfile import write
@@ -264,12 +280,9 @@ def trim_audio(path, new_path, top_db=20):
     write(new_path, sr, trimmed)
 
 
-
-
 def load_wav_to_torch(path):
     sr, data = read(path)
     return torch.FloatTensor(data.astype(np.float32)), sr
-
 
 
 from scipy import signal

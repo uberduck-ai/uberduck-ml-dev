@@ -1,4 +1,4 @@
-__all__ = ['parse_args', 'run']
+__all__ = ["parse_args", "run"]
 
 
 import argparse

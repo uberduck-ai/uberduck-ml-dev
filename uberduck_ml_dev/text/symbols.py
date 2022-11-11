@@ -1,10 +1,33 @@
-__all__ = ['symbols_portuguese', 'PORTUGUESE_SYMBOLS', 'symbols_polish', 'POLISH_SYMBOLS', 'symbols_dutch',
-           'DUTCH_SYMBOLS', 'symbols_spanish', 'SPANISH_SYMBOLS', 'symbols_russian', 'RUSSIAN_SYMBOLS',
-           'symbols_ukrainian', 'UKRAINIAN_SYMBOLS', 'symbols', 'symbols_nvidia_taco2', 'symbols_with_ipa',
-           'grad_tts_symbols', 'DEFAULT_SYMBOLS', 'IPA_SYMBOLS', 'NVIDIA_TACO2_SYMBOLS', 'GRAD_TTS_SYMBOLS',
-           'SYMBOL_SETS', 'symbols_to_sequence', 'arpabet_to_sequence', 'should_keep_symbol', 'symbol_to_id',
-           'id_to_symbol', 'curly_re', 'words_re']
-
+__all__ = [
+    "symbols_portuguese",
+    "PORTUGUESE_SYMBOLS",
+    "symbols_polish",
+    "POLISH_SYMBOLS",
+    "symbols_dutch",
+    "DUTCH_SYMBOLS",
+    "symbols_spanish",
+    "SPANISH_SYMBOLS",
+    "symbols_russian",
+    "RUSSIAN_SYMBOLS",
+    "symbols_ukrainian",
+    "UKRAINIAN_SYMBOLS",
+    "symbols",
+    "symbols_nvidia_taco2",
+    "symbols_with_ipa",
+    "grad_tts_symbols",
+    "DEFAULT_SYMBOLS",
+    "IPA_SYMBOLS",
+    "NVIDIA_TACO2_SYMBOLS",
+    "GRAD_TTS_SYMBOLS",
+    "SYMBOL_SETS",
+    "symbols_to_sequence",
+    "arpabet_to_sequence",
+    "should_keep_symbol",
+    "symbol_to_id",
+    "id_to_symbol",
+    "curly_re",
+    "words_re",
+]
 
 
 """ from https://github.com/keithito/tacotron """

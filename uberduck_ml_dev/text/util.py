@@ -1,8 +1,29 @@
-__all__ = ['normalize_numbers', 'expand_abbreviations', 'expand_numbers', 'lowercase', 'collapse_whitespace',
-           'convert_to_ascii', 'convert_to_arpabet', 'basic_cleaners', 'transliteration_cleaners', 'english_cleaners',
-           'english_cleaners_phonemizer', 'batch_english_cleaners_phonemizer', 'g2p', 'batch_clean_text', 'clean_text',
-           'english_to_arpabet', 'cleaned_text_to_sequence', 'text_to_sequence', 'sequence_to_text', 'BATCH_CLEANERS',
-           'CLEANERS', 'text_to_sequence_for_editts', 'random_utterance', 'utterances']
+__all__ = [
+    "normalize_numbers",
+    "expand_abbreviations",
+    "expand_numbers",
+    "lowercase",
+    "collapse_whitespace",
+    "convert_to_ascii",
+    "convert_to_arpabet",
+    "basic_cleaners",
+    "transliteration_cleaners",
+    "english_cleaners",
+    "english_cleaners_phonemizer",
+    "batch_english_cleaners_phonemizer",
+    "g2p",
+    "batch_clean_text",
+    "clean_text",
+    "english_to_arpabet",
+    "cleaned_text_to_sequence",
+    "text_to_sequence",
+    "sequence_to_text",
+    "BATCH_CLEANERS",
+    "CLEANERS",
+    "text_to_sequence_for_editts",
+    "random_utterance",
+    "utterances",
+]
 
 
 """ from https://github.com/keithito/tacotron """
@@ -225,7 +246,6 @@ def batch_english_cleaners_phonemizer(text: List[str]):
     return batch
 
 
-
 import random
 
 from .symbols import (
@@ -331,8 +351,6 @@ def sequence_to_text(sequence, symbol_set=DEFAULT_SYMBOLS):
                 s = "{%s}" % s[1:]
             result += s
     return result.replace("}{", " ")
-
-
 
 
 def text_to_sequence_for_editts(text, cleaner_names, symbol_set=GRAD_TTS_SYMBOLS):

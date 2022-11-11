@@ -1,4 +1,4 @@
-__all__ = ['batch', 'flatten']
+__all__ = ["batch", "flatten"]
 
 
 import argparse

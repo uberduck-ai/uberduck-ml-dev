@@ -1,5 +1,4 @@
-__all__ = ['VITSEncoder', 'Decoder', 'MultiHeadAttention', 'FFN']
-
+__all__ = ["VITSEncoder", "Decoder", "MultiHeadAttention", "FFN"]
 
 
 import copy

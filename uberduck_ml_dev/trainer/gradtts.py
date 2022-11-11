@@ -1,4 +1,4 @@
-__all__ = ['GradTTSTrainer']
+__all__ = ["GradTTSTrainer"]
 
 
 import json

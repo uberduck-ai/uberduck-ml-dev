@@ -1,4 +1,4 @@
-__all__ = ['fix_len_compatibility_text_edit', 'EdiTTS']
+__all__ = ["fix_len_compatibility_text_edit", "EdiTTS"]
 
 
 import random
@@ -23,8 +23,6 @@ from .gradtts import (
     get_noise,
     DEFAULTS,
 )
-
-
 
 
 def fix_len_compatibility_text_edit(length, num_downsamplings_in_unet=2):

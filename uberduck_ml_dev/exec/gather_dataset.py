@@ -1,7 +1,6 @@
 __all__ = []
 
 
-
 import argparse
 import os
 from tempfile import NamedTemporaryFile

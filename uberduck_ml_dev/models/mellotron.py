@@ -1,4 +1,4 @@
-__all__ = ['DEFAULTS', 'Postnet', 'Prenet', 'Encoder', 'Decoder', 'Mellotron']
+__all__ = ["DEFAULTS", "Postnet", "Prenet", "Encoder", "Decoder", "Mellotron"]
 
 
 from math import sqrt
@@ -73,8 +73,6 @@ DEFAULTS = HParams(
 )
 
 
-
-
 class Postnet(nn.Module):
     """Postnet
     - Five 1-d convolution with 512 channels and kernel size 5
@@ -139,8 +137,6 @@ class Postnet(nn.Module):
         x = F.dropout(self.convolutions[-1](x), self.dropout_rate, self.training)
 
         return x
-
-
 
 
 class Prenet(nn.Module):

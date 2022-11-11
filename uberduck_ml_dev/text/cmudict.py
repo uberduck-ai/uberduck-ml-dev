@@ -1,5 +1,4 @@
-__all__ = ['CMUDict', 'valid_symbols']
-
+__all__ = ["CMUDict", "valid_symbols"]
 
 
 """ from https://github.com/keithito/tacotron """

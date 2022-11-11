@@ -1,5 +1,4 @@
-__all__ = ['ensure_speaker_table']
-
+__all__ = ["ensure_speaker_table"]
 
 
 import os

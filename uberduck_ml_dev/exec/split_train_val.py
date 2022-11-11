@@ -1,4 +1,4 @@
-__all__ = ['write_filenames', 'run', 'parse_args']
+__all__ = ["write_filenames", "run", "parse_args"]
 
 
 import os

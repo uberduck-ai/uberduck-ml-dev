@@ -1,4 +1,4 @@
-__all__ = ['tts', 'rhythm_transfer']
+__all__ = ["tts", "rhythm_transfer"]
 
 
 import torch
@@ -6,7 +6,6 @@ import torch
 from .text.symbols import NVIDIA_TACO2_SYMBOLS
 from .text.util import text_to_sequence
 from .data_loader import prepare_input_sequence
-
 
 
 from typing import List
@@ -48,7 +47,6 @@ def tts(
     audio = y_g_hat.reshape(1, -1)
     audio = audio * max_wav_value
     return audio
-
 
 
 from typing import Optional

@@ -464,15 +464,19 @@ class Tacotron2Trainer(TTSTrainer):
                 sampler.set_epoch(epoch)
             for batch_idx, batch in enumerate(train_loader):
                 self.global_step += 1
-                
+
                 # Learning Rate decay, can be disabled if lr_decay_start is == 0 or None
-                if (self.global_step > self.lr_decay_start) and (self.lr_decay_start not in [0, None]):
-                    learning_rate = (self.learning_rate * (np.exp(-self.global_step / self.lr_decay_rate)))
+                if (self.global_step > self.lr_decay_start) and (
+                    self.lr_decay_start not in [0, None]
+                ):
+                    learning_rate = self.learning_rate * (
+                        np.exp(-self.global_step / self.lr_decay_rate)
+                    )
                     learning_rate = max(self.lr_decay_min, learning_rate)
                     self.learning_rate = learning_rate
                     for param_group in optimizer.param_groups:
-                        param_group['lr'] = learning_rate
-                        
+                        param_group["lr"] = learning_rate
+
                 # NOTE (Sam): model.module.zero_grad() needed for distributed run?
                 model.zero_grad()
 

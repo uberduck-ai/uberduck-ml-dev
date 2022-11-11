@@ -1,5 +1,10 @@
-__all__ = ['get_summary_statistics', 'calculate_statistics', 'generate_markdown', 'parse_args', 'run']
-
+__all__ = [
+    "get_summary_statistics",
+    "calculate_statistics",
+    "generate_markdown",
+    "parse_args",
+    "run",
+]
 
 
 import argparse
@@ -29,8 +34,6 @@ from ..data.statistics import (
 )
 from ..text.util import clean_text, text_to_sequence
 from ..utils.audio import compute_yin
-
-
 
 
 def get_summary_statistics(arr):
@@ -408,8 +411,6 @@ def generate_markdown(output_file, dataset_path, output_folder, data):
     mdFile.create_md_file()
 
 
-
-
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -478,7 +479,6 @@ def run(
             json_data = {k: data[k] for k in keys}
             json_data["arpabet_rnn"] = data["lookup_results"]["RNN"]
             json.dump(json_data, outfile, indent=2)
-
 
 
 try:

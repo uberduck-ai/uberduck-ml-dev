@@ -1,7 +1,32 @@
-__all__ = ['BaseModule', 'Mish', 'Upsample', 'Downsample', 'Rezero', 'Block', 'ResnetBlock', 'LinearAttention',
-           'Residual', 'SinusoidalPosEmb', 'GradLogPEstimator2d', 'get_noise', 'Diffusion', 'sequence_mask',
-           'fix_len_compatibility', 'convert_pad_shape', 'generate_path', 'duration_loss', 'LayerNorm', 'ConvReluNorm',
-           'DurationPredictor', 'MultiHeadAttention', 'FFN', 'Encoder', 'TextEncoder', 'GradTTS', 'DEFAULTS']
+__all__ = [
+    "BaseModule",
+    "Mish",
+    "Upsample",
+    "Downsample",
+    "Rezero",
+    "Block",
+    "ResnetBlock",
+    "LinearAttention",
+    "Residual",
+    "SinusoidalPosEmb",
+    "GradLogPEstimator2d",
+    "get_noise",
+    "Diffusion",
+    "sequence_mask",
+    "fix_len_compatibility",
+    "convert_pad_shape",
+    "generate_path",
+    "duration_loss",
+    "LayerNorm",
+    "ConvReluNorm",
+    "DurationPredictor",
+    "MultiHeadAttention",
+    "FFN",
+    "Encoder",
+    "TextEncoder",
+    "GradTTS",
+    "DEFAULTS",
+]
 
 
 import random
@@ -18,8 +43,6 @@ from ..vendor.tfcompat.hparam import HParams
 from ..text.symbols import SYMBOL_SETS
 from ..text.util import text_to_sequence
 from ..utils.utils import intersperse, intersperse_emphases
-
-
 
 
 class BaseModule(torch.nn.Module):
@@ -46,8 +69,6 @@ class BaseModule(torch.nn.Module):
             if isinstance(x[i], torch.Tensor) and x[i].device != device:
                 x[i] = x[i].to(device)
         return x
-
-
 
 
 class Mish(BaseModule):
@@ -839,7 +860,6 @@ class TextEncoder(BaseModule):
         logw = self.proj_w(x_dp, x_mask)
 
         return mu, logw, x_mask
-
 
 
 import monotonic_align

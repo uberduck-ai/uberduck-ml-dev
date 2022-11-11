@@ -1,5 +1,4 @@
-__all__ = ['FORMATS']
-
+__all__ = ["FORMATS"]
 
 
 import argparse
