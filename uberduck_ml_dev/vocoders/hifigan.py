@@ -59,6 +59,8 @@ class HiFiGanGenerator(nn.Module):
 
     @torch.no_grad()
     def load_config(self):
+        if isinstance(self.config, dict):
+            return AttrDict(self.config)
         with open(self.config) as f:
             h = AttrDict(json.load(f))
         return h
