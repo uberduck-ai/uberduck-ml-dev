@@ -56,7 +56,17 @@ TODO
 
 1. No GST
 
-TODO
+    ```python
+    from uberduck_ml_dev.data_loader import prepare_input_sequence
+    from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS
+    
+    model = Tacotron2(DEFAULTS)
+    inputs, input_lengths = prepare_input_sequence(["This is a test voice message"], cpu_run=True, arpabet=True)
+    speaker_ids = torch.tensor([0])
+    model.eval()
+    with torch.no_grad():
+        output = model.inference(inputs, input_lengths, speaker_ids, None)
+    ```
 
 2. Using Torchmoji as GST
 
