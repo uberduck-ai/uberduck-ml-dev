@@ -224,7 +224,7 @@ id_to_symbol = {
     POLISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
     DUTCH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
     SPANISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
-    NORWEGIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[NORGWEGIAN_SYMBOLS])},
+    NORWEGIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
     RUSSIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
     UKRAINIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
 }
