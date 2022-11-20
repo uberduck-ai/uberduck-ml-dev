@@ -7,6 +7,8 @@ __all__ = [
     "DUTCH_SYMBOLS",
     "symbols_spanish",
     "SPANISH_SYMBOLS",
+    "symbols_norwegian",
+    "NORWEGIAN_SYMBOLS",
     "symbols_russian",
     "RUSSIAN_SYMBOLS",
     "symbols_ukrainian",
@@ -116,6 +118,20 @@ SPANISH_SYMBOLS = "spanish"
 
 ##
 
+_norwegian = "ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅabcdefghijklmnopqrstuvwxyzæøå"
+
+symbols_norwegian = (
+    [_pad]
+    + list(_special_nvidia_taco2)
+    + list(_punctuation_nvidia_taco2)
+    + list(_norwegian)
+    + _arpabet
+)
+
+NORWEGIAN_SYMBOLS = "norwegian"
+
+##
+
 _russian = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя"
 
 symbols_russian = (
@@ -174,6 +190,7 @@ SYMBOL_SETS = {
     POLISH_SYMBOLS: symbols_polish,
     DUTCH_SYMBOLS: symbols_dutch,
     SPANISH_SYMBOLS: symbols_spanish,
+    NORWEGIAN_SYMBOLS: symbols_norwegian,
     RUSSIAN_SYMBOLS: symbols_russian,
     UKRAINIAN_SYMBOLS: symbols_ukrainian,
 }
@@ -192,6 +209,7 @@ symbol_to_id = {
     POLISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
     DUTCH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
     SPANISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
+    NORWEGIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
     RUSSIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
     UKRAINIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
 }
@@ -206,6 +224,7 @@ id_to_symbol = {
     POLISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
     DUTCH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
     SPANISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
+    NORWEGIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
     RUSSIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
     UKRAINIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
 }
