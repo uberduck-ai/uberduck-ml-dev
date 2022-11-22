@@ -73,8 +73,10 @@ DEFAULTS = HParams(
     n_frames_per_step_initial=1,
     win_length=1024,
     gst_type=None,
+    gst_dim=2304, # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
+    # NOTE (Sam): to-do - move sample_inference parameters to trainer.
     sample_inference_speaker_ids=None,
     sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
     distributed_run=False,
