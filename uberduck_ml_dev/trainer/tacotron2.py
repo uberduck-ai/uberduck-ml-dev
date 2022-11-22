@@ -422,7 +422,7 @@ class Tacotron2Trainer(TTSTrainer):
         self,
         interrupt_condition=lambda: False,
         interrupt_action=lambda: None,
-        save_function=lambda: None,
+        save_function=lambda epoch: None,
     ):
 
         train_start_time = time.perf_counter()
