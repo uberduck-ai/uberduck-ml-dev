@@ -418,7 +418,12 @@ class Tacotron2Trainer(TTSTrainer):
         )
         return train_set, val_set, train_loader, sampler, collate_fn
 
-    def train(self):
+    def train(
+        self,
+        interrupt_condition=lambda x: True,
+        interrupt_action=lambda x: None,
+        save_function=lambda x: None,
+    ):
 
         train_start_time = time.perf_counter()
         print("start train", train_start_time)
@@ -534,6 +539,11 @@ class Tacotron2Trainer(TTSTrainer):
                 if self.distributed_run:
                     log_str += f" | rank: {self.rank}"
                 print(log_str)
+
+                interrupt = interrupt_condition()
+                if interrupt:
+                    interrupt_action()
+                    
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"{self.checkpoint_name}_{epoch}",
@@ -543,9 +553,8 @@ class Tacotron2Trainer(TTSTrainer):
                     learning_rate=self.learning_rate,
                     global_step=self.global_step,
                 )
+                save_function(epoch)
 
-            # NOTE (Zach): There's no need to validate in debug mode since we're not really training.
-            # NOTE (Sam): What if I want to debug the validator?
             if self.is_validate:
                 self.validate(
                     model=model,
@@ -556,6 +565,8 @@ class Tacotron2Trainer(TTSTrainer):
             if self.debug:
                 self.loss.append(reduced_loss)
                 continue
+
+
 
     def validate(self, **kwargs):
         val_start_time = time.perf_counter()
