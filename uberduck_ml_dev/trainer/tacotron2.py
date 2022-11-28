@@ -166,13 +166,15 @@ class Tacotron2Trainer(TTSTrainer):
             alignment_max = alignment_metrics["max"]
             sample_idx = randint(0, y_pred["mel_outputs_postnet"].size(0) - 1)
             audio = self.sample(mel=y_pred["mel_outputs_postnet"][sample_idx])
+            audio_target = self.sample(mel=mel_target[sample_idx])
             self.log(
                 "AlignmentDiagonalness/train",
                 self.global_step,
                 scalar=alignment_diagonalness,
             )
             self.log("AlignmentMax/train", self.global_step, scalar=alignment_max)
-            self.log("AudioSample/train", self.global_step, audio=audio)
+            self.log("AudioTeacherForced/train", self.global_step, audio=audio)
+            self.log("TargetAudio/train", self.global_step, audio=audio_target)
             self.log(
                 "MelPredicted/train",
                 self.global_step,
@@ -345,12 +347,13 @@ class Tacotron2Trainer(TTSTrainer):
         alignment_max = alignment_metrics["max"]
         sample_idx = randint(0, self.batch_size)
         audio = self.sample(mel=y_pred["mel_outputs_postnet"][sample_idx])
-
+        audio_target = self.sample(mel=X["mel_padded"][sample_idx])
         self.log(
             "AlignmentDiagonalness/val", self.global_step, scalar=alignment_diagonalness
         )
         self.log("AlignmentMax/val", self.global_step, scalar=alignment_max)
-        self.log("AudioSample/val", self.global_step, audio=audio)
+        self.log("AudioTeacherForced/val", self.global_step, audio=audio)
+        self.log("AudioTarget/val", self.global_step, audio=audio_target)
         self.log(
             "MelPredicted/val",
             self.global_step,
@@ -543,7 +546,7 @@ class Tacotron2Trainer(TTSTrainer):
                 interrupt = interrupt_condition()
                 if interrupt:
                     interrupt_action()
-                    
+
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"{self.checkpoint_name}_{epoch}",
@@ -565,8 +568,6 @@ class Tacotron2Trainer(TTSTrainer):
             if self.debug:
                 self.loss.append(reduced_loss)
                 continue
-
-
 
     def validate(self, **kwargs):
         val_start_time = time.perf_counter()
