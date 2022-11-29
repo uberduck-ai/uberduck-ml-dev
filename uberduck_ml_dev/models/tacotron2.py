@@ -166,6 +166,7 @@ class Tacotron2(TTSModel):
             max_len,
             output_lengths,
             speaker_ids,
+            embedded_gst,
             *_,
         ) = inputs
 
@@ -180,12 +181,69 @@ class Tacotron2(TTSModel):
             if self.n_speakers > 1:
                 encoder_outputs += self.spkr_lin(embedded_speakers)
 
+        if self.gst_lin is not None:
+            assert (
+                embedded_gst is not None
+            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
+            encoder_outputs += self.gst_lin(embedded_gst)
+
         encoder_outputs = torch.cat((encoder_outputs,), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=input_lengths
         )
         return alignments
+
+
+    @torch.no_grad()
+    def inference_noattention(self, input_text, input_lengths, speaker_ids, embedded_gst, attention):
+
+        # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
+        embedded_inputs = self.embedding(input_text).transpose(1, 2)
+        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
+        encoder_outputs = embedded_text
+        if self.speaker_embedding is not None:
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            # NOTE (Sam): this requires more careful thought
+            if self.n_speakers > 1:
+                encoder_outputs += self.spkr_lin(embedded_speakers)
+
+        if self.gst_lin is not None:
+            assert (
+                embedded_gst is not None
+            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
+            encoder_outputs += self.gst_lin(embedded_gst)
+
+        mel_outputs, gate_predicted, alignments = self.decoder.inference_noattention(
+            encoder_outputs, attention
+        )
+        mel_outputs_postnet = self.postnet(mel_outputs)
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+
+        dummy_output_length = torch.LongTensor([0]) if not self.cudnn_enabled else torch.LongTensor([0]).cuda()
+
+        (
+            output_lengths,
+            mel_outputs,
+            mel_outputs_postnet,
+            gate_predicted,
+        ) = self.mask_output(
+            mel_outputs=mel_outputs,
+            mel_outputs_postnet=mel_outputs_postnet,
+            gate_predicted=gate_predicted,
+            output_lengths=dummy_output_length, # noattention does not return output lengths.
+        )
+
+        # NOTE (Sam): batch class in inference methods breaks torchscript
+        output = dict(
+            mel_outputs=mel_outputs,
+            mel_outputs_postnet=mel_outputs_postnet,
+            gate_predicted=gate_predicted,
+            alignments=alignments,
+            output_lengths=output_lengths,
+        )
+        return output
+
 
     def forward(
         self,
