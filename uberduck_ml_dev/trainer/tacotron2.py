@@ -571,13 +571,15 @@ class Tacotron2Trainer(TTSTrainer):
                 )
                 save_function(epoch)
 
-            if self.is_validate:
-                self.validate(
-                    model=model,
-                    val_set=val_set,
-                    collate_fn=collate_fn,
-                    criterion=criterion,
-                )
+            # NOTE(zach): Validation is currently broken. Comment out to fix
+            # training in master.
+            # if self.is_validate:
+            #     self.validate(
+            #         model=model,
+            #         val_set=val_set,
+            #         collate_fn=collate_fn,
+            #         criterion=criterion,
+            #     )
             if self.debug:
                 self.loss.append(reduced_loss)
                 continue
