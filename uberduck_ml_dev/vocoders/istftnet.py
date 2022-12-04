@@ -219,7 +219,7 @@ class STFT(torch.nn.Module):
 
 
 class TorchSTFT(torch.nn.Module):
-    def __init__(self, filter_length=800, hop_length=200, win_length=800, window='hann'):
+    def __init__(self, filter_length=800, hop_length=200, win_length=800, window='hann', device="cpu"):
         super().__init__()
         self.filter_length = filter_length
         self.hop_length = hop_length
@@ -237,7 +237,7 @@ class TorchSTFT(torch.nn.Module):
     def inverse(self, magnitude, phase):
         inverse_transform = torch.istft(
             magnitude * torch.exp(phase * 1j),
-            self.filter_length, self.hop_length, self.win_length, window=self.window)
+            self.filter_length, self.hop_length, self.win_length, window=self.window.to(self.device))
 
         return inverse_transform.unsqueeze(-2)  # unsqueeze to stay consistent with conv_transpose1d implementation
 
@@ -252,7 +252,6 @@ class iSTFTNetGenerator(nn.Module):
         super().__init__()
         self.config = config
         self.checkpoint = checkpoint
-        self.stft = 
         self.device = "cuda" if torch.cuda.is_available() and cudnn_enabled else "cpu"
         self.vocoder, self.stft = self.load_checkpoint().eval()
         self.vocoder.remove_weight_norm()
@@ -261,7 +260,7 @@ class iSTFTNetGenerator(nn.Module):
     def load_checkpoint(self):
         h = self.load_config()
         vocoder = Generator(h)
-        stft = TorchSTFT(filter_length=h.gen_istft_n_fft, hop_length=h.gen_istft_hop_size, win_length=h.gen_istft_n_fft).to(device)
+        stft = TorchSTFT(filter_length=h.gen_istft_n_fft, hop_length=h.gen_istft_hop_size, win_length=h.gen_istft_n_fft, device=device).to(device)
         vocoder.load_state_dict(
             torch.load(
                 self.checkpoint,
