@@ -25,7 +25,6 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
-from utils import init_weights, get_padding
 import numpy as np
 from torch.autograd import Variable
 from scipy.signal import get_window
