@@ -282,7 +282,7 @@ class iSTFTNetGenerator(nn.Module):
 
     @torch.no_grad()
     def infer(self, mel, max_wav_value=32768):
-        spec, phase = self.vocoder(x)
+        spec, phase = self.vocoder(mel)
         y_g_hat = self.stft.inverse(spec, phase)
         audio = (
             y_g_hat.cpu().squeeze().clamp(-1, 1).numpy()
