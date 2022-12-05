@@ -48,8 +48,8 @@ class Denoiser(torch.nn.Module):
 
         with torch.no_grad():
             if isinstance(hifigan, iSTFTNetGenerator):
-                self.stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16, device=hifigan.device).to(hifigan.device)
-                spec, phase = hifigan.vocoder(mel_input.to(hifigan.device))
+                self.stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16, device="cpu").to("cpu")
+                spec, phase = hifigan.vocoder(mel_input.cpu())
                 y_g_hat = self.stft.inverse(spec, phase)
                 bias_audio = (
                     y_g_hat
