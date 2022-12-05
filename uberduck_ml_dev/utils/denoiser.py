@@ -1,15 +1,12 @@
 """
-Removes bias from HiFi-Gan and Avocodo (typically heard as noise in the audio)
+Removes bias from vocoders (typically heard as metalic noise in the audio)
 
 Usage:
 from denoiser import Denoiser
-denoiser = Denoiser(HIFIGANGENERATOR, mode="normal") # Experiment with modes "normal" and "zeros"
+denoiser = Denoiser(VOCODERGENERATOR, mode="normal") # Experiment with modes "normal" and "zeros"
 
 # Inference Vocoder
-audio = hifigan.vocoder.forward(output[1][:1])
-
-audio = audio.squeeze()
-audio = audio * 32768.0
+audio = VOCODERGENERATOR.vocoder.forward(output[1][:1])
 
 # Denoise
 audio_denoised = denoiser(audio.view(1, -1), strength=15)[:, 0] # Change strength if needed
@@ -22,6 +19,7 @@ audio_denoised = audio_denoised * normalize
 import sys
 import torch
 from ..models.common import STFT
+from ..vocoders.istftnet import iSTFTNetGenerator
 
 
 class Denoiser(torch.nn.Module):
@@ -46,11 +44,18 @@ class Denoiser(torch.nn.Module):
             raise Exception("Mode {} if not supported".format(mode))
 
         with torch.no_grad():
-            bias_audio = (
-                hifigan.vocoder.forward(mel_input.to(hifigan.device))
-                .view(1, -1)
-                .float()
-            )
+            if isinstance(hifigan, iSTFTNetGenerator):
+                bias_audio = (
+                    hifigan(mel_input.to(hifigan.device))
+                    .view(1, -1)
+                    .float()
+                )
+            else:
+                bias_audio = (
+                    hifigan.vocoder.forward(mel_input.to(hifigan.device))
+                    .view(1, -1)
+                    .float()
+                )
             bias_spec, _ = self.stft.transform(bias_audio.cpu())
 
         self.register_buffer("bias_spec", bias_spec[:, :, 0][:, :, None])
