@@ -253,14 +253,14 @@ class iSTFTNetGenerator(nn.Module):
         self.config = config
         self.checkpoint = checkpoint
         self.device = "cuda" if torch.cuda.is_available() and cudnn_enabled else "cpu"
-        self.vocoder, self.stft = self.load_checkpoint().eval()
+        self.vocoder, self.stft = self.load_checkpoint()
         self.vocoder.remove_weight_norm()
 
     @torch.no_grad()
     def load_checkpoint(self):
         h = self.load_config()
         vocoder = Generator(h)
-        stft = TorchSTFT(filter_length=h.gen_istft_n_fft, hop_length=h.gen_istft_hop_size, win_length=h.gen_istft_n_fft, device=device).to(device)
+        stft = TorchSTFT(filter_length=h.gen_istft_n_fft, hop_length=h.gen_istft_hop_size, win_length=h.gen_istft_n_fft, device=self.device).to(self.device)
         vocoder.load_state_dict(
             torch.load(
                 self.checkpoint,
@@ -269,7 +269,7 @@ class iSTFTNetGenerator(nn.Module):
         )
         if self.device == "cuda":
             vocoder = vocoder.cuda()
-        return vocoder, stft
+        return vocoder.eval(), stft
 
     @torch.no_grad()
     def load_config(self):
