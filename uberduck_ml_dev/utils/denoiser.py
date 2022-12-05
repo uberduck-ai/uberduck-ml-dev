@@ -1,12 +1,15 @@
 """
-Removes bias from vocoders (typically heard as metalic noise in the audio)
+Removes bias from HiFi-Gan and Avocodo (typically heard as noise in the audio)
 
 Usage:
 from denoiser import Denoiser
-denoiser = Denoiser(VOCODERGENERATOR, mode="normal") # Experiment with modes "normal" and "zeros"
+denoiser = Denoiser(HIFIGANGENERATOR, mode="normal") # Experiment with modes "normal" and "zeros"
 
 # Inference Vocoder
-audio = VOCODERGENERATOR.vocoder.forward(output[1][:1])
+audio = hifigan.vocoder.forward(output[1][:1])
+
+audio = audio.squeeze()
+audio = audio * 32768.0
 
 # Denoise
 audio_denoised = denoiser(audio.view(1, -1), strength=15)[:, 0] # Change strength if needed
@@ -45,8 +48,10 @@ class Denoiser(torch.nn.Module):
 
         with torch.no_grad():
             if isinstance(hifigan, iSTFTNetGenerator):
+                spec, phase = hifigan.vocoder(mel_input.to(hifigan.device))
+                y_g_hat = self.stft.inverse(spec, phase)
                 bias_audio = (
-                    hifigan(mel_input.to(hifigan.device))
+                    y_g_hat
                     .view(1, -1)
                     .float()
                 )
