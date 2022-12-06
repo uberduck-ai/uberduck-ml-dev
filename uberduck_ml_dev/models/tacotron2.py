@@ -56,7 +56,6 @@ DEFAULTS = HParams(
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
-    with_gst=False,
     has_speaker_embedding=False,
     filter_length=1024,
     hop_length=256,
@@ -72,8 +71,10 @@ DEFAULTS = HParams(
     mel_fmin=0,
     n_frames_per_step_initial=1,
     win_length=1024,
+    # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically
     gst_type=None,
-    gst_dim=2304, # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
+    with_gst=False,  # redundant
+    gst_dim=2304,  # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
     # NOTE (Sam): to-do - move sample_inference parameters to trainer.
@@ -194,9 +195,10 @@ class Tacotron2(TTSModel):
         )
         return alignments
 
-
     @torch.no_grad()
-    def inference_noattention(self, input_text, input_lengths, speaker_ids, embedded_gst, attention):
+    def inference_noattention(
+        self, input_text, input_lengths, speaker_ids, embedded_gst, attention
+    ):
 
         # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
@@ -220,7 +222,11 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        dummy_output_length = torch.LongTensor([0]) if not self.cudnn_enabled else torch.LongTensor([0]).cuda()
+        dummy_output_length = (
+            torch.LongTensor([0])
+            if not self.cudnn_enabled
+            else torch.LongTensor([0]).cuda()
+        )
 
         (
             output_lengths,
@@ -231,7 +237,7 @@ class Tacotron2(TTSModel):
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
             gate_predicted=gate_predicted,
-            output_lengths=dummy_output_length, # noattention does not return output lengths.
+            output_lengths=dummy_output_length,  # noattention does not return output lengths.
         )
 
         # NOTE (Sam): batch class in inference methods breaks torchscript
@@ -243,7 +249,6 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
         )
         return output
-
 
     def forward(
         self,
