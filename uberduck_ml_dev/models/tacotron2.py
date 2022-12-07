@@ -134,13 +134,11 @@ class Tacotron2(TTSModel):
         else:
             self.speaker_embedding = None
 
-        # NOTE (Sam): Why does the zero network alter results (see below)?
         if self.has_speaker_embedding:
+            #   NOTE (Sam): self.spkr_lin = ZeroNetwork() if n_speakers == 1 gives fewer trainable terms, and could potentially be better for fine tuning, although we don't really know.
             self.spkr_lin = nn.Linear(
                 self.speaker_embedding_dim, self.encoder_embedding_dim
             )
-        else:
-            self.spkr_lin = ZeroNetwork()
 
         self.gst_init(hparams)
 
@@ -190,9 +188,9 @@ class Tacotron2(TTSModel):
         mel_stop_index: Optional[int] = 0,
     ):
 
-        if input_lengths:
+        if input_lengths is not None:
             input_lengths = input_lengths.data
-        if output_lengths:
+        if output_lengths is not None:
             output_lengths = output_lengths.data
 
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
