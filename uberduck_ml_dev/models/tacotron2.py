@@ -1,9 +1,10 @@
+# TODO (Sam): unite the 5 different forward / inference methods using if statements.
+# TODO (Sam): move to Hydra or more organized config
 from torch import nn
 import numpy as np
 import torch
 from torch.nn import functional as F
 
-# NOTE (Sam): components is redundant with common - we needed a different name to make the package imports work as we migrate to a folder based approach
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
 from ..data.batch import Batch
@@ -119,9 +120,8 @@ class Tacotron2(TTSModel):
         else:
             self.speaker_embedding = None
 
-        # NOTE (Sam): it is not totally clear to me this should be split - what if we want to optimize position within the speaker_embedding_dim?
-        # What is the role of has_speaker_embedding?
-        if self.n_speakers > 1:
+        # NOTE (Sam): Why does the zero network alter results (see below)?
+        if self.has_speaker_embedding:
             self.spkr_lin = nn.Linear(
                 self.speaker_embedding_dim, self.encoder_embedding_dim
             )
@@ -130,6 +130,7 @@ class Tacotron2(TTSModel):
 
         self.gst_init(hparams)
 
+    # TODO (Sam): treat "gst" (i.e. torchmoji) the same as speaker encoding
     def gst_init(self, hparams):
         self.gst_lin = None
         self.gst_type = None
@@ -265,12 +266,13 @@ class Tacotron2(TTSModel):
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
+        # TODO (Sam): treat "gst" and "speaker_embedding" generically
+        # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
+        if self.has_speaker_embedding is True:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
+        # NOTE (Sam): with_gst?
         if self.gst_lin is not None:
             assert (
                 embedded_gst is not None
@@ -296,7 +298,7 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
         )
 
-        # NOTE (Sam): batch class in inference methods breaks torchscript
+        # NOTE (Sam): batch class in inference methods breaks torchscript.
         output = dict(
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
@@ -367,11 +369,9 @@ class Tacotron2(TTSModel):
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
+        if self.has_speaker_embedding is True:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
         if self.gst_lin is not None:
             assert (
