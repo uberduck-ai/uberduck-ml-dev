@@ -96,6 +96,7 @@ class Tacotron2Trainer(TTSTrainer):
         self.lr_decay_rate = self.hparams.lr_decay_rate
         self.lr_decay_min = self.hparams.lr_decay_min
 
+        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or some other helper function
         if self.hparams.get("gst_type") == "torchmoji":
             assert self.hparams.get(
                 "torchmoji_vocabulary_file"
@@ -109,10 +110,17 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_vocabulary_file"),
                 self.hparams.get("torchmoji_model_file"),
             )
+            # NOTE (Sam): rename gst to gsts[0]
             self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
             self.compute_gst = None
 
+        # NOTE (Sam): some ambiguity in naming between audio_encoder and speaker_encoder
+        # Speaker_encoder is really mean audio_encoder
+        if self.hparams.get("audio_encoder") == "spkrec-ecapa-voxceleb":
+            from speechbrain.pretrained import EncoderClassifier
+            self.audio_encoder = EncoderClassifier.from_hparams(self.hparams.get("speechbrain/spkrec-ecapa-voxceleb"))
+            self.compute_audio_encoding =
         if not self.sample_inference_speaker_ids:
             self.sample_inference_speaker_ids = list(range(self.n_speakers))
 
@@ -559,7 +567,7 @@ class Tacotron2Trainer(TTSTrainer):
                 interrupt = interrupt_condition()
                 if interrupt:
                     interrupt_action()
-                    
+
             if epoch % self.epochs_per_checkpoint == 0:
                 self.save_checkpoint(
                     f"{self.checkpoint_name}_{epoch}",
@@ -583,8 +591,6 @@ class Tacotron2Trainer(TTSTrainer):
             if self.debug:
                 self.loss.append(reduced_loss)
                 continue
-
-
 
     def validate(self, **kwargs):
         val_start_time = time.perf_counter()

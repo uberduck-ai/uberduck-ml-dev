@@ -128,9 +128,13 @@ class Tacotron2(TTSModel):
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
         if hparams.has_speaker_embedding:
-            self.speaker_embedding = nn.Embedding(
-                self.n_speakers, hparams.speaker_embedding_dim
-            )
+            if self.new_speaker_embedding:
+                self.speaker_embedding = nn.Embedding(
+                    self.n_speakers, hparams.speaker_embedding_dim
+                )
+            # NOTE (Sam): treating context encoders generically will remove such code.
+            if self.speechbrain_speaker_embedding:
+                self.speaker_embedding = self.mean_embedding_function()
         else:
             self.speaker_embedding = None
 
@@ -142,7 +146,7 @@ class Tacotron2(TTSModel):
 
         self.gst_init(hparams)
 
-    # TODO (Sam): treat "gst" (i.e. torchmoji) the same as speaker encoding
+    # TODO (Sam): treat "gst" (i.e. torchmoji) the same as speaker embedding
     def gst_init(self, hparams):
         self.gst_lin = None
         self.gst_type = None
@@ -177,8 +181,12 @@ class Tacotron2(TTSModel):
         input_text,
         input_lengths,
         speaker_ids,
-        embedded_gst,
         mode=TEACHER_FORCED,
+        # TODO (Sam): treat encodings generically or x_encoding, y_encoding
+        # TODO (Sam): rename "emotional_encoding"
+        embedded_gst: Optional[torch.tensor] = None,
+        # NOTE (Sam): can have an audio_encoding of speaker by taking mean speaker_encoding
+        audio_encoding: Optional[torch.tensor] = None,
         targets: Optional[torch.tensor] = None,
         output_lengths: Optional[torch.tensor] = None,
         attention: Optional[torch.tensor] = None,
@@ -199,11 +207,14 @@ class Tacotron2(TTSModel):
         # TODO (Sam): treat "gst" and "speaker_embedding" generically
         # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
         if self.has_speaker_embedding is True:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
+            if self.has_audio_embedding is True:
+                embedded_speakers += self.audio_lin(audio_encoding)
+            else:
+                embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+                encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        # NOTE (Sam): with_gst?
-        if self.gst_lin is not None:
+        # NOTE (Sam): with_gst or gst_lin?
+        if self.with_gst is not None:
             assert (
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
@@ -215,8 +226,14 @@ class Tacotron2(TTSModel):
                 decoder_inputs=targets,
                 memory_lengths=input_lengths,
             )
+
         if mode == INFERENCE:
-            self.decoder.inference(encoder_outputs, input_lengths)
+            (
+                mel_outputs,
+                gate_predicted,
+                alignments,
+                output_lengths,
+            ) = self.decoder.inference(encoder_outputs, input_lengths)
 
         if mode == DOUBLE_TEACHER_FORCED:
             # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf
