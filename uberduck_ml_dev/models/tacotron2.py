@@ -130,13 +130,9 @@ class Tacotron2(TTSModel):
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
         if hparams.has_speaker_embedding:
-            if self.new_speaker_embedding:
-                self.speaker_embedding = nn.Embedding(
-                    self.n_speakers, hparams.speaker_embedding_dim
-                )
-            # NOTE (Sam): treating context encoders generically will remove such code.
-            if self.speechbrain_speaker_embedding:
-                self.speaker_embedding = self.mean_embedding_function()
+            self.speaker_embedding = nn.Embedding(
+                self.n_speakers, hparams.speaker_embedding_dim
+            )
         else:
             self.speaker_embedding = None
 
