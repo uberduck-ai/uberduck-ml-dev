@@ -96,7 +96,7 @@ class Tacotron2Trainer(TTSTrainer):
         self.lr_decay_rate = self.hparams.lr_decay_rate
         self.lr_decay_min = self.hparams.lr_decay_min
 
-        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or some other helper function
+        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or some other helper function.
         if self.hparams.get("gst_type") == "torchmoji":
             assert self.hparams.get(
                 "torchmoji_vocabulary_file"
@@ -110,7 +110,7 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_vocabulary_file"),
                 self.hparams.get("torchmoji_model_file"),
             )
-            # TODO (Sam): rename gst to gsts[0]
+            # TODO (Sam): rename gst to gsts[0].
             self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
             self.compute_gst = None
