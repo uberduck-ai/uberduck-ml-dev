@@ -201,11 +201,8 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
         if self.has_speaker_embedding is True:
-            if self.has_audio_embedding is True:
-                embedded_speakers += self.audio_lin(audio_encoding)
-            else:
-                embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-                encoder_outputs += self.spkr_lin(embedded_speakers)
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
         if self.with_gst:
             assert (
