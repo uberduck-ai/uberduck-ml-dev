@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
-
+from speechbrain.pretrained import EncoderClassifier
 
 from ..data_loader import TextMelDataset, TextMelCollate
 from ..models.tacotron2 import Tacotron2
@@ -118,9 +118,14 @@ class Tacotron2Trainer(TTSTrainer):
         # NOTE (Sam): some ambiguity in naming between audio_encoder and speaker_encoder
         # Speaker_encoder is really mean audio_encoder
         if self.hparams.get("audio_encoder") == "spkrec-ecapa-voxceleb":
-            from speechbrain.pretrained import EncoderClassifier
-            self.audio_encoder = EncoderClassifier.from_hparams(self.hparams.get("speechbrain/spkrec-ecapa-voxceleb"))
-            self.compute_audio_encoding =
+
+            self.audio_encoder = EncoderClassifier.from_hparams(
+                self.hparams.get("audio_encoder_path")
+            )
+            self.compute_audio_encoding = lambda audios: self.speaker_encoder(audios)
+        else:
+            self.compute_audio_encoding = None
+
         if not self.sample_inference_speaker_ids:
             self.sample_inference_speaker_ids = list(range(self.n_speakers))
 

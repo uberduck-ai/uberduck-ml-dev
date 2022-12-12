@@ -96,6 +96,7 @@ DEFAULTS = HParams(
     sample_inference_speaker_ids=None,
     sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
     distributed_run=False,
+    audio_encoder_path=None,
 )
 
 config = DEFAULTS.values()
