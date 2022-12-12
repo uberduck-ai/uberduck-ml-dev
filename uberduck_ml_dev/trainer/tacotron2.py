@@ -110,17 +110,11 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_vocabulary_file"),
                 self.hparams.get("torchmoji_model_file"),
             )
-            # NOTE (Sam): rename gst to gsts[0]
+            # TODO (Sam): rename gst to gsts[0]
             self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
             self.compute_gst = None
 
-        # NOTE (Sam): some ambiguity in naming between audio_encoder and speaker_encoder
-        # Speaker_encoder is really mean audio_encoder
-        if self.hparams.get("audio_encoder") == "spkrec-ecapa-voxceleb":
-            from speechbrain.pretrained import EncoderClassifier
-            self.audio_encoder = EncoderClassifier.from_hparams(self.hparams.get("speechbrain/spkrec-ecapa-voxceleb"))
-            self.compute_audio_encoding =
         if not self.sample_inference_speaker_ids:
             self.sample_inference_speaker_ids = list(range(self.n_speakers))
 
