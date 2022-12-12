@@ -203,8 +203,9 @@ class TextMelDataset(Dataset):
             )  # add a blank token, whose id number is len(symbols)
 
         audio = torch.FloatTensor(wav_data)
-        audio_norm = audio / self.max_wav_value
+        audio_norm = audio / (np.abs(audio).max() * 2)  # NOTE (Sam): just must be < 1.
         audio_norm = audio_norm.unsqueeze(0)
+
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
         data = {
@@ -426,8 +427,10 @@ class TextAudioSpeakerLoader(Dataset):
                 )
             )
 
-        audio_norm = audio / self.max_wav_value
+        audio = torch.FloatTensor(audio)
+        audio_norm = audio / (np.abs(audio).max() * 2)  # NOTE (Sam): just must be < 1
         audio_norm = audio_norm.unsqueeze(0)
+
         spec_filename = filename.replace(".wav", ".uberduck.spec.pt")
         if os.path.exists(spec_filename):
             spec = torch.load(spec_filename)

@@ -82,7 +82,7 @@ def lj_trainer(lj_speech_tacotron2_file):
         ),
         checkpoint_name="test",
         checkpoint_path="test_checkpoint",
-        epochs=2,
+        epochs=3,
         log_dir="",
         debug=True,
         batch_size=4,
