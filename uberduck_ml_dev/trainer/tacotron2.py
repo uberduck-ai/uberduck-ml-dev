@@ -22,7 +22,7 @@ from ..monitoring.statistics import get_alignment_metrics
 from ..data.batch import Batch
 from ..vendor.tfcompat.hparam import HParams
 from .base import DEFAULTS as TRAINER_DEFAULTS
-from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
+from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS, INFERENCE
 from ..models.torchmoji import TorchMojiInterface
 from ..utils.plot import (
     plot_attention,
@@ -96,6 +96,7 @@ class Tacotron2Trainer(TTSTrainer):
         self.lr_decay_rate = self.hparams.lr_decay_rate
         self.lr_decay_min = self.hparams.lr_decay_min
 
+        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or some other helper function.
         if self.hparams.get("gst_type") == "torchmoji":
             assert self.hparams.get(
                 "torchmoji_vocabulary_file"
@@ -109,6 +110,7 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_vocabulary_file"),
                 self.hparams.get("torchmoji_model_file"),
             )
+            # TODO (Sam): rename gst to gsts[0].
             self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
             self.compute_gst = None
@@ -267,11 +269,12 @@ class Tacotron2Trainer(TTSTrainer):
 
             model.eval()
 
-            sample_inference = model.inference(
+            sample_inference = model.forward(
                 input_text=utterance,
                 input_lengths=input_lengths,
                 speaker_ids=speaker_id_tensor,
                 embedded_gst=gst_embedding,
+                mode=INFERENCE,
             )
             model.train()
             try:

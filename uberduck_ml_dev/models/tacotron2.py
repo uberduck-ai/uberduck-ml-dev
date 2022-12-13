@@ -1,9 +1,12 @@
+# TODO (Sam): unite the 5 different forward / inference methods in the decoder as well.
+# TODO (Sam): treat "gst" and "speaker_embedding" generically (e.g. x_encoding, y_encoding)
+# TODO (Sam): move to Hydra or more organized config
 from torch import nn
 import numpy as np
 import torch
 from torch.nn import functional as F
+from typing import Optional
 
-# NOTE (Sam): components is redundant with common - we needed a different name to make the package imports work as we migrate to a folder based approach
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
 from ..data.batch import Batch
@@ -14,6 +17,19 @@ from .components.decoders.tacotron2 import Decoder, DecoderForwardIsInfer
 from .components.encoders.tacotron2 import Encoder, EncoderForwardIsInfer
 from .components.postnet import Postnet
 from .components.zero_network import ZeroNetwork
+
+TEACHER_FORCED = "teacher-forced"
+LEFT_TEACHER_FORCED = "left-teacher-forced"
+DOUBLE_TEACHER_FORCED = "double-teacher-forced"
+INFERENCE = "inference"
+ATTENTION_FORCED = "attention-forced"
+MODES = [
+    TEACHER_FORCED,
+    LEFT_TEACHER_FORCED,
+    DOUBLE_TEACHER_FORCED,
+    INFERENCE,
+    ATTENTION_FORCED,
+]
 
 DEFAULTS = HParams(
     symbols_embedding_dim=512,
@@ -56,7 +72,6 @@ DEFAULTS = HParams(
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
-    with_gst=False,
     has_speaker_embedding=False,
     filter_length=1024,
     hop_length=256,
@@ -72,8 +87,10 @@ DEFAULTS = HParams(
     mel_fmin=0,
     n_frames_per_step_initial=1,
     win_length=1024,
+    # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename
     gst_type=None,
-    gst_dim=2304, # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
+    with_gst=False,
+    gst_dim=2304,  # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
     # NOTE (Sam): to-do - move sample_inference parameters to trainer.
@@ -108,6 +125,7 @@ class Tacotron2(TTSModel):
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
         self.has_speaker_embedding = hparams.has_speaker_embedding
         self.cudnn_enabled = hparams.cudnn_enabled
+        self.with_gst = hparams.with_gst
 
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
@@ -118,14 +136,11 @@ class Tacotron2(TTSModel):
         else:
             self.speaker_embedding = None
 
-        # NOTE (Sam): it is not totally clear to me this should be split - what if we want to optimize position within the speaker_embedding_dim?
-        # What is the role of has_speaker_embedding?
-        if self.n_speakers > 1:
+        if self.has_speaker_embedding:
+            #   NOTE (Sam): self.spkr_lin = ZeroNetwork() if n_speakers == 1 gives fewer trainable terms, and could potentially be better for fine tuning, although we don't really know.
             self.spkr_lin = nn.Linear(
                 self.speaker_embedding_dim, self.encoder_embedding_dim
             )
-        else:
-            self.spkr_lin = ZeroNetwork()
 
         self.gst_init(hparams)
 
@@ -157,141 +172,106 @@ class Tacotron2(TTSModel):
 
         return output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
 
-    @torch.no_grad()
-    def get_alignment(self, inputs):
-        (
-            input_text,
-            input_lengths,
-            targets,
-            max_len,
-            output_lengths,
-            speaker_ids,
-            embedded_gst,
-            *_,
-        ) = inputs
-
-        input_lengths, output_lengths = input_lengths.data, output_lengths.data
-
-        embedded_inputs = self.embedding(input_text).transpose(1, 2)
-        embedded_text = self.encoder(embedded_inputs, input_lengths)
-        encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought.
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
-
-        if self.gst_lin is not None:
-            assert (
-                embedded_gst is not None
-            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-            encoder_outputs += self.gst_lin(embedded_gst)
-
-        encoder_outputs = torch.cat((encoder_outputs,), dim=2)
-
-        mel_outputs, gate_outputs, alignments = self.decoder(
-            encoder_outputs, targets, memory_lengths=input_lengths
-        )
-        return alignments
-
-
-    @torch.no_grad()
-    def inference_noattention(self, input_text, input_lengths, speaker_ids, embedded_gst, attention):
-
-        # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
-        embedded_inputs = self.embedding(input_text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-        encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
-
-        if self.gst_lin is not None:
-            assert (
-                embedded_gst is not None
-            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-            encoder_outputs += self.gst_lin(embedded_gst)
-
-        mel_outputs, gate_predicted, alignments = self.decoder.inference_noattention(
-            encoder_outputs, attention
-        )
-        mel_outputs_postnet = self.postnet(mel_outputs)
-        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-        dummy_output_length = torch.LongTensor([0]) if not self.cudnn_enabled else torch.LongTensor([0]).cuda()
-
-        (
-            output_lengths,
-            mel_outputs,
-            mel_outputs_postnet,
-            gate_predicted,
-        ) = self.mask_output(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            output_lengths=dummy_output_length, # noattention does not return output lengths.
-        )
-
-        # NOTE (Sam): batch class in inference methods breaks torchscript
-        output = dict(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            alignments=alignments,
-            output_lengths=output_lengths,
-        )
-        return output
-
-
     def forward(
         self,
         input_text,
         input_lengths,
-        targets,
-        output_lengths,
         speaker_ids,
-        embedded_gst,
+        mode=TEACHER_FORCED,
+        # TODO (Sam): rename "emotional_encoding"
+        embedded_gst: Optional[torch.tensor] = None,
+        # NOTE (Sam): can have an audio_encoding of speaker by taking mean audio_encoding.
+        audio_encoding: Optional[torch.tensor] = None,
+        targets: Optional[torch.tensor] = None,
+        output_lengths: Optional[torch.tensor] = None,
+        attention: Optional[torch.tensor] = None,
+        # TODO (Sam): use these to set inference, forward, left_tf, and double_tf as the same mode.
+        # NOTE (Sam): [0, mel_stop_index) tf, (mel_stop_index, mel_start_index) inf, (mel_start_index, max) tf
+        mel_start_index: Optional[int] = 0,
+        mel_stop_index: Optional[int] = 0,
     ):
 
-        input_lengths, output_lengths = input_lengths.data, output_lengths.data
+        if input_lengths is not None:
+            input_lengths = input_lengths.data
+        if output_lengths is not None:
+            output_lengths = output_lengths.data
 
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
+        # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
+        if self.has_speaker_embedding is True:
             embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        if self.gst_lin is not None:
+        if self.with_gst:
             assert (
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
-        mel_outputs, gate_predicted, alignments = self.decoder(
-            memory=encoder_outputs,
-            decoder_inputs=targets,
-            memory_lengths=input_lengths,
-        )
+
+        if mode == TEACHER_FORCED:
+            mel_outputs, gate_predicted, alignments = self.decoder(
+                memory=encoder_outputs,
+                decoder_inputs=targets,
+                memory_lengths=input_lengths,
+            )
+
+        if mode == INFERENCE:
+            (
+                mel_outputs,
+                gate_predicted,
+                alignments,
+                output_lengths,
+            ) = self.decoder.inference(encoder_outputs, input_lengths)
+
+        if mode == DOUBLE_TEACHER_FORCED:
+            # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf
+            mel_outputs, gate_predicted, alignments = self.decoder.inference_double_tf(
+                memory=encoder_outputs,
+                decoder_inputs=targets,
+                memory_lengths=input_lengths,
+                mel_start_index=mel_start_index,
+                mel_stop_index=mel_stop_index,
+            )
+
+        if mode == LEFT_TEACHER_FORCED:
+            mel_outputs, gate_predicted, alignments = self.decoder.inference_partial_tf(
+                memory=encoder_outputs,
+                decoder_inputs=targets,
+                tf_until_idx=mel_stop_index,
+            )
+
+        if mode == ATTENTION_FORCED:
+            # NOTE (Sam): decoder.inference_noattention does not return output lengths.
+            output_lengths = (
+                torch.LongTensor([0])
+                if not self.cudnn_enabled
+                else torch.LongTensor([0]).cuda()
+            )
+            (
+                mel_outputs,
+                gate_predicted,
+                alignments,
+            ) = self.decoder.inference_noattention(encoder_outputs, attention)
+
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        (
-            output_lengths,
-            mel_outputs,
-            mel_outputs_postnet,
-            gate_predicted,
-        ) = self.mask_output(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            output_lengths=output_lengths,
-        )
+        if mode in [INFERENCE, TEACHER_FORCED, ATTENTION_FORCED]:
+            (
+                output_lengths,
+                mel_outputs,
+                mel_outputs_postnet,
+                gate_predicted,
+            ) = self.mask_output(
+                mel_outputs=mel_outputs,
+                mel_outputs_postnet=mel_outputs_postnet,
+                gate_predicted=gate_predicted,
+                output_lengths=output_lengths,
+            )
 
-        # NOTE (Sam): batch class in inference methods breaks torchscript
+        # NOTE (Sam): batch class in inference methods breaks torchscript.
         output = dict(
             mel_outputs=mel_outputs,
             mel_outputs_postnet=mel_outputs_postnet,
@@ -301,152 +281,8 @@ class Tacotron2(TTSModel):
         )
         return output
 
-    @torch.no_grad()
-    def inference(self, input_text, input_lengths, speaker_ids, embedded_gst):
 
-        # NOTE (Sam): could compute input_lengths = torch.LongTensor([utterance.shape[1]]) here.
-        embedded_inputs = self.embedding(input_text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-        encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
-
-        if self.gst_lin is not None:
-            assert (
-                embedded_gst is not None
-            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-            encoder_outputs += self.gst_lin(embedded_gst)
-
-        mel_outputs, gate_predicted, alignments, mel_lengths = self.decoder.inference(
-            encoder_outputs, input_lengths
-        )
-        mel_outputs_postnet = self.postnet(mel_outputs)
-        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-        (
-            output_lengths,
-            mel_outputs,
-            mel_outputs_postnet,
-            gate_predicted,
-        ) = self.mask_output(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            output_lengths=mel_lengths,
-        )
-
-        # NOTE (Sam): batch class in inference methods breaks torchscript
-        output = dict(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            alignments=alignments,
-            output_lengths=output_lengths,
-        )
-        return output
-
-    def inference_double_tf(
-        self,
-        input_text,
-        input_lengths,
-        speaker_ids,
-        embedded_gst,
-        mel_template,
-        mel_start_index,
-        mel_stop_index,
-    ):
-        # NOTE (Sam): forward, inference_partial_tf, and inference are special cases of this function so they should be removed.
-        embedded_inputs = self.embedding(input_text).transpose(1, 2)
-        embedded_text = self.encoder(embedded_inputs, input_lengths)
-        encoder_outputs = embedded_text
-        if self.speaker_embedding is not None:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            # NOTE (Sam): this requires more careful thought
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
-
-        if self.gst_lin is not None:
-            assert (
-                embedded_gst is not None
-            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-            encoder_outputs += self.gst_lin(embedded_gst)
-
-        mel_outputs, gate_outputs, alignments = self.decoder.inference_double_tf(
-            memory=encoder_outputs,
-            decoder_inputs=mel_template,
-            memory_lengths=input_lengths,
-            mel_start_index=mel_start_index,
-            mel_stop_index=mel_stop_index,
-        )
-
-        mel_outputs_postnet = self.postnet(mel_outputs)
-        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-        # NOTE (Sam): do we need masking here?
-        output = dict(
-            mel_outputs_postnet=mel_outputs_postnet,
-            mel_outputs=mel_outputs,
-            gate_outputs=gate_outputs,
-            alignments=alignments,
-        )
-        return output
-
-    @torch.no_grad()
-    def inference_partial_tf(
-        self,
-        input_text,
-        input_lengths,
-        speaker_ids,
-        embedded_gst,
-        tf_mel,
-        tf_until_idx,
-        device="cpu",
-    ):
-        """Run inference with partial teacher forcing.
-
-        Teacher forcing is done until tf_until_idx in the mel spectrogram.
-        Make sure you pass the mel index and not the text index!
-
-        tf_mel: (B, T, n_mel_channels)
-        """
-        embedded_inputs = self.embedding(input_text).transpose(1, 2)
-        embedded_text = self.encoder.inference(embedded_inputs, input_lengths)
-        encoder_outputs = embedded_text
-        if self.speaker_embedding:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            if self.n_speakers > 1:
-                encoder_outputs += self.spkr_lin(embedded_speakers)
-
-        if self.gst_lin is not None:
-            assert (
-                embedded_gst is not None
-            ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
-            encoder_outputs += self.gst_lin(embedded_gst)
-
-        mel_outputs, gate_predicted, alignments = self.decoder.inference_partial_tf(
-            memory=encoder_outputs,
-            decoder_inputs=tf_mel,
-            tf_until_idx=tf_until_idx,
-            device=device,
-        )
-
-        mel_outputs_postnet = self.postnet(mel_outputs)
-        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
-
-        # NOTE (Sam): no mask_output call since output_lengths is not given or predicted
-        output = Batch(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            alignments=alignments,
-        )
-
-        return output
-
-
+# NOTE (Sam): I'm not sure if this is necessary anymore since inference is now in forward.
 class Tacotron2ForwardIsInfer(Tacotron2):
     def __init__(self, hparams):
         super().__init__(hparams)
