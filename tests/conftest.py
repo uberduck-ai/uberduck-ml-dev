@@ -4,7 +4,8 @@ import os
 import tempfile
 
 import torch
-import wget
+
+import requests
 
 from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
@@ -26,10 +27,14 @@ def _load_tacotron_uninitialized(overrides=None):
 @pytest.fixture(scope="session")
 def lj_speech_tacotron2_file():
     tf = tempfile.NamedTemporaryFile(suffix=".pt")
-    tf.close()
+    # tf.close()
     # NOTE (Sam): A canonical LJ statedict used in our warm starting notebook.
     url_ = "https://uberduck-demo.s3.us-west-2.amazonaws.com/tacotron2_statedict_lj_test.pt"
-    wget.download(url_, out=tf.name)
+    res = requests.get(url_)
+    if res.status_code == 200:  # http 200 means success
+        with open(tf.name, "wb") as file_handle:  # wb means Write Binary
+            file_handle.write(res.content)
+
     return tf
 
 
