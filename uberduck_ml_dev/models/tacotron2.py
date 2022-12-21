@@ -1,4 +1,5 @@
-# TODO (Sam): unite the 5 different forward / inference methods using if statements.
+# TODO (Sam): unite the 5 different forward / inference methods in the decoder as well.
+# TODO (Sam): treat "gst" and "speaker_embedding" generically (e.g. x_encoding, y_encoding)
 # TODO (Sam): move to Hydra or more organized config
 from torch import nn
 import numpy as np
@@ -86,9 +87,9 @@ DEFAULTS = HParams(
     mel_fmin=0,
     n_frames_per_step_initial=1,
     win_length=1024,
-    # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically
+    # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename
     gst_type=None,
-    with_gst=False,  # redundant
+    with_gst=False,
     gst_dim=2304,  # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
@@ -125,17 +126,14 @@ class Tacotron2(TTSModel):
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
         self.has_speaker_embedding = hparams.has_speaker_embedding
         self.cudnn_enabled = hparams.cudnn_enabled
+        self.with_gst = hparams.with_gst
 
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
         if hparams.has_speaker_embedding:
-            if self.new_speaker_embedding:
-                self.speaker_embedding = nn.Embedding(
-                    self.n_speakers, hparams.speaker_embedding_dim
-                )
-            # NOTE (Sam): treating context encoders generically will remove such code.
-            if self.speechbrain_speaker_embedding:
-                self.speaker_embedding = self.mean_embedding_function()
+            self.speaker_embedding = nn.Embedding(
+                self.n_speakers, hparams.speaker_embedding_dim
+            )
         else:
             self.speaker_embedding = None
 
@@ -147,7 +145,6 @@ class Tacotron2(TTSModel):
 
         self.gst_init(hparams)
 
-    # TODO (Sam): treat "gst" (i.e. torchmoji) the same as speaker embedding
     def gst_init(self, hparams):
         self.gst_lin = None
         self.gst_type = None
@@ -176,23 +173,21 @@ class Tacotron2(TTSModel):
 
         return output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
 
-    # NOTE (Sam): computationally get_alignment was the same as just running forward
     def forward(
         self,
         input_text,
         input_lengths,
         speaker_ids,
         mode=TEACHER_FORCED,
-        # TODO (Sam): treat encodings generically or x_encoding, y_encoding
         # TODO (Sam): rename "emotional_encoding"
         embedded_gst: Optional[torch.tensor] = None,
-        # NOTE (Sam): can have an audio_encoding of speaker by taking mean speaker_encoding
+        # NOTE (Sam): can have an audio_encoding of speaker by taking mean audio_encoding.
         audio_encoding: Optional[torch.tensor] = None,
         targets: Optional[torch.tensor] = None,
         output_lengths: Optional[torch.tensor] = None,
         attention: Optional[torch.tensor] = None,
-        # TODO (Sam): use these to set inference, forward, left_tf, and double_tf as the same mode
-        # NOTE (Sam): double: [0, mel_stop_index) tf, (mel_stop_index, mel_start_index) inf, (mel_start_index, max) tf
+        # TODO (Sam): use these to set inference, forward, left_tf, and double_tf as the same mode.
+        # NOTE (Sam): [0, mel_stop_index) tf, (mel_stop_index, mel_start_index) inf, (mel_start_index, max) tf
         mel_start_index: Optional[int] = 0,
         mel_stop_index: Optional[int] = 0,
     ):
@@ -205,17 +200,12 @@ class Tacotron2(TTSModel):
         embedded_inputs = self.embedding(input_text).transpose(1, 2)
         embedded_text = self.encoder(embedded_inputs, input_lengths)
         encoder_outputs = embedded_text
-        # TODO (Sam): treat "gst" and "speaker_embedding" generically
         # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
         if self.has_speaker_embedding is True:
-            if self.has_audio_embedding is True:
-                embedded_speakers += self.audio_lin(audio_encoding)
-            else:
-                embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-                encoder_outputs += self.spkr_lin(embedded_speakers)
+            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+            encoder_outputs += self.spkr_lin(embedded_speakers)
 
-        # NOTE (Sam): with_gst or gst_lin?
-        if self.with_gst is not None:
+        if self.with_gst:
             assert (
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
@@ -238,8 +228,7 @@ class Tacotron2(TTSModel):
 
         if mode == DOUBLE_TEACHER_FORCED:
             # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf
-            # In general, we should combine the decoder methods as well.
-            mel_outputs, gate_outputs, alignments = self.decoder.inference_double_tf(
+            mel_outputs, gate_predicted, alignments = self.decoder.inference_double_tf(
                 memory=encoder_outputs,
                 decoder_inputs=targets,
                 memory_lengths=input_lengths,
@@ -252,7 +241,6 @@ class Tacotron2(TTSModel):
                 memory=encoder_outputs,
                 decoder_inputs=targets,
                 tf_until_idx=mel_stop_index,
-                # device=device, # NOTE (Sam): why is device set here and not elsewhere?
             )
 
         if mode == ATTENTION_FORCED:
@@ -271,18 +259,18 @@ class Tacotron2(TTSModel):
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
 
-        # NOTE (Sam): do we need masking for teacher forced inference since output_lengths is not given or predicted?
-        (
-            output_lengths,
-            mel_outputs,
-            mel_outputs_postnet,
-            gate_predicted,
-        ) = self.mask_output(
-            mel_outputs=mel_outputs,
-            mel_outputs_postnet=mel_outputs_postnet,
-            gate_predicted=gate_predicted,
-            output_lengths=output_lengths,
-        )
+        if mode in [INFERENCE, TEACHER_FORCED, ATTENTION_FORCED]:
+            (
+                output_lengths,
+                mel_outputs,
+                mel_outputs_postnet,
+                gate_predicted,
+            ) = self.mask_output(
+                mel_outputs=mel_outputs,
+                mel_outputs_postnet=mel_outputs_postnet,
+                gate_predicted=gate_predicted,
+                output_lengths=output_lengths,
+            )
 
         # NOTE (Sam): batch class in inference methods breaks torchscript.
         output = dict(

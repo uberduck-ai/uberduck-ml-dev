@@ -8,7 +8,7 @@ import torch
 import numpy as np
 
 from uberduck_ml_dev.data_loader import prepare_input_sequence
-from uberduck_ml_dev.models.tacotron2 import Tacotron2
+from uberduck_ml_dev.models.tacotron2 import Tacotron2, INFERENCE, LEFT_TEACHER_FORCED
 from uberduck_ml_dev.trainer.tacotron2 import (
     Tacotron2Trainer,
     DEFAULTS as TACOTRON2_TRAINER_DEFAULTS,
@@ -77,8 +77,8 @@ class TestTacotron2Model:
         sequences = sequences.repeat(nreps, 1)
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
 
-        mel_outputs_postnet = lj_speech_tacotron2.inference(
-            sequences, input_lengths, None, None
+        mel_outputs_postnet = lj_speech_tacotron2.forward(
+            sequences, input_lengths, None, mode=INFERENCE
         )["mel_outputs_postnet"]
 
         estimated_vector = rearrange(
@@ -96,8 +96,8 @@ class TestTacotron2Model:
         torch.random.manual_seed(1235)
         np.random.seed(1235)
 
-        mel_outputs_postnet = lj_speech_tacotron2.inference(
-            sequences, input_lengths, None, None
+        mel_outputs_postnet = lj_speech_tacotron2.forward(
+            sequences, input_lengths, None, mode=INFERENCE
         )["mel_outputs_postnet"]
 
         tf_index = 111  # NOTE (Sam): look at the beginning of the clip since they are different lengths.
@@ -138,20 +138,22 @@ class TestTacotron2Model:
         input_lengths = input_lengths.repeat(1, nreps).squeeze(0)
         sample_inference_spectrogram = sample_inference_spectrogram[None, :]
 
-        mel_outputs_postnet_tf = lj_speech_tacotron2.inference_partial_tf(
+        mel_outputs_postnet_tf = lj_speech_tacotron2.forward(
             input_text=sequences,
             input_lengths=input_lengths,
             speaker_ids=None,
             embedded_gst=None,
-            tf_mel=sample_inference_spectrogram,
-            tf_until_idx=tf_index,
+            targets=sample_inference_spectrogram,
+            mel_stop_index=tf_index,
+            mode=LEFT_TEACHER_FORCED,
         )["mel_outputs_postnet"]
 
-        mel_outputs_postnet_original = lj_speech_tacotron2.inference(
+        mel_outputs_postnet_original = lj_speech_tacotron2.forward(
             input_text=sequences,
             input_lengths=input_lengths,
             speaker_ids=None,
             embedded_gst=None,
+            mode=INFERENCE,
         )["mel_outputs_postnet"]
 
         non_tf_mel_outputs_postnet_beginning = (
@@ -204,20 +206,19 @@ class TestTacotron2Model:
 
         torch.random.manual_seed(1235)
         np.random.seed(1235)
-        (
-            mel_outputs,
-            mel_outputs_postnet_tf,
-            gate_outputs,
-            alignments,
-        ) = lj_speech_tacotron2.inference_partial_tf(
+        mel_outputs_postnet_tf = lj_speech_tacotron2.forward(
             input_text=sequences,
             input_lengths=input_lengths,
             speaker_ids=None,
             embedded_gst=None,
-            tf_mel=sample_inference_spectrogram,
-            tf_until_idx=tf_index,
-        )
-        assert rho_beginning[0, 1] > 0.98
+            targets=sample_inference_spectrogram,
+            mel_stop_index=tf_index,
+            mode=LEFT_TEACHER_FORCED,
+        )["mel_outputs_postnet"]
+
+        tf_mel_outputs_postnet_beginning = mel_outputs_postnet_tf.detach().numpy()[
+            :, :, :tf_index
+        ]
 
         tf_estimate_vector_beginning = rearrange(
             tf_mel_outputs_postnet_beginning, "b m t -> (b m t)"

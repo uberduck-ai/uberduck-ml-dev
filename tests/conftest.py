@@ -1,12 +1,11 @@
 import torch
-import tempfile
 import pytest
 import os
+import tempfile
 
-import gdown
-from scipy.io import wavfile
-import numpy as np
 import torch
+
+import requests
 
 from uberduck_ml_dev.models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 from uberduck_ml_dev.models.tacotron2 import Tacotron2
@@ -27,11 +26,16 @@ def _load_tacotron_uninitialized(overrides=None):
 
 @pytest.fixture(scope="session")
 def lj_speech_tacotron2_file():
+    tf = tempfile.NamedTemporaryFile(suffix=".pt")
+    # tf.close()
     # NOTE (Sam): A canonical LJ statedict used in our warm starting notebook.
-    url = "https://drive.google.com/uc?id=1qgEwtL53oFsdllM14FRZncgnARnAGInO"
-    output_file = tempfile.NamedTemporaryFile()
-    gdown.download(url, output_file.name, quiet=False)
-    return output_file
+    url_ = "https://uberduck-demo.s3.us-west-2.amazonaws.com/tacotron2_statedict_lj_test.pt"
+    res = requests.get(url_)
+    if res.status_code == 200:  # http 200 means success
+        with open(tf.name, "wb") as file_handle:  # wb means Write Binary
+            file_handle.write(res.content)
+
+    return tf
 
 
 @pytest.fixture
@@ -82,7 +86,7 @@ def lj_trainer(lj_speech_tacotron2_file):
         ),
         checkpoint_name="test",
         checkpoint_path="test_checkpoint",
-        epochs=2,
+        epochs=3,
         log_dir="",
         debug=True,
         batch_size=4,
