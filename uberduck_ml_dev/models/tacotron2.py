@@ -31,6 +31,11 @@ MODES = [
     ATTENTION_FORCED,
 ]
 
+SPEAKER_ENCODER = "speaker_encoder"
+TORCHMOJI_ENCODER = "torchmoji_encoder"
+AUDIO_ENCODER = "audio_encoder"
+GLOBAL_ENCODERS = [SPEAKER_ENCODER, TORCHMOJI_ENCODER, AUDIO_ENCODER]
+
 DEFAULTS = HParams(
     symbols_embedding_dim=512,
     fp16_run=False,
@@ -124,9 +129,11 @@ class Tacotron2(TTSModel):
         self.postnet = Postnet(hparams)
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        # TODO (Sam): make these names match
         self.has_speaker_embedding = hparams.has_speaker_embedding
-        self.cudnn_enabled = hparams.cudnn_enabled
         self.with_gst = hparams.with_gst
+
+        self.cudnn_enabled = hparams.cudnn_enabled
 
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
@@ -144,6 +151,7 @@ class Tacotron2(TTSModel):
             )
 
         self.gst_init(hparams)
+        self.audio_encoder_init(hparams)
 
     def gst_init(self, hparams):
         self.gst_lin = None
@@ -156,6 +164,17 @@ class Tacotron2(TTSModel):
             print("Initialized Torchmoji GST")
         else:
             print("Not using any style tokens")
+
+    def audio_encoder_init(self, hparams):
+        self.audio_encoder = None
+        if hparams.audio_encoder_path:
+            from speechbrain.pretrained import EncoderClassifier
+
+            self.audio_encoder_lin = nn.Linear(
+                hparams.audio_encoder_dim, hparams.encoder_embedding_dim
+            )
+            self.audio_encoder = EncoderClassifier(hparams)
+            print("Initialized Audio Encoder")
 
     def mask_output(
         self, output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
@@ -173,6 +192,11 @@ class Tacotron2(TTSModel):
 
         return output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
 
+    # NOTE (Sam): it is unclear whether forward should take encoder outputs as arguements or compute them.
+    # Probably compute them since we don't want to train the encoder weights.
+    # However, randomly initialized speaker embeddings are currently computed within forward, which allows them to be optimized.
+    # It potentially could be better to have the audio embeddings optimized as well.
+    # Maybe just add more layers?
     def forward(
         self,
         input_text,
@@ -210,6 +234,9 @@ class Tacotron2(TTSModel):
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
+
+        if self.audio_encoder is not None:
+            encoder_outputs += self.audio_encoder_lin(audio_encoding)
 
         if mode == TEACHER_FORCED:
             mel_outputs, gate_predicted, alignments = self.decoder(

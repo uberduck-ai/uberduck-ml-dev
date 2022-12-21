@@ -1,7 +1,4 @@
-from dataclasses import dataclass
-import torch
-
-from typing import List, Optional, Dict
+from typing import Dict
 
 from ..utils.utils import to_gpu
 
@@ -23,6 +20,7 @@ class Batch(Dict):
     # mel_outputs_postnet: Optional[torch.Tensor] = None
     # gate_predicted: Optional[torch.LongTensor] = None  # could be bool.
     # alignments: Optional[torch.Tensor] = None
+    # audio_encodings: Optional[torch.Tensor] = None
 
     def subset(self, keywords, fragile=False) -> "Batch":
         d = {}
