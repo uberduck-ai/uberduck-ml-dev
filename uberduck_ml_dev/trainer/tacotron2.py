@@ -115,7 +115,6 @@ class Tacotron2Trainer(TTSTrainer):
         else:
             self.compute_gst = None
 
-<<<<<<< HEAD
         # NOTE (Sam): some ambiguity in naming between audio_encoder and speaker_encoder
         # Speaker_encoder is really mean audio_encoder
         if self.hparams.get("audio_encoder") == "spkrec-ecapa-voxceleb":
@@ -127,8 +126,6 @@ class Tacotron2Trainer(TTSTrainer):
         else:
             self.compute_audio_encoding = None
 
-=======
->>>>>>> master
         if not self.sample_inference_speaker_ids:
             self.sample_inference_speaker_ids = list(range(self.n_speakers))
 
