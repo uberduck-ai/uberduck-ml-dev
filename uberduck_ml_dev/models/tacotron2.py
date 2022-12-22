@@ -98,6 +98,7 @@ DEFAULTS = HParams(
     gst_dim=2304,  # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
+    audio_encoder_dim=192,
     # NOTE (Sam): to-do - move sample_inference parameters to trainer.
     sample_inference_speaker_ids=None,
     sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
@@ -168,12 +169,15 @@ class Tacotron2(TTSModel):
     def audio_encoder_init(self, hparams):
         self.audio_encoder = None
         if hparams.audio_encoder_path:
+            # TODO (Sam): compute metadata like this ahead of time rather than in each pass
             from speechbrain.pretrained import EncoderClassifier
 
             self.audio_encoder_lin = nn.Linear(
                 hparams.audio_encoder_dim, hparams.encoder_embedding_dim
             )
-            self.audio_encoder = EncoderClassifier(hparams)
+            self.audio_encoder = EncoderClassifier.from_hparams(
+                source=hparams.audio_encoder_path
+            )
             print("Initialized Audio Encoder")
 
     def mask_output(

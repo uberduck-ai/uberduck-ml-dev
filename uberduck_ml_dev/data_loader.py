@@ -127,7 +127,7 @@ class TextMelDataset(Dataset):
         intersperse_text: bool = False,
         intersperse_token: int = 0,
         compute_gst=None,
-        compute_audio_encoding=None,
+        audio_encoder_forward=None,
     ):
         super().__init__()
         path = audiopaths_and_text
@@ -167,7 +167,7 @@ class TextMelDataset(Dataset):
         self.intersperse_text = intersperse_text
         self.intersperse_token = intersperse_token
         self.compute_gst = compute_gst
-        self.compute_audio_encoding = compute_audio_encoding
+        self.audio_encoder_forward = audio_encoder_forward
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -189,7 +189,7 @@ class TextMelDataset(Dataset):
         return self.compute_gst(transcription)
 
     def _get_audio_encoding(self, audio):
-        return self.compute_audio_encoding(audio)
+        return self.audio_encoder_forward(audio)
 
     def _get_data(self, audiopath_and_text):
         path, transcription, speaker_id = audiopath_and_text
@@ -226,7 +226,7 @@ class TextMelDataset(Dataset):
             embedded_gst = self._get_gst([transcription])
             data["embedded_gst"] = embedded_gst
 
-        if self.compute_audio_encoding:
+        if self.audio_encoder_forward:
             audio_encoding = self._get_audio_encoding(audio_norm)
             data["audio_encoding"] = audio_encoding
 
@@ -340,10 +340,9 @@ class TextMelCollate:
         if batch[0]["audio_encoding"] is None:
             audio_encodings = None
         else:
-            audio_encodings = [
-                torch.FloatTensor(np.array(sample["audio_encoding"]))
-                for sample in batch
-            ]
+            audio_encodings = torch.FloatTensor(
+                torch.cat([sample["audio_encoding"] for sample in batch])
+            )
         output = Batch(
             text_int_padded=text_padded,
             input_lengths=input_lengths,
@@ -354,6 +353,9 @@ class TextMelCollate:
             audio_encodings=audio_encodings,
             gst=embedded_gsts,
         )
+        # import pdb
+
+        # pdb.set_trace()
         if self.cudnn_enabled:
             output = output.to_gpu()
         return output
