@@ -20,6 +20,7 @@ from scipy.io.wavfile import read
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
+from einops import rearrange
 
 from .models.common import STFT, MelSTFT
 from .text.symbols import (
@@ -128,6 +129,7 @@ class TextMelDataset(Dataset):
         intersperse_token: int = 0,
         compute_gst=None,
         audio_encoder_forward=None,
+        speaker_embeddings=None,
     ):
         super().__init__()
         path = audiopaths_and_text
@@ -168,6 +170,7 @@ class TextMelDataset(Dataset):
         self.intersperse_token = intersperse_token
         self.compute_gst = compute_gst
         self.audio_encoder_forward = audio_encoder_forward
+        self.speaker_embeddings = speaker_embeddings
 
     def _get_f0(self, audio):
         f0, harmonic_rates, argmins, times = compute_yin(
@@ -227,7 +230,9 @@ class TextMelDataset(Dataset):
             data["embedded_gst"] = embedded_gst
 
         if self.audio_encoder_forward:
-            audio_encoding = self._get_audio_encoding(audio_norm)
+            # audio_encoding = self._get_audio_encoding(audio_norm)
+            # NOTE (Sam): hardcoded for debug
+            audio_encoding = rearrange(self.speaker_embeddings, "o s -> 1 o s")
             data["audio_encoding"] = audio_encoding
 
         if self.include_f0:
@@ -298,6 +303,7 @@ class TextMelCollate:
 
         text_padded = torch.LongTensor(len(batch), max_input_len)
         text_padded.zero_()
+        # NOTE (Sam): this reordering I believe is for compatibility with an earlier version of torch and should be removed.
         for i in range(len(ids_sorted_decreasing)):
             text = batch[ids_sorted_decreasing[i]]["text_sequence"]
             text_padded[i, : text.size(0)] = text
@@ -353,9 +359,6 @@ class TextMelCollate:
             audio_encodings=audio_encodings,
             gst=embedded_gsts,
         )
-        # import pdb
-
-        # pdb.set_trace()
         if self.cudnn_enabled:
             output = output.to_gpu()
         return output
