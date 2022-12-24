@@ -10,6 +10,7 @@ import torch.distributed as dist
 from tensorboardX import SummaryWriter
 import numpy as np
 import time
+import wandb
 
 from ..models.common import MelSTFT
 from ..vocoders.hifigan import HiFiGanGenerator
@@ -23,6 +24,9 @@ class TTSTrainer:
     # Note (Sam): should migrate to Lightning.
     def __init__(self, hparams, rank=None, world_size=None, device=None):
         print("TTSTrainer start", time.perf_counter())
+
+        wandb.init(project="my-test-project")
+        wandb.config = hparams.values()
         torch.backends.cudnn_enabled = hparams.cudnn_enabled
 
         # NOTE (Sam): all hparams should be added to initializations and this next line removed.
