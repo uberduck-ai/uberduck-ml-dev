@@ -192,7 +192,7 @@ def basic_cleaners(text):
 
 
 def turkish_cleaners(text):
-    text = text.replace("İ", "i").replace("I", "ı").replace('"', "").replace("'", "")
+    text = text.replace("İ", "i").replace("I", "ı")
     text = lowercase(text)
     text = collapse_whitespace(text)
     return text
