@@ -7,6 +7,7 @@ __all__ = [
     "convert_to_ascii",
     "convert_to_arpabet",
     "basic_cleaners",
+    "turkish_cleaners",
     "transliteration_cleaners",
     "english_cleaners",
     "english_cleaners_phonemizer",
@@ -190,6 +191,13 @@ def basic_cleaners(text):
     return text
 
 
+def turkish_cleaners(text):
+    text = text.replace("İ", "i").replace("I", "ı")
+    text = lowercase(text)
+    text = collapse_whitespace(text)
+    return text
+
+
 def transliteration_cleaners(text):
     """Pipeline for non-English text that transliterates to ASCII."""
     text = convert_to_ascii(text)
@@ -266,6 +274,7 @@ CLEANERS = {
     "english_cleaners": english_cleaners,
     "english_cleaners_phonemizer": english_cleaners_phonemizer,
     "basic_cleaners": basic_cleaners,
+    "turkish_cleaners": turkish_cleaners,
     "transliteration_cleaners": transliteration_cleaners,
 }
 
