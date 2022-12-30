@@ -21,6 +21,7 @@ from ..vendor.tfcompat.hparam import HParams
 from .base import DEFAULTS as TRAINER_DEFAULTS
 from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS, INFERENCE
 from ..models.torchmoji import TorchMojiInterface
+
 from ..utils.plot import (
     plot_attention,
     plot_gate_outputs,
