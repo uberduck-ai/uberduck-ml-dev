@@ -25,8 +25,6 @@ class TTSTrainer:
     def __init__(self, hparams, rank=None, world_size=None, device=None):
         print("TTSTrainer start", time.perf_counter())
 
-        wandb.init(project="my-test-project")
-        wandb.config = hparams.values()
         torch.backends.cudnn_enabled = hparams.cudnn_enabled
 
         # NOTE (Sam): all hparams should be added to initializations and this next line removed.
@@ -161,9 +159,12 @@ class TTSTrainer:
         print("Starting warm_start", time.perf_counter())
         checkpoint = self.load_checkpoint()
         # TODO(zach): Once we are no longer using checkpoints of the old format, remove the conditional and use checkpoint["model"] only.
-        model_state_dict = (
-            checkpoint["model"] if "model" in checkpoint else checkpoint["state_dict"]
-        )
+        if "model" in checkpoint:
+            model_state_dict = checkpoint["model"]
+        elif "state_dict" in checkpoint:
+            model_state_dict = checkpoint["state_dict"]
+        else:
+            model_state_dict = checkpoint
         model.from_pretrained(
             model_dict=model_state_dict,
             device=self.device,

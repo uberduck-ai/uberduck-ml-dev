@@ -337,18 +337,18 @@ class TextMelCollate:
             speaker_ids[i] = batch[ids_sorted_decreasing[i]]["speaker_id"]
 
         # NOTE (Sam): does this make maximum sense?
-        if batch[0]["embedded_gst"] is None:
-            embedded_gsts = None
-        else:
+        if hasattr(batch[0], "embedded_gst"):
             embedded_gsts = torch.FloatTensor(
                 np.array([sample["embedded_gst"] for sample in batch])
             )
-        if batch[0]["audio_encoding"] is None:
-            audio_encodings = None
         else:
+            embedded_gsts = None
+        if hasattr(batch[0], "audio_encoding"):
             audio_encodings = torch.FloatTensor(
                 torch.cat([sample["audio_encoding"] for sample in batch])
             )
+        else:
+            audio_encodings = None
         output = Batch(
             text_int_padded=text_padded,
             input_lengths=input_lengths,
