@@ -401,7 +401,7 @@ class Tacotron2Trainer(TTSTrainer):
         )
         collate_fn = TextMelCollate(
             n_frames_per_step=n_frames_per_step,
-            include_f0=include_f0,
+            include_f0=include_f0,  # unused
             cudnn_enabled=self.cudnn_enabled,
         )
         sampler = None
@@ -478,7 +478,6 @@ class Tacotron2Trainer(TTSTrainer):
                         "audio_encodings",
                     ]
                 )
-
                 model_output = model(
                     input_text=model_input["text_int_padded"],
                     input_lengths=model_input["input_lengths"],
