@@ -10,7 +10,6 @@ import torch.distributed as dist
 from tensorboardX import SummaryWriter
 import numpy as np
 import time
-import wandb
 
 from ..models.common import MelSTFT
 from ..vocoders.hifigan import HiFiGanGenerator

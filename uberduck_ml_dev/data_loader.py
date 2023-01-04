@@ -229,11 +229,11 @@ class TextMelDataset(Dataset):
             data["embedded_gst"] = embedded_gst
 
         if self.audio_encoder_forward is not None:
-            # NOTE (Sam): hardcoded for debug
+            # NOTE (Sam): hardcoded for now.
             audio_encoding = rearrange(self.speaker_embeddings, "o s -> 1 o s")
             data["audio_encoding"] = audio_encoding
 
-        # NOTE (Sam): f0 not currently functional
+        # NOTE (Sam): f0 not currently functional.
         if self.include_f0:
             f0 = self._get_f0(audio.data.cpu().numpy())
             f0 = torch.from_numpy(f0)[None]
