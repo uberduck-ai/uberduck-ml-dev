@@ -221,7 +221,6 @@ class TextMelDataset(Dataset):
             "text_sequence": text_sequence,
             "mel": melspec,
             "speaker_id": speaker_id,
-            "embedded_gst": None,
             "f0": None,
         }
 
@@ -229,7 +228,7 @@ class TextMelDataset(Dataset):
             embedded_gst = self._get_gst([transcription])
             data["embedded_gst"] = embedded_gst
 
-        if self.audio_encoder_forward:
+        if self.audio_encoder_forward is not None:
             # audio_encoding = self._get_audio_encoding(audio_norm)
             # NOTE (Sam): hardcoded for debug
             audio_encoding = rearrange(self.speaker_embeddings, "o s -> 1 o s")
@@ -338,6 +337,9 @@ class TextMelCollate:
 
         # NOTE (Sam): does this make maximum sense?
         if "embedded_gst" in batch[0]:
+            import pdb
+
+            pdb.set_trace()
             embedded_gsts = torch.FloatTensor(
                 np.array([sample["embedded_gst"] for sample in batch])
             )

@@ -8,9 +8,9 @@ from einops import rearrange
 
 # TODO (Sam): move this to a proper model.
 def get_speaker_encoding_for_dataset(
-    speaker_encoding_path, filelist_path, embedding_dim
+    speaker_encoding_path, filelist_path, embedding_dim, speaker_encoder_path
 ):
-    classifier = EncoderClassifier.from_hparams(source=speaker_encoding_path)
+    classifier = EncoderClassifier.from_hparams(source=speaker_encoder_path)
 
     audio_file_paths = pd.read_csv(filelist_path, header=None, sep="|")[0]
     embedding_dim = 192
@@ -24,6 +24,7 @@ def get_speaker_encoding_for_dataset(
         embeddings[i] = classifier.encode_batch(signal)
     # NOTE (Sam): hack - only works for single speaker
     speaker_encoding = rearrange(embeddings.mean(axis=0), "s -> 1 s")
+
     torch.save(speaker_encoding, speaker_encoding_path)
 
 
