@@ -216,6 +216,9 @@ class Tacotron2(TTSModel):
         mel_stop_index: Optional[int] = 0,
     ):
 
+        if speaker_ids is not None:
+            if max(speaker_ids) >= self.n_speakers:
+                raise Exception("Speaker id out of range")
         if input_lengths is not None:
             input_lengths = input_lengths.data
         if output_lengths is not None:
