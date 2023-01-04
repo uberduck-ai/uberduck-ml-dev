@@ -40,7 +40,7 @@ class TestTextMelCollation:
         collate_fn = TextMelCollate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            assert len(batch) == 7
+            assert len(batch) == 8
 
     def test_batch_dimensions(self):
 
@@ -71,7 +71,7 @@ class TestTextMelCollation:
             assert output_lengths.item() == 566
             assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
-            assert len(batch) == 7
+            assert len(batch) == 8
 
     def test_batch_dimensions_partial(self):
 
