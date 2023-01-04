@@ -226,17 +226,19 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
         if self.has_speaker_embedding is True:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
-
+            if self.audio_encoder is not None:
+                # NOTE (Sam): right now, audio_encoding is a mean of the audio encoder outputs and only works for a single speaker.
+                encoder_outputs += self.audio_encoder_lin(audio_encoding)
+            else:
+                # NOTE (Sam): its unclear where speaker_embedding adds a useful degree of freedom for training.
+                # It seems we could use a deeper embedding of the pre-trained encoding to get the same effect.
+                embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+                encoder_outputs += self.spkr_lin(embedded_speakers)
         if self.with_gst:
             assert (
                 embedded_gst is not None
             ), f"embedded_gst is None but gst_type was set to {self.gst_type}"
             encoder_outputs += self.gst_lin(embedded_gst)
-
-        if self.audio_encoder is not None:
-            encoder_outputs += self.audio_encoder_lin(audio_encoding)
 
         if mode == TEACHER_FORCED:
             mel_outputs, gate_predicted, alignments = self.decoder(

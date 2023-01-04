@@ -262,6 +262,7 @@ class Tacotron2Trainer(TTSTrainer):
                 input_text=utterance,
                 input_lengths=input_lengths,
                 speaker_ids=speaker_id_tensor,
+                # NOTE (Sam): this is None if using old multispeaker training, not None if using new pretrained encoder.
                 audio_encoding=speaker_embedding,
                 embedded_gst=gst_embedding,
                 mode=INFERENCE,
