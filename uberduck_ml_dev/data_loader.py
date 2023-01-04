@@ -229,11 +229,11 @@ class TextMelDataset(Dataset):
             data["embedded_gst"] = embedded_gst
 
         if self.audio_encoder_forward is not None:
-            # audio_encoding = self._get_audio_encoding(audio_norm)
             # NOTE (Sam): hardcoded for debug
             audio_encoding = rearrange(self.speaker_embeddings, "o s -> 1 o s")
             data["audio_encoding"] = audio_encoding
 
+        # NOTE (Sam): f0 not currently functional
         if self.include_f0:
             f0 = self._get_f0(audio.data.cpu().numpy())
             f0 = torch.from_numpy(f0)[None]
@@ -361,6 +361,3 @@ class TextMelCollate:
         if self.cudnn_enabled:
             output = output.to_gpu()
         return output
-
-
-# NOTE (Sam):  12/21/2022 - removed DistributedBucketSampler TextAudioSpeakerLoader, and TextAudioSpeakerCollatebut not yet VITS or GradTTS.

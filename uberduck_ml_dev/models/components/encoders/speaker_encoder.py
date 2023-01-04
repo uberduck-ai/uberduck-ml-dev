@@ -18,18 +18,15 @@ def get_speaker_encoding_for_dataset(
     embeddings = torch.zeros((n_files, embedding_dim))
     for i, audio_file_path in tqdm(enumerate(audio_file_paths)):
         signal, fs = torchaudio.load(audio_file_path)
-        #     audio = torch.FloatTensor(wav_data)
         signal = signal / (np.abs(signal).max() * 2)  # NOTE (Sam): just must be < 1.
-        #     audio_norm = audio_norm.unsqueeze(0)
         embeddings[i] = classifier.encode_batch(signal)
-    # NOTE (Sam): hack - only works for single speaker
+    # NOTE (Sam): hack - only works for single speaker.
     speaker_encoding = rearrange(embeddings.mean(axis=0), "s -> 1 s")
-
     torch.save(speaker_encoding, speaker_encoding_path)
 
 
 # # NOTE (Sam): maybe rename "CategoricalEncoder"
-# # TODO (Sam): this should work without audio encodings as well
+# # TODO (Sam): this should work without audio encodings as well -> need centroid computation code.
 # class SpeakerEncoder(torch.nn.Module):
 #     def __init__(self, speaker_ids, audio_encodings):
 #         self.speaker_ids = speaker_ids

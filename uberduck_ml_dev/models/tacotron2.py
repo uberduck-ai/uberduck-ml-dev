@@ -7,6 +7,8 @@ import torch
 from torch.nn import functional as F
 from typing import Optional
 
+from speechbrain.pretrained import EncoderClassifier
+
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
 from ..data.batch import Batch
@@ -169,8 +171,6 @@ class Tacotron2(TTSModel):
     def audio_encoder_init(self, hparams):
         self.audio_encoder = None
         if hparams.audio_encoder_path:
-            # TODO (Sam): compute metadata like this ahead of time rather than in each pass
-            from speechbrain.pretrained import EncoderClassifier
 
             self.audio_encoder_lin = nn.Linear(
                 hparams.audio_encoder_dim, hparams.encoder_embedding_dim
@@ -197,24 +197,20 @@ class Tacotron2(TTSModel):
         return output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
 
     # NOTE (Sam): it is unclear whether forward should take encoder outputs as arguements or compute them.
-    # Probably compute them since we don't want to train the encoder weights.
-    # However, randomly initialized speaker embeddings are currently computed within forward, which allows them to be optimized.
-    # It potentially could be better to have the audio embeddings optimized as well.
-    # Maybe just add more layers?
     def forward(
         self,
         input_text,
         input_lengths,
         speaker_ids,
         mode=TEACHER_FORCED,
-        # TODO (Sam): rename "emotional_encoding"
+        # TODO (Sam): treat all global encodings the same way.
         embedded_gst: Optional[torch.tensor] = None,
         # NOTE (Sam): can have an audio_encoding of speaker by taking mean audio_encoding.
         audio_encoding: Optional[torch.tensor] = None,
         targets: Optional[torch.tensor] = None,
         output_lengths: Optional[torch.tensor] = None,
         attention: Optional[torch.tensor] = None,
-        # TODO (Sam): use these to set inference, forward, left_tf, and double_tf as the same mode.
+        # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf.
         # NOTE (Sam): [0, mel_stop_index) tf, (mel_stop_index, mel_start_index) inf, (mel_start_index, max) tf
         mel_start_index: Optional[int] = 0,
         mel_stop_index: Optional[int] = 0,
@@ -258,7 +254,7 @@ class Tacotron2(TTSModel):
             ) = self.decoder.inference(encoder_outputs, input_lengths)
 
         if mode == DOUBLE_TEACHER_FORCED:
-            # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf
+
             mel_outputs, gate_predicted, alignments = self.decoder.inference_double_tf(
                 memory=encoder_outputs,
                 decoder_inputs=targets,
@@ -314,7 +310,7 @@ class Tacotron2(TTSModel):
         return output
 
 
-# NOTE (Sam): I'm not sure if this is necessary anymore since inference is now in forward.
+# NOTE (Sam): I'm not sure if this is necessary for torchscript anymore since inference is now in forward.
 class Tacotron2ForwardIsInfer(Tacotron2):
     def __init__(self, hparams):
         super().__init__(hparams)
