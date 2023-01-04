@@ -337,9 +337,6 @@ class TextMelCollate:
 
         # NOTE (Sam): does this make maximum sense?
         if "embedded_gst" in batch[0]:
-            import pdb
-
-            pdb.set_trace()
             embedded_gsts = torch.FloatTensor(
                 np.array([sample["embedded_gst"] for sample in batch])
             )
