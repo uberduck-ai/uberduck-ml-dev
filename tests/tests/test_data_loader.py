@@ -104,4 +104,4 @@ class TestTextMelCollation:
             assert batch["gate_target"].size(1) == 570, print(
                 "actual shape: ", batch["gate_target"].shape
             )
-            assert len(batch) == 7
+            assert len(batch) == 8

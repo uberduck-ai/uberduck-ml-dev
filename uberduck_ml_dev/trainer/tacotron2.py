@@ -553,9 +553,9 @@ class Tacotron2Trainer(TTSTrainer):
             #         criterion=criterion,
             #     )
 
-            # if self.debug:
-            #     self.loss.append(reduced_loss)
-            #     continue
+            if self.debug:
+                self.loss.append(reduced_loss)
+                continue
 
     def validate(self, **kwargs):
         val_start_time = time.perf_counter()
