@@ -3,7 +3,7 @@ from torch import nn
 
 from .data.batch import Batch
 
-# NOTE (Sam): This should get its own file, and loss should get its own class.
+
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
         if pos_weight is not None:
