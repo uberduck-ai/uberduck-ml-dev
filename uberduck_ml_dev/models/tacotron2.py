@@ -7,6 +7,8 @@ import torch
 from torch.nn import functional as F
 from typing import Optional
 
+from speechbrain.pretrained import EncoderClassifier
+
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
 from ..data.batch import Batch
@@ -30,6 +32,11 @@ MODES = [
     INFERENCE,
     ATTENTION_FORCED,
 ]
+
+SPEAKER_ENCODER = "speaker_encoder"
+TORCHMOJI_ENCODER = "torchmoji_encoder"
+AUDIO_ENCODER = "audio_encoder"
+GLOBAL_ENCODERS = [SPEAKER_ENCODER, TORCHMOJI_ENCODER, AUDIO_ENCODER]
 
 DEFAULTS = HParams(
     symbols_embedding_dim=512,
@@ -93,10 +100,12 @@ DEFAULTS = HParams(
     gst_dim=2304,  # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
+    audio_encoder_dim=192,
     # NOTE (Sam): to-do - move sample_inference parameters to trainer.
     sample_inference_speaker_ids=None,
     sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
     distributed_run=False,
+    audio_encoder_path=None,
 )
 
 config = DEFAULTS.values()
@@ -123,9 +132,11 @@ class Tacotron2(TTSModel):
         self.postnet = Postnet(hparams)
         self.speaker_embedding_dim = hparams.speaker_embedding_dim
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
+        # TODO (Sam): make these names match
         self.has_speaker_embedding = hparams.has_speaker_embedding
-        self.cudnn_enabled = hparams.cudnn_enabled
         self.with_gst = hparams.with_gst
+
+        self.cudnn_enabled = hparams.cudnn_enabled
 
         if self.n_speakers > 1 and not self.has_speaker_embedding:
             raise Exception("Speaker embedding is required if n_speakers > 1")
@@ -143,6 +154,7 @@ class Tacotron2(TTSModel):
             )
 
         self.gst_init(hparams)
+        self.audio_encoder_init(hparams)
 
     def gst_init(self, hparams):
         self.gst_lin = None
@@ -155,6 +167,18 @@ class Tacotron2(TTSModel):
             print("Initialized Torchmoji GST")
         else:
             print("Not using any style tokens")
+
+    def audio_encoder_init(self, hparams):
+        self.audio_encoder = None
+        if hparams.audio_encoder_path:
+
+            self.audio_encoder_lin = nn.Linear(
+                hparams.audio_encoder_dim, hparams.encoder_embedding_dim
+            )
+            self.audio_encoder = EncoderClassifier.from_hparams(
+                source=hparams.audio_encoder_path
+            )
+            print("Initialized Audio Encoder")
 
     def mask_output(
         self, output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
@@ -172,25 +196,29 @@ class Tacotron2(TTSModel):
 
         return output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
 
+    # NOTE (Sam): it is unclear whether forward should take encoder outputs as arguements or compute them.
     def forward(
         self,
         input_text,
         input_lengths,
         speaker_ids,
         mode=TEACHER_FORCED,
-        # TODO (Sam): rename "emotional_encoding"
+        # TODO (Sam): treat all global encodings the same way.
         embedded_gst: Optional[torch.tensor] = None,
         # NOTE (Sam): can have an audio_encoding of speaker by taking mean audio_encoding.
         audio_encoding: Optional[torch.tensor] = None,
         targets: Optional[torch.tensor] = None,
         output_lengths: Optional[torch.tensor] = None,
         attention: Optional[torch.tensor] = None,
-        # TODO (Sam): use these to set inference, forward, left_tf, and double_tf as the same mode.
+        # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf.
         # NOTE (Sam): [0, mel_stop_index) tf, (mel_stop_index, mel_start_index) inf, (mel_start_index, max) tf
         mel_start_index: Optional[int] = 0,
         mel_stop_index: Optional[int] = 0,
     ):
 
+        if speaker_ids is not None:
+            if max(speaker_ids) >= self.n_speakers:
+                raise Exception("Speaker id out of range")
         if input_lengths is not None:
             input_lengths = input_lengths.data
         if output_lengths is not None:
@@ -201,9 +229,14 @@ class Tacotron2(TTSModel):
         encoder_outputs = embedded_text
         # NOTE (Sam): in a previous version, has_speaker_embedding was implicitly set to be false for n_speakers = 1.
         if self.has_speaker_embedding is True:
-            embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
-            encoder_outputs += self.spkr_lin(embedded_speakers)
-
+            if self.audio_encoder is not None:
+                # NOTE (Sam): right now, audio_encoding is a mean of the audio encoder outputs and only works for a single speaker.
+                encoder_outputs += self.audio_encoder_lin(audio_encoding)
+            else:
+                # NOTE (Sam): its unclear where speaker_embedding adds a useful degree of freedom for training.
+                # It seems we could use a deeper embedding of the pre-trained encoding to get the same effect.
+                embedded_speakers = self.speaker_embedding(speaker_ids)[:, None]
+                encoder_outputs += self.spkr_lin(embedded_speakers)
         if self.with_gst:
             assert (
                 embedded_gst is not None
@@ -226,7 +259,7 @@ class Tacotron2(TTSModel):
             ) = self.decoder.inference(encoder_outputs, input_lengths)
 
         if mode == DOUBLE_TEACHER_FORCED:
-            # TODO (Sam): use inference_double_tf for inference, forward, left_tf, and double_tf
+
             mel_outputs, gate_predicted, alignments = self.decoder.inference_double_tf(
                 memory=encoder_outputs,
                 decoder_inputs=targets,
@@ -282,7 +315,7 @@ class Tacotron2(TTSModel):
         return output
 
 
-# NOTE (Sam): I'm not sure if this is necessary anymore since inference is now in forward.
+# NOTE (Sam): I'm not sure if this is necessary for torchscript anymore since inference is now in forward.
 class Tacotron2ForwardIsInfer(Tacotron2):
     def __init__(self, hparams):
         super().__init__(hparams)
