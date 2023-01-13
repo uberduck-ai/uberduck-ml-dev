@@ -5,7 +5,6 @@
 <h1>Table of Contents<span class="tocSkip"></span></h1>
 <div class="toc">
    <ul class="toc-item">
-      <li>
          <ul class="toc-item">
             <li><span><a href="#Overview" data-toc-modified-id="Overview-1.0"><span class="toc-item-num">1.0&nbsp;&nbsp;</span>Overview</a></span></li>
             <li><span><a href="#Installation" data-toc-modified-id="Installation-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Installation</a></span></li>
@@ -20,7 +19,6 @@
                </ul>
             </li>
          </ul>
-      </li>
    </ul>
 </div>
 
