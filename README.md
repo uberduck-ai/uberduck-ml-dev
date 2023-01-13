@@ -2,7 +2,6 @@
 
 [**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with voice cloning with neural text-to-speech. This repository will get you creating your own speech synthesis model. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
 
-<h1>Table of Contents<span class="tocSkip"></span></h1>
 <div class="toc">
    <ul class="toc-item">
          <ul class="toc-item">
@@ -28,7 +27,7 @@ This repository is based on the NVIDIA Mellotron.  The state of the various late
 
 \ Multispeaker training (functioning, beneficial)
 \ Torchmoji conditioning (functioning, 
-\ Mean speaker encoding (functioning)
+\ Audio/speaker embedding (functioning)
 \ Pitch conditioning (non functioning)
 \ SRMR and MOSNet conditioning (non functioning)
 
