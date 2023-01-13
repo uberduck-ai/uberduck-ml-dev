@@ -1,5 +1,7 @@
 # 🦆 Uberduck Text-to-speech ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
+[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with voice cloning with neural text-to-speech. This repository will get you creating your own speech synthesis model. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
+
 <h1>Table of Contents<span class="tocSkip"></span></h1>
 <div class="toc">
    <ul class="toc-item">
@@ -22,8 +24,6 @@
       </li>
    </ul>
 </div>
-
-[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with voice cloning with neural text-to-speech. This repository will get you creating your own speech synthesis model. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
 
 ## Overview
 
