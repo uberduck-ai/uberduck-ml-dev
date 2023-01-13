@@ -36,15 +36,17 @@ It also includes teacher forcing type methods for prosody matching, and should c
 Entrypoint scripts for running training jobs are executed via a command like
 `python -m uberduck_ml_dev.exec.train_tacotron2 --your-args here`
 
-## Installation
+
+
+## Usage
+
+### Installation
 
 ```
 conda create -n 'uberduck-ml-dev' python=3.8
 source activate uberduck-ml-dev
 pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 ```
-
-## Usage
 
 ### Training
 
