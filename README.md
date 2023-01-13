@@ -4,7 +4,7 @@
 
 ## Overview
 
-This repository is based on the NVIDIA Mellotron.  The state of the various latent space features are.
+This repository is based on the NVIDIA Mellotron.  The states of the various latent space features are
 
 - Multispeaker training (functioning, beneficial) <br>
 - Torchmoji conditioning (functioning)  <br>
