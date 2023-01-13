@@ -4,7 +4,7 @@
 
 ## Overview
 
-The "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The states of the various latent space features are
+The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The states of the various latent space features are
 
 - Multispeaker training (functioning, beneficial) <br>
 - Torchmoji conditioning (functioning)  <br>
@@ -12,7 +12,7 @@ The "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The 
 - Pitch conditioning (non functioning) <br>
 - SRMR and MOSNet conditioning (non functioning) <br>
 
-It also includes teacher forcing type methods for prosody matching, and should compile for torchscript inference.
+It also includes teacher forcing type methods for prosody matching, as well as language, tensorboard, and torchscript support, and improvements to the learning rate scheduling.
 
 ## Usage
 
