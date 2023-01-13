@@ -1,4 +1,4 @@
-# 🦆 Uberduck TTS ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
+# 🦆 Uberduck Text-to-speech ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
 <h1>Table of Contents<span class="tocSkip"></span></h1>
 <div class="toc">
@@ -23,17 +23,21 @@
    </ul>
 </div>
 
-[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with audio machine learning, currently focused on voice cloning and neural text-to-speech. This repository includes development tools to get started with creating your own speech synthesis model. For more information on the state of this repo, please see the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
+[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with voice cloning with neural text-to-speech. This repository will get you creating your own speech synthesis model. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
 
 ## Overview
 
-An overview of the subpackages in this library:
+This repository is based on the NVIDIA Mellotron.  The state of the various latent space features are.
 
-`models`: TTS model implementations. All models descend from `models.base.TTSModel`.
+\ Multispeaker training (functioning, beneficial)
+\ Torchmoji conditioning (functioning, 
+\ Mean speaker encoding (functioning)
+\ Pitch conditioning (non functioning)
+\ SRMR and MOSNet conditioning (non functioning)
 
-`trainer`: A trainer has logic for training a model.
+It also includes teacher forcing type methods for prosody matching, and should compile for torchscript inference.
 
-`exec`: Contains entrypoint scripts for running training jobs. Executed via a command like
+Entrypoint scripts for running training jobs are executed via a command like
 `python -m uberduck_ml_dev.exec.train_tacotron2 --your-args here`
 
 ## Installation
@@ -60,71 +64,20 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
    python -m uberduck_ml_dev.exec.train_tacotron2 --config tacotron2_config.json
    ```
 
-### Inference
-
-#### Tacotron2 Inference
-
-1. No GST
-
-    ```python
-    from uberduck_ml_dev.data_loader import prepare_input_sequence
-    from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS
-    
-    model = Tacotron2(DEFAULTS)
-    inputs, input_lengths = prepare_input_sequence(["This is a test voice message"], cpu_run=True, arpabet=True)
-    speaker_ids = torch.tensor([0])
-    model.eval()
-    with torch.no_grad():
-        output = model.inference(inputs, input_lengths, speaker_ids, None)
-    ```
-
-2. Using Torchmoji as GST
-
-   First, download torchmoji weights to your local filesystem from [here](https://github.com/huggingface/torchMoji). Then:
-   
-   ```python
-   from uberduck_ml_dev.models.torchmoji import TorchMojiInterface
-   
-   torchmoji_model = TorchMojiInterface("path/to/vocab.json", "path/to/torchmoji_weights.bin")
-   
-   gsts = torch.tensor(torchmoji_model.encode_texts(["This is a test."]))
-   gsts_repeated = gsts.repeat(1, 1).unsqueeze(1)
-   # sequences, input_lengths, speaker_ids instantiation not shown here.
-   output = tacotron2.inference(sequences, input_lengths, speaker_ids, gsts_repeated)
-   ```
-
 ## Development
 
-To start contributing, install the required development dependencies in a virtual environment:
 
 ```bash
-pip install pre-commit black
-```
-
-Clone the repository:
-
-```bash
-git clone git@github.com:uberduck-ai/uberduck-ml-dev.git
-```
-
-Install required Git hooks:
-
-```bash
-pre-commit install
-```
-
-Install the library:
-
-```bash
-python setup.py develop
+pip install pre-commit black # install the required development dependencies in a virtual environment
+git clone git@github.com:uberduck-ai/uberduck-ml-dev.git # clone the repository:
+pre-commit install # Install required Git hooks:
+python setup.py develop # Install the library
 ```
 
 ### 🚩 Testing
 
+In an environment with uberduck-ml-dev installed, run 
+
 ```bash
 python -m pytest
 ```
-
-### 🔧 Troubleshooting
-
-- It is important for you to spell the name of your user and repo correctly in `settings.ini`. If you change the name of the repo, you have to make the appropriate changes in `settings.ini`
