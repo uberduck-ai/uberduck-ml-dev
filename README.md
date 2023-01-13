@@ -4,7 +4,7 @@
 
 ## Overview
 
-This repository is based on the NVIDIA Mellotron.  The states of the various latent space features are
+The "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The states of the various latent space features are
 
 - Multispeaker training (functioning, beneficial) <br>
 - Torchmoji conditioning (functioning)  <br>
