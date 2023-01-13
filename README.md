@@ -6,7 +6,6 @@
 <div class="toc">
    <ul class="toc-item">
       <li>
-         <span><a href="#🦆-Uberduck-TTS---" data-toc-modified-id="🦆-Uberduck-TTS----1"><span class="toc-item-num">1&nbsp;&nbsp;</span>🦆 Uberduck TTS <img src="https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev" alt=""> <img src="https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev" alt=""></a></span>
          <ul class="toc-item">
             <li><span><a href="#Overview" data-toc-modified-id="Overview-1.0"><span class="toc-item-num">1.0&nbsp;&nbsp;</span>Overview</a></span></li>
             <li><span><a href="#Installation" data-toc-modified-id="Installation-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Installation</a></span></li>
