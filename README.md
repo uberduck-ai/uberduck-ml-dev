@@ -6,11 +6,11 @@
 
 This repository is based on the NVIDIA Mellotron.  The state of the various latent space features are.
 
-\ Multispeaker training (functioning, beneficial)
-\ Torchmoji conditioning (functioning, 
-\ Audio/speaker embedding (functioning)
-\ Pitch conditioning (non functioning)
-\ SRMR and MOSNet conditioning (non functioning)
+\ Multispeaker training (functioning, beneficial) <br>
+\ Torchmoji conditioning (functioning)  <br>
+\ Audio/speaker embedding (functioning) <br>
+\ Pitch conditioning (non functioning) <br>
+\ SRMR and MOSNet conditioning (non functioning) <br>
 
 It also includes teacher forcing type methods for prosody matching, and should compile for torchscript inference.
 
