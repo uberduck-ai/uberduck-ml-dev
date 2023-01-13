@@ -6,20 +6,17 @@
 
 This repository is based on the NVIDIA Mellotron.  The state of the various latent space features are.
 
-\ Multispeaker training (functioning, beneficial) <br>
-\ Torchmoji conditioning (functioning)  <br>
-\ Audio/speaker embedding (functioning) <br>
-\ Pitch conditioning (non functioning) <br>
-\ SRMR and MOSNet conditioning (non functioning) <br>
+- Multispeaker training (functioning, beneficial) <br>
+- Torchmoji conditioning (functioning)  <br>
+- Audio/speaker embedding (functioning) <br>
+- Pitch conditioning (non functioning) <br>
+- SRMR and MOSNet conditioning (non functioning) <br>
 
 It also includes teacher forcing type methods for prosody matching, and should compile for torchscript inference.
 
-Entrypoint scripts for running training jobs are executed via a command like
-`python -m uberduck_ml_dev.exec.train_tacotron2 --your-args here`
-
-
-
 ## Usage
+
+The easiest ways to try us out are the colab notebooks, but if you want to install, run 
 
 ### Installation
 
