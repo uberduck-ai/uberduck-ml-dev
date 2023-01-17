@@ -1,6 +1,6 @@
 # 🦆 Uberduck Text-to-speech ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
-[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with voice cloning with neural text-to-speech. This repository will get you creating your own speech synthesis model. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
+[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with neural text-to-speech. This repository will get you creating your own speech synthesis models. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
 
 ## Overview
 
@@ -28,13 +28,14 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 
 ### Training
 
-1. Download torchmoji models if training with Torchmoji GST.
+
+1. Create your training config and filelists. Use the training configs in the `configs` directory as a starting point, e.g. [this one](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/configs/tacotron2_config.json).
+2. (Optional) Download torchmoji models if training with Torchmoji GST.
 
    ```bash
    wget "https://github.com/johnpaulbin/torchMoji/releases/download/files/pytorch_model.bin" -O pytorch_model.bin
    wget "https://raw.githubusercontent.com/johnpaulbin/torchMoji/master/model/vocabulary.json" -O vocabulary.json
    ```
-2. Create your training config. Use the training configs in the `configs` directory as a starting point, e.g. [this one](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/configs/tacotron2_config.json).
 3. Start training. Example invocation for Tacotron2 training:
    ```bash
    python -m uberduck_ml_dev.exec.train_tacotron2 --config tacotron2_config.json
@@ -42,6 +43,7 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 
 ## Development
 
+We love contributions!  To install in development mode, run
 
 ```bash
 pip install pre-commit black # install the required development dependencies in a virtual environment
