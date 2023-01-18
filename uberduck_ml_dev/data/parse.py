@@ -158,3 +158,20 @@ def _write_db_to_csv(conn, output_path):
     results = pd.DataFrame.from_records(data=query.fetchall(), columns=cols)
     results.to_csv(output_path, header=True)
     cursor.close()
+    
+from uberduck_ml_dev.data.parse import _filelist_to_montreal_format
+import pandas as pd
+import os
+from pathlib import Path
+import shutil
+def _filelist_to_montreal_format(data_dir, filelist_path):
+
+    filelist = pd.read_csv(filelist_path, sep="|", header=None, index_col=None)
+    output_directory = str(Path(data_dir,"montreal/"))
+    os.makedirs(output_directory, exist_ok=True)
+#     NOTE (iterrows is an antipattern but the size is too small here to matter)
+    for i,datum in filelist.iterrows():
+        wav_path = datum[0]
+        output_path = str(Path(output_directory,wav_path.split('/')[-1].split('.')[0]))
+        shutil.copy(wav_path, f"{output_path}.wav")
+        pd.DataFrame([wav_path]).to_csv(f"{output_path}.lab", header = None, index = None)
