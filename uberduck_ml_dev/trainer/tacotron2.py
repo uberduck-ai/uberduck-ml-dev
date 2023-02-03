@@ -7,11 +7,9 @@ import torch
 
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-from torch.cuda.amp import GradScaler
-from torch.nn.parallel import DistributedDataParallel as DDP
 from speechbrain.pretrained import EncoderClassifier
 
-from ..data_loader import TextMelDataset, TextMelCollate
+from ..data_loader import TextMelCollate
 from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
@@ -31,8 +29,8 @@ from ..utils.plot import (
 )
 from ..text.util import text_to_sequence, random_utterance
 from .base import TTSTrainer
-from ..data_loader import TextMelDataset, TextMelCollate
 from ..losses import Tacotron2Loss
+from ..data.data import Data
 
 
 class Tacotron2Trainer(TTSTrainer):
@@ -390,12 +388,12 @@ class Tacotron2Trainer(TTSTrainer):
         )
 
     def initialize_loader(self, include_f0: bool = False, n_frames_per_step: int = 1):
-        train_set = TextMelDataset(
+        train_set = Data(
             **self.training_dataset_args,
             debug=self.debug,
             debug_dataset_size=self.batch_size,
         )
-        val_set = TextMelDataset(
+        val_set = Data(
             **self.val_dataset_args,
             debug=self.debug,
             debug_dataset_size=self.batch_size,

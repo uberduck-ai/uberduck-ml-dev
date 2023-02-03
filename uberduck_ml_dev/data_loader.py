@@ -2,39 +2,23 @@ __all__ = [
     "pad_sequences",
     "prepare_input_sequence",
     "oversample",
-    "TextMelDataset",
     "TextMelCollate",
     "TextAudioSpeakerLoader",
     "TextAudioSpeakerCollate",
     "DistributedBucketSampler",
 ]
 
-import os
-import random
-import re
-from pathlib import Path
+
 from typing import List
 
 import numpy as np
-from scipy.io.wavfile import read
 import torch
-from torch.utils.data import Dataset
-from torch.utils.data.distributed import DistributedSampler
-from einops import rearrange
 
-from .models.common import STFT, MelSTFT
 from .text.symbols import (
-    DEFAULT_SYMBOLS,
-    IPA_SYMBOLS,
     NVIDIA_TACO2_SYMBOLS,
-    GRAD_TTS_SYMBOLS,
 )
-from .text.util import cleaned_text_to_sequence, text_to_sequence
-from .utils.audio import compute_yin, load_wav_to_torch
-from .utils.utils import (
-    load_filepaths_and_text,
-    intersperse,
-)
+from .text.util import text_to_sequence
+
 from .data.batch import Batch
 
 
@@ -51,6 +35,16 @@ def pad_sequences(batch):
     return text_padded, input_lengths
 
 
+# def map_text_encodings(encoding_1, encoding_2):
+#     """Create a matrix associating graphemes/phonemes in encoding_1 with graphemes/phonemes in encoding_2."""
+#     if set([encoding_1, encoding_2]) == set([TALKNET_SYMBOLS, NVIDIA_TACO2_SYMBOLS])
+#         encoding_map = torch.zeros(len(TALKNET_SYMBOLS), len(NVIDIA_TACO2_SYMBOLS))
+#         if encoding_2 == NVIDIA_TACO2_SYMBOLS:
+#             return encoding_map.t()
+#         else:
+#             return encoding_map
+
+
 def prepare_input_sequence(
     texts,
     cpu_run=False,
@@ -63,6 +57,7 @@ def prepare_input_sequence(
     for text in texts:
         seqs.append(
             torch.IntTensor(
+                # NOTE (Sam): this adds a period to the end of every text.
                 text_to_sequence(
                     text,
                     text_cleaner,
@@ -80,189 +75,6 @@ def prepare_input_sequence(
         input_lengths = input_lengths.long()
 
     return text_padded, input_lengths
-
-
-def oversample(filepaths_text_sid, sid_to_weight):
-    assert all([isinstance(sid, str) for sid in sid_to_weight.keys()])
-    output = []
-    for fts in filepaths_text_sid:
-        sid = fts[2]
-        for _ in range(sid_to_weight.get(sid, 1)):
-            output.append(fts)
-    return output
-
-
-def _orig_to_dense_speaker_id(speaker_ids):
-    speaker_ids = np.asarray(list(set(speaker_ids)), dtype=str)
-    id_order = np.argsort(np.asarray(speaker_ids, dtype=int))
-    output = {
-        orig: idx for orig, idx in zip(speaker_ids[id_order], range(len(speaker_ids)))
-    }
-    return output
-
-
-class TextMelDataset(Dataset):
-    def __init__(
-        self,
-        audiopaths_and_text: str,
-        text_cleaners: List[str],
-        p_arpabet: float,
-        n_mel_channels: int,
-        sampling_rate: int,
-        mel_fmin: float,
-        mel_fmax: float,
-        filter_length: int,
-        hop_length: int,
-        win_length: int,
-        symbol_set: str,
-        padding: int = None,
-        max_wav_value: float = 32768.0,
-        include_f0: bool = False,
-        pos_weight: float = 10,
-        f0_min: int = 80,
-        f0_max: int = 880,
-        harmonic_thresh=0.25,
-        debug: bool = False,
-        debug_dataset_size: int = None,
-        oversample_weights=None,
-        intersperse_text: bool = False,
-        intersperse_token: int = 0,
-        compute_gst=None,
-        audio_encoder_forward=None,
-        speaker_embeddings=None,
-    ):
-        super().__init__()
-        path = audiopaths_and_text
-        oversample_weights = oversample_weights or {}
-        self.audiopaths_and_text = oversample(
-            load_filepaths_and_text(path), oversample_weights
-        )
-        self.text_cleaners = text_cleaners
-        self.p_arpabet = p_arpabet
-
-        self.stft = MelSTFT(
-            filter_length=filter_length,
-            hop_length=hop_length,
-            win_length=win_length,
-            n_mel_channels=n_mel_channels,
-            sampling_rate=sampling_rate,
-            mel_fmin=mel_fmin,
-            mel_fmax=mel_fmax,
-            padding=padding,
-        )
-        self.max_wav_value = max_wav_value
-        self.sampling_rate = sampling_rate
-        self.filter_length = filter_length
-        self.hop_length = hop_length
-        self.mel_fmin = mel_fmin
-        self.mel_fmax = mel_fmax
-        self.include_f0 = include_f0
-        self.f0_min = f0_min
-        self.f0_max = f0_max
-        self.harmonic_threshold = harmonic_thresh
-        # speaker id lookup table
-        speaker_ids = [i[2] for i in self.audiopaths_and_text]
-        self._speaker_id_map = _orig_to_dense_speaker_id(speaker_ids)
-        self.debug = debug
-        self.debug_dataset_size = debug_dataset_size
-        self.symbol_set = symbol_set
-        self.intersperse_text = intersperse_text
-        self.intersperse_token = intersperse_token
-        self.compute_gst = compute_gst
-        self.audio_encoder_forward = audio_encoder_forward
-        self.speaker_embeddings = speaker_embeddings
-
-    def _get_f0(self, audio):
-        f0, harmonic_rates, argmins, times = compute_yin(
-            audio,
-            self.sampling_rate,
-            self.filter_length,
-            self.hop_length,
-            self.f0_min,
-            self.f0_max,
-            self.harmonic_threshold,
-        )
-        pad = int((self.filter_length / self.hop_length) / 2)
-        f0 = [0.0] * pad + f0 + [0.0] * pad
-        f0 = np.array(f0, dtype=np.float32)
-        return f0
-
-    # TODO (Sam): rename this!
-    def _get_gst(self, transcription):
-        return self.compute_gst(transcription)
-
-    def _get_audio_encoding(self, audio):
-        return self.audio_encoder_forward(audio)
-
-    def _get_data(self, audiopath_and_text):
-        path, transcription, speaker_id = audiopath_and_text
-        speaker_id = self._speaker_id_map[speaker_id]
-        sampling_rate, wav_data = read(path)
-        text_sequence = torch.LongTensor(
-            text_to_sequence(
-                transcription,
-                self.text_cleaners,
-                p_arpabet=self.p_arpabet,
-                symbol_set=self.symbol_set,
-            )
-        )
-        if self.intersperse_text:
-            text_sequence = torch.LongTensor(
-                intersperse(text_sequence.numpy(), self.intersperse_token)
-            )  # add a blank token, whose id number is len(symbols)
-
-        audio = torch.FloatTensor(wav_data)
-        audio_norm = audio / (np.abs(audio).max() * 2)  # NOTE (Sam): just must be < 1.
-        audio_norm = audio_norm.unsqueeze(0)
-
-        melspec = self.stft.mel_spectrogram(audio_norm)
-        melspec = torch.squeeze(melspec, 0)
-        data = {
-            "text_sequence": text_sequence,
-            "mel": melspec,
-            "speaker_id": speaker_id,
-            "f0": None,
-        }
-
-        if self.compute_gst:
-            embedded_gst = self._get_gst([transcription])
-            data["embedded_gst"] = embedded_gst
-
-        if self.audio_encoder_forward is not None:
-            # NOTE (Sam): hardcoded for now.
-            audio_encoding = rearrange(self.speaker_embeddings, "o s -> 1 o s")
-            data["audio_encoding"] = audio_encoding
-
-        # NOTE (Sam): f0 not currently functional.
-        if self.include_f0:
-            f0 = self._get_f0(audio.data.cpu().numpy())
-            f0 = torch.from_numpy(f0)[None]
-            f0 = f0[:, : melspec.size(1)]
-            data["f0"] = f0
-
-        return data
-
-    def __getitem__(self, idx):
-        """Return data for a single audio file + transcription."""
-        try:
-            data = self._get_data(self.audiopaths_and_text[idx])
-        except Exception as e:
-            print(f"Error while getting data: {self.audiopaths_and_text[idx]}")
-            print(e)
-            raise
-        return data
-
-    def __len__(self):
-        if self.debug and self.debug_dataset_size:
-            return min(self.debug_dataset_size, len(self.audiopaths_and_text))
-        return len(self.audiopaths_and_text)
-
-    def sample_test_batch(self, size):
-        idx = np.random.choice(range(len(self)), size=size, replace=False)
-        test_batch = []
-        for index in idx:
-            test_batch.append(self.__getitem__(index))
-        return test_batch
 
 
 class TextMelCollate:
