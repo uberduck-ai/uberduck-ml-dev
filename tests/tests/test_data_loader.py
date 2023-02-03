@@ -1,6 +1,7 @@
-from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset, oversample
-from collections import Counter
+from uberduck_ml_dev.data_loader import TextMelCollate
 from torch.utils.data import DataLoader
+from uberduck_ml_dev.data.utils import oversample
+from uberduck_ml_dev.data.data import Data
 
 
 class TestTextMelCollation:
@@ -20,7 +21,7 @@ class TestTextMelCollation:
         ]
 
     def test_batch_structure(self):
-        ds = TextMelDataset(
+        ds = Data(
             "tests/fixtures/val.txt",
             ["english_cleaners"],
             0.0,
@@ -44,7 +45,7 @@ class TestTextMelCollation:
 
     def test_batch_dimensions(self):
 
-        ds = TextMelDataset(
+        ds = Data(
             "tests/fixtures/val.txt",
             ["english_cleaners"],
             0.0,
@@ -75,7 +76,7 @@ class TestTextMelCollation:
 
     def test_batch_dimensions_partial(self):
 
-        ds = TextMelDataset(
+        ds = Data(
             "tests/fixtures/val.txt",
             ["english_cleaners"],
             0.0,
