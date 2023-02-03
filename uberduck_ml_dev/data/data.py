@@ -46,6 +46,7 @@ class Data(Dataset):
         compute_gst=None,
         audio_encoder_forward=None,
         speaker_embeddings=None,
+        use_f0=False,
     ):
         super().__init__()
         path = audiopaths_and_text
@@ -87,7 +88,8 @@ class Data(Dataset):
         self.compute_gst = compute_gst
         self.audio_encoder_forward = audio_encoder_forward
         self.speaker_embeddings = speaker_embeddings
-
+        self.use_f0 = use_f0
+        
     # NOTE (Sam): this is the RADTTS version.
     # RADTTS is more recent than mellotron from the same author so let's assume this method is better.
     def _get_f0(self, audiopath, audio):
