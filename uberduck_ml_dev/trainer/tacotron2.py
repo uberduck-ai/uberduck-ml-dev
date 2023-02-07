@@ -64,7 +64,7 @@ class Tacotron2Trainer(TTSTrainer):
         self.has_audio_encoder = self.hparams.audio_encoder_path is not None
 
         if hasattr(self.hparams, "speaker_embeddings_path"):
-
+            # TODO (Sam): move this to "load" type method in Data.
             get_speaker_encoding_for_dataset(
                 self.hparams.speaker_embeddings_path,
                 self.training_audiopaths_and_text,
@@ -75,7 +75,7 @@ class Tacotron2Trainer(TTSTrainer):
             self.speaker_embeddings = torch.load(self.hparams.speaker_embeddings_path)
         else:
             self.speaker_embeddings = None
-        # NOTE (Sam): gst_type == torchmoji and with_gst are currently redundant although syntactically different.
+        # NOTE (Sam): gst_type == torchmoji and use_gst are currently redundant although syntactically different.
         # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder)
         if self.hparams.get("with_gst"):
             assert self.hparams.get(
@@ -91,9 +91,9 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_model_file"),
             )
             # TODO (Sam): rename gst to gsts[0].
-            self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
+            self.get_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
-            self.compute_gst = None
+            self.get_gst = None
 
         # TODO (Sam): datapoint specific encoder is really unused as of now.
         if self.has_audio_encoder:
@@ -398,11 +398,7 @@ class Tacotron2Trainer(TTSTrainer):
             debug=self.debug,
             debug_dataset_size=self.batch_size,
         )
-        collate_fn = Collate(
-            n_frames_per_step=n_frames_per_step,
-            include_f0=include_f0,  # unused
-            cudnn_enabled=self.cudnn_enabled,
-        )
+        collate_fn = Collate(**self.collate_args)
         sampler = None
         train_loader = DataLoader(
             train_set,
@@ -673,8 +669,13 @@ class Tacotron2Trainer(TTSTrainer):
     def training_dataset_args(self):
         return {
             "audiopaths_and_text": self.training_audiopaths_and_text,
+            # Text parameters
+            "return_texts": self.return_texts,
             "text_cleaners": self.text_cleaners,
+            "symbol_set": self.symbol_set,
             "p_arpabet": self.p_arpabet,
+            # Audio parameters
+            "return_mels": self.return_mels,
             "n_mel_channels": self.n_mel_channels,
             "sampling_rate": self.sampling_rate,
             "mel_fmin": self.mel_fmin,
@@ -682,16 +683,35 @@ class Tacotron2Trainer(TTSTrainer):
             "filter_length": self.filter_length,
             "hop_length": self.hop_length,
             "win_length": self.win_length,
-            "symbol_set": self.symbol_set,
             "max_wav_value": self.max_wav_value,
-            "pos_weight": self.pos_weight,
-            "compute_gst": self.compute_gst,
+            # Speaker embedding parameters
             "audio_encoder_forward": self.audio_encoder_forward,
             "speaker_embeddings": self.speaker_embeddings,
+            # F0 parameters
+            "return_f0": self.with_f0,
+            "load_f0": self.load_f0,
+            "compute_f0": self.compute_f0,
+            # GST parameters
+            "return_gst": self.with_gst,
+            "load_gst": self.load_gst,
+            "compute_gst": self.compute_gst,
+            "get_gst": self.get_gst,
+        }
+
+    @property
+    def collate_args(self):
+        return {
+            "return_f0s": self.with_f0,
+            "return_gsts": self.with_gst,
+            "return_mels": True,
+            "return_text_sequences": True,
+            "return_audio_encodings": self.with_audio_encoding,
+            "cudnn_enabled": self.cudnn_enabled,
+            "n_frames_per_step": self.n_frames_per_step,
         }
 
 
 config = TRAINER_DEFAULTS.values()
 config.update(TACOTRON2_DEFAULTS.values())
-config.update({"sample_inference_text": "Duck party on aisle 6."})
+config.update({"n_frames_per_step_initial": 1})
 DEFAULTS = HParams(**config)

@@ -212,6 +212,8 @@ DEFAULTS = HParams(
     lr_decay_start=15000,
     lr_decay_rate=216000,
     lr_decay_min=1e-5,
+    sample_inference_speaker_ids=None,
+    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
 )
 
 config = DEFAULTS.values()

@@ -37,12 +37,14 @@ SPEAKER_ENCODER = "speaker_encoder"
 TORCHMOJI_ENCODER = "torchmoji_encoder"
 AUDIO_ENCODER = "audio_encoder"
 GLOBAL_ENCODERS = [SPEAKER_ENCODER, TORCHMOJI_ENCODER, AUDIO_ENCODER]
+N_MEL_CHANNELS = 80
+ENGLISH_CLEANERS = "english_cleaners"
 
 DEFAULTS = HParams(
     symbols_embedding_dim=512,
     fp16_run=False,
     mask_padding=True,
-    n_mel_channels=80,
+    n_mel_channels=N_MEL_CHANNELS,
     # encoder parameters
     encoder_kernel_size=5,
     encoder_n_convolutions=3,
@@ -51,17 +53,17 @@ DEFAULTS = HParams(
     coarse_n_frames_per_step=None,
     decoder_rnn_dim=1024,
     prenet_dim=256,
-    prenet_f0_n_layers=1,
-    prenet_f0_dim=1,
-    prenet_f0_kernel_size=1,
-    prenet_rms_dim=0,
-    prenet_fms_kernel_size=1,
+    with_f0=False,
+    # prenet_f0_n_layers=1,
+    # prenet_f0_dim=1,
+    # prenet_f0_kernel_size=1,
+    # prenet_rms_dim=0,
+    # prenet_fms_kernel_size=1,
     max_decoder_steps=1000,
     gate_threshold=0.5,
     p_attention_dropout=0.1,
     p_decoder_dropout=0.1,
     p_teacher_forcing=1.0,
-    pos_weight=None,
     # attention parameters
     attention_rnn_dim=1024,
     attention_dim=128,
@@ -79,14 +81,11 @@ DEFAULTS = HParams(
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
-    has_speaker_embedding=False,
+    # Audio parameters
     filter_length=1024,
     hop_length=256,
-    include_f0=False,
     ref_enc_gru_size=128,
-    symbol_set="nvidia_taco2",
     num_heads=8,
-    text_cleaners=["english_cleaners"],
     sampling_rate=22050,
     checkpoint_name=None,
     max_wav_value=32768.0,
@@ -94,18 +93,24 @@ DEFAULTS = HParams(
     mel_fmin=0,
     n_frames_per_step_initial=1,
     win_length=1024,
-    # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename
+    # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename.
+    # TODO (Sam): Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     gst_type=None,
     with_gst=False,
-    gst_dim=2304,  # Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
+    load_gst=False,
+    compute_gst=False,
+    get_gst=None,
+    gst_dim=2304,
     torchmoji_model_file=None,
     torchmoji_vocabulary_file=None,
+    # Speaker encoder parameters
     audio_encoder_dim=192,
-    # NOTE (Sam): to-do - move sample_inference parameters to trainer.
-    sample_inference_speaker_ids=None,
-    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
-    distributed_run=False,
+    with_audio_encoding=False,
     audio_encoder_path=None,
+    has_speaker_embedding=False,
+    # Text parameters
+    symbol_set="nvidia_taco2",
+    text_cleaners=[ENGLISH_CLEANERS],
 )
 
 config = DEFAULTS.values()
@@ -118,8 +123,7 @@ class Tacotron2(TTSModel):
         super().__init__(hparams)
 
         self.mask_padding = hparams.mask_padding
-        self.fp16_run = hparams.fp16_run
-        self.pos_weight = hparams.pos_weight
+        self.fp16_run = hparams.fp16_run  # TODO (Sam): remove
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step_initial = hparams.n_frames_per_step_initial
         self.n_frames_per_step_current = hparams.n_frames_per_step_initial
@@ -313,21 +317,3 @@ class Tacotron2(TTSModel):
             output_lengths=output_lengths,
         )
         return output
-
-
-# NOTE (Sam): I'm not sure if this is necessary for torchscript anymore since inference is now in forward.
-class Tacotron2ForwardIsInfer(Tacotron2):
-    def __init__(self, hparams):
-        super().__init__(hparams)
-
-        self.encoder = EncoderForwardIsInfer(hparams)
-        self.decoder = DecoderForwardIsInfer(hparams)
-
-    def forward(
-        self,
-        input_text,
-        input_lengths,
-        speaker_ids,
-        embedded_gst,
-    ):
-        return self.inference(input_text, input_lengths, speaker_ids, embedded_gst)
