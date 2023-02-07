@@ -1610,7 +1610,10 @@ class TorchMoji(nn.Module):
 
             # Pack sequence and work on data tensor to reduce embeddings/dropout computations
             packed_input = pack_padded_sequence(
-                input_seqs, input_lengths.cpu().numpy(), batch_first=True
+                input_seqs,
+                input_lengths.cpu().numpy(),
+                batch_first=True,
+                enforce_sorted=False,
             )
             reorder_output = True
         else:
@@ -1648,7 +1651,9 @@ class TorchMoji(nn.Module):
             packed_input.batch_sizes,
         )
 
-        input_seqs, _ = pad_packed_sequence(packed_input, batch_first=True)
+        input_seqs, _ = pad_packed_sequence(
+            packed_input, batch_first=True, enforce_sorted=False
+        )
 
         x, att_weights = self.attention_layer(input_seqs, input_lengths)
 

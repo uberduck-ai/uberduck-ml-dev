@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from speechbrain.pretrained import EncoderClassifier
 
-from ..data_loader import TextMelCollate
+from ..data.collate import Collate
 from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
@@ -398,7 +398,7 @@ class Tacotron2Trainer(TTSTrainer):
             debug=self.debug,
             debug_dataset_size=self.batch_size,
         )
-        collate_fn = TextMelCollate(
+        collate_fn = Collate(
             n_frames_per_step=n_frames_per_step,
             include_f0=include_f0,  # unused
             cudnn_enabled=self.cudnn_enabled,

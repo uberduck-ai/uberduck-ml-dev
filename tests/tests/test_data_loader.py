@@ -1,7 +1,8 @@
-from uberduck_ml_dev.data_loader import TextMelCollate
 from torch.utils.data import DataLoader
+
 from uberduck_ml_dev.data.utils import oversample
 from uberduck_ml_dev.data.data import Data
+from uberduck_ml_dev.data.collate import Collate
 
 
 class TestTextMelCollation:
@@ -38,7 +39,7 @@ class TestTextMelCollation:
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = TextMelCollate()
+        collate_fn = Collate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
             assert len(batch) == 8
@@ -63,7 +64,7 @@ class TestTextMelCollation:
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = TextMelCollate(include_f0=True)
+        collate_fn = Collate(include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
             output_lengths = batch["output_lengths"]
@@ -94,7 +95,7 @@ class TestTextMelCollation:
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = TextMelCollate(n_frames_per_step=5, include_f0=True)
+        collate_fn = Collate(n_frames_per_step=5, include_f0=True)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
 
