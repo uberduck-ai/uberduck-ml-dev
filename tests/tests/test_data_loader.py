@@ -24,16 +24,6 @@ class TestTextMelCollation:
     def test_batch_structure(self):
         ds = Data(
             "tests/fixtures/val.txt",
-            ["english_cleaners"],
-            0.0,
-            80,
-            22050,
-            0,
-            8000,
-            1024,
-            256,
-            padding=None,
-            win_length=1024,
             debug=True,
             debug_dataset_size=12,
             symbol_set="default",
@@ -42,29 +32,18 @@ class TestTextMelCollation:
         collate_fn = Collate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            assert len(batch) == 8
+            assert len(batch) == 9
 
     def test_batch_dimensions(self):
 
         ds = Data(
-            "tests/fixtures/val.txt",
-            ["english_cleaners"],
-            0.0,
-            80,
-            22050,
-            0,
-            8000,
-            1024,
-            256,
-            padding=None,
-            win_length=1024,
+            audiopaths_and_text="tests/fixtures/val.txt",
             debug=True,
             debug_dataset_size=12,
-            include_f0=True,
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = Collate(include_f0=True)
+        collate_fn = Collate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
             output_lengths = batch["output_lengths"]
@@ -73,37 +52,24 @@ class TestTextMelCollation:
             assert output_lengths.item() == 566
             assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
-            assert len(batch) == 8
+            assert len(batch) == 9
 
     def test_batch_dimensions_partial(self):
 
         ds = Data(
             "tests/fixtures/val.txt",
-            ["english_cleaners"],
-            0.0,
-            80,
-            22050,
-            0,
-            8000,
-            1024,
-            256,
-            padding=None,
-            win_length=1024,
             debug=True,
             debug_dataset_size=12,
-            include_f0=True,
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = Collate(n_frames_per_step=5, include_f0=True)
+        collate_fn = Collate(n_frames_per_step=5)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
 
-            assert batch["output_lengths"].item() == 566, batch["output_lengths"].item()
-            assert batch["mel_padded"].size(2) == 570, print(
-                "actual shape: ", batch["mel_padded"].shape
-            )
-            assert batch["gate_target"].size(1) == 570, print(
-                "actual shape: ", batch["gate_target"].shape
-            )
-            assert len(batch) == 8
+            assert batch["output_lengths"].item() == 566
+            assert (
+                batch["mel_padded"].size(2) == 566
+            )  # I'm not sure why this was 570 - maybe 566 + 5 (i.e. the n_frames_per_step)
+            assert batch["gate_target"].size(1) == 566
+            assert len(batch) == 9

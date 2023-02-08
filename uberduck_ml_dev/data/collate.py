@@ -13,7 +13,7 @@ class Collate:
         return_mels: bool = True,
         return_text_sequences: bool = True,
         return_speaker_ids: bool = True,
-        return_gsts: bool = True,
+        return_gsts: bool = False,
         return_audio_encodings: bool = False,
     ):
         self.n_frames_per_step = n_frames_per_step
@@ -47,7 +47,6 @@ class Collate:
         max_input_len = max(input_lengths)
         n_mel_channels = batch[0]["mel"].size(0)
         max_target_len = max([x["mel"].size(1) for x in batch])
-
         if self.return_text_sequences:
             text_padded = torch.LongTensor(len(batch), max_input_len)
             text_padded.zero_()
@@ -94,6 +93,7 @@ class Collate:
                 mel_padded[i, :, : mel.size(1)] = mel
                 gate_padded[i, mel.size(1) - 1 :] = 1
                 output_lengths[i] = mel.size(1)
+                print(mel.size(1), "asdf")
             if self.return_speaker_ids:
                 speaker_ids[i] = sample["speaker_id"]
             if self.return_f0s:

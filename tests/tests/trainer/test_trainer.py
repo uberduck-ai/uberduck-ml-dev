@@ -41,9 +41,11 @@ class TestTacotron2Trainer:
         # train_loss_4_datapoints_1_iteration = 0.319
         # NOTE (Sam): new numbers taken after normalization change 12/11/22
         # Have to run two iterations for loss to go down now.
-        train_loss_start = 0.339
-        train_loss_4_datapoints_2_iteration = 0.327
-
+        # train_loss_start = 0.339
+        # train_loss_4_datapoints_2_iteration = 0.327
+        # NOTE (Sam): new numbers taken after enforce_sorted = False 2/7/23
+        train_loss_start = 0.334
+        train_loss_4_datapoints_2_iteration = 0.326
         assert math.isclose(lj_trainer.loss[0], train_loss_start, abs_tol=5e-4)
 
         assert math.isclose(

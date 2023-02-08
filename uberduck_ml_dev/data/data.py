@@ -31,11 +31,11 @@ class Data(Dataset):
         ] = None,  # TODO (Sam): consider removing triplicate audiopaths_and_text argument
         oversample_weights=None,
         # Text parameters
-        return_texts: bool = False,  # NOTE (Sam): maybe include include_texts parameter if text is ever inferred.
+        return_texts: bool = True,  # NOTE (Sam): maybe include include_texts parameter if text is ever inferred.
         texts: Optional[List[str]] = None,
         intersperse_text: Optional[bool] = False,
         intersperse_token: Optional[int] = 0,
-        text_cleaners: Optional[List[str]] = "english_cleaners",
+        text_cleaners: Optional[List[str]] = ["english_cleaners"],
         p_arpabet: Optional[float] = 1.0,
         # Audio parameters
         return_mels=True,
@@ -60,7 +60,7 @@ class Data(Dataset):
         # Torchmoji parameters
         return_gsts: bool = False,
         load_gsts=False,  # TODO (Sam): check this against existing crust models
-        get_gst=None,  # NOTE (Sam): this is a functional argument.
+        get_gst=lambda text: None,  # NOTE (Sam): this is a functional argument.
         # Speaker embedding parameters
         return_speaker_ids: bool = True,
         load_speaker_ids: bool = True,
