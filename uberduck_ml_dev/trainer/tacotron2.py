@@ -66,7 +66,9 @@ class Tacotron2Trainer(TTSTrainer):
         self.with_f0s = self.hparams.with_f0s
         self.load_f0s = self.hparams.load_f0s
         self.load_gsts = self.hparams.load_gsts
-        self.with_gsts = self.hparams.with_gsts
+        self.with_gsts = (
+            self.hparams.with_gsts
+        )  # NOTE (Sam): should this be singular or plural?
 
         if hasattr(self.hparams, "speaker_embeddings_path"):
             # TODO (Sam): move this to "load" type method in Data.
@@ -80,9 +82,9 @@ class Tacotron2Trainer(TTSTrainer):
             self.speaker_embeddings = torch.load(self.hparams.speaker_embeddings_path)
         else:
             self.speaker_embeddings = None
-        # NOTE (Sam): gst_type == torchmoji and use_gst are currently redundant although syntactically different.
-        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder)
-        if self.hparams.get("with_gst"):
+        # NOTE (Sam): gst_type == torchmoji and with_gst are currently redundant.
+        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder).
+        if self.hparams.get("with_gsts"):
             assert self.hparams.get(
                 "torchmoji_vocabulary_file"
             ), "torchmoji_vocabulary_file must be set"
@@ -228,8 +230,8 @@ class Tacotron2Trainer(TTSTrainer):
                 transcription = random_utterance()
 
             # NOTE (Sam): treat global encoders equivalently.
-            if self.compute_gst:
-                gst_embedding = torch.FloatTensor(self.compute_gst([transcription]))
+            if self.with_gsts and not self.load_gsts:
+                gst_embedding = torch.FloatTensor(self.get_gst([transcription]))
             else:
                 gst_embedding = None
             # NOTE (Sam): audio_encoder of data points is logically like teacher forcing since it acts on the ys.

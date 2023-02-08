@@ -93,7 +93,6 @@ class Collate:
                 mel_padded[i, :, : mel.size(1)] = mel
                 gate_padded[i, mel.size(1) - 1 :] = 1
                 output_lengths[i] = mel.size(1)
-                print(mel.size(1), "asdf")
             if self.return_speaker_ids:
                 speaker_ids[i] = sample["speaker_id"]
             if self.return_f0s:

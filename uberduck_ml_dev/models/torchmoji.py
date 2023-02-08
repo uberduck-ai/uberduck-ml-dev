@@ -1651,9 +1651,7 @@ class TorchMoji(nn.Module):
             packed_input.batch_sizes,
         )
 
-        input_seqs, _ = pad_packed_sequence(
-            packed_input, batch_first=True, enforce_sorted=False
-        )
+        input_seqs, _ = pad_packed_sequence(packed_input, batch_first=True)
 
         x, att_weights = self.attention_layer(input_seqs, input_lengths)
 

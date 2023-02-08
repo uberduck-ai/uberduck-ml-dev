@@ -11,14 +11,13 @@ from speechbrain.pretrained import EncoderClassifier
 
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
-from ..data.batch import Batch
 from .base import TTSModel
 from ..vendor.tfcompat.hparam import HParams
 from .base import DEFAULTS as MODEL_DEFAULTS
-from .components.decoders.tacotron2 import Decoder, DecoderForwardIsInfer
-from .components.encoders.tacotron2 import Encoder, EncoderForwardIsInfer
+from .components.decoders.tacotron2 import Decoder
+from .components.encoders.tacotron2 import Encoder
 from .components.postnet import Postnet
-from .components.zero_network import ZeroNetwork
+from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 
 TEACHER_FORCED = "teacher-forced"
 LEFT_TEACHER_FORCED = "left-teacher-forced"
@@ -41,10 +40,10 @@ N_MEL_CHANNELS = 80
 ENGLISH_CLEANERS = "english_cleaners"
 
 DEFAULTS = HParams(
-    symbols_embedding_dim=512,
     fp16_run=False,
+    # Text parameters
+    symbols_embedding_dim=512,
     mask_padding=True,
-    n_mel_channels=N_MEL_CHANNELS,
     # encoder parameters
     encoder_kernel_size=5,
     encoder_n_convolutions=3,
@@ -53,7 +52,6 @@ DEFAULTS = HParams(
     coarse_n_frames_per_step=None,
     decoder_rnn_dim=1024,
     prenet_dim=256,
-    with_f0=False,
     max_decoder_steps=1000,
     gate_threshold=0.5,
     p_attention_dropout=0.1,
@@ -69,14 +67,13 @@ DEFAULTS = HParams(
     postnet_embedding_dim=512,
     postnet_kernel_size=5,
     postnet_n_convolutions=5,
-    n_speakers=1,
-    speaker_embedding_dim=128,
     # reference encoder
     ref_enc_filters=[32, 32, 64, 64, 128, 128],
     ref_enc_size=[3, 3],
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
     # Audio parameters
+    n_mel_channels=N_MEL_CHANNELS,
     filter_length=1024,
     hop_length=256,
     ref_enc_gru_size=128,
@@ -92,19 +89,18 @@ DEFAULTS = HParams(
     # TODO (Sam): Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     gst_type=None,
     with_gst=False,
-    load_gst=False,
-    compute_gst=False,
-    get_gst=None,
     gst_dim=2304,
-    torchmoji_model_file=None,
-    torchmoji_vocabulary_file=None,
+    # f0 parameters
+    with_f0=False,
     # Speaker encoder parameters
+    n_speakers=1,
+    speaker_embedding_dim=128,
     audio_encoder_dim=192,
     with_audio_encoding=False,
     audio_encoder_path=None,
     has_speaker_embedding=False,
     # Text parameters
-    symbol_set="nvidia_taco2",
+    symbol_set=NVIDIA_TACO2_SYMBOLS,  # should this be here?
     text_cleaners=[ENGLISH_CLEANERS],
 )
 
