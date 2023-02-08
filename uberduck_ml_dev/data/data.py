@@ -29,6 +29,7 @@ class Data(Dataset):
         audiopaths_and_text: Optional[
             str
         ] = None,  # TODO (Sam): consider removing triplicate audiopaths_and_text argument
+        oversample_weights=None,
         # Text parameters
         return_texts: bool = False,  # NOTE (Sam): maybe include include_texts parameter if text is ever inferred.
         texts: Optional[List[str]] = None,
@@ -37,8 +38,9 @@ class Data(Dataset):
         text_cleaners: Optional[List[str]] = "english_cleaners",
         p_arpabet: Optional[float] = 1.0,
         # Audio parameters
+        return_mels=True,
         audiopaths: Optional[List[str]] = None,
-        load_audio: bool = False,
+        load_audios: bool = False,
         n_mel_channels: Optional[int] = N_MEL_CHANNELS,
         sampling_rate: Optional[int] = 22050,
         mel_fmin: Optional[float] = 0.0,
@@ -51,15 +53,13 @@ class Data(Dataset):
         max_wav_value: Optional[float] = 32768.0,
         # Pitch parameters
         # TODO (Sam): consider use_f0 = load_f0 or compute_f0
-        return_f0: bool = False,
-        load_f0: bool = False,
-        compute_f0: Optional[bool] = False,
+        return_f0s: bool = False,
+        load_f0s: bool = False,
         f0_min: Optional[int] = 80,
         f0_max: Optional[int] = 880,
         # Torchmoji parameters
-        return_gst: bool = False,
-        load_gst=False,  # TODO (Sam): check this against existing crust models
-        compute_gst: bool = False,
+        return_gsts: bool = False,
+        load_gsts=False,  # TODO (Sam): check this against existing crust models
         get_gst=None,  # NOTE (Sam): this is a functional argument.
         # Speaker embedding parameters
         return_speaker_ids: bool = True,
@@ -74,26 +74,26 @@ class Data(Dataset):
         # oversample_weights: Optional[Dict] = None,  # TODO (Sam): type this.
     ):
         super().__init__()
-        # TODO (Sam): refactor support for oversampling to generic method.
-        if audiopaths_and_text:
-            oversample_weights = oversample_weights or {}
-            self.audiopaths_and_text = oversample(
-                load_filepaths_and_text(self.audiopaths_and_text), oversample_weights
-            )
-
-        self.return_texts = return_texts
-        self.load_texts = return_texts
-        self.load_audio = load_audio
-        self.load_f0 = load_f0
-        self.compute_f0 = compute_f0
-        self.load_gst = load_gst
-        self.compute_gst = compute_gst
-
-        self.load_speaker_ids = load_speaker_ids
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
 
-        if self.load_audio:
+        # TODO (Sam): refactor support for oversampling to make generic across data types.
+        if audiopaths_and_text:
+            oversample_weights = {}
+            self.audiopaths_and_text = oversample(
+                load_filepaths_and_text(audiopaths_and_text), oversample_weights
+            )
+
+        self.return_texts = return_texts
+        self.return_mels = return_mels
+        self.return_f0s = return_f0s
+        self.load_f0s = load_f0s
+        self.return_gsts = return_gsts
+        self.load_gsts = load_gsts
+        self.return_speaker_ids = return_speaker_ids
+        self.load_speaker_ids = load_speaker_ids
+
+        if self.return_mels:
             self.stft = MelSTFT(
                 filter_length=filter_length,
                 hop_length=hop_length,
@@ -116,7 +116,7 @@ class Data(Dataset):
             else:
                 self.audiopaths = audiopaths
 
-        if self.load_texts:
+        if self.return_texts:
             self.text_cleaners = text_cleaners
             self.p_arpabet = p_arpabet
             self.symbol_set = symbol_set
@@ -127,25 +127,28 @@ class Data(Dataset):
             else:
                 self.texts = texts
 
-        if self.load_f0 or self.compute_f0:
+        if self.return_f0s:
             # NOTE (Sam): its unclear if these are necessary for load_f0 only
             self.f0_min = f0_min
             self.f0_max = f0_max
 
-        if self.compute_gst:
+        if self.return_gsts and not self.load_gsts:
             self.get_gst = get_gst
 
         # NOTE (Sam): right now only old audiopaths_and_text based loading is supported.
-        if self.load_speaker_ids:
-            if self.audiopaths_and_text:
-                speaker_ids = [i[2] for i in self.audiopaths_and_text]
-                self._speaker_id_map = _orig_to_dense_speaker_id(speaker_ids)
+        # TODO (Sam): think more carefully about how the audio_encoder interface should work.
+        if self.return_speaker_ids:
+            if self.load_speaker_ids:
+                if self.audiopaths_and_text:
+                    speaker_ids = [i[2] for i in self.audiopaths_and_text]
+                    self._speaker_id_map = _orig_to_dense_speaker_id(speaker_ids)
+            # else could be speaker classification positions for example.
 
+        # NOTE (Sam): this is hacky and not consistent with other approaches.
         self.audio_encoder_forward = audio_encoder_forward
         self.speaker_embeddings = speaker_embeddings
 
-    # NOTE (Sam): this is the RADTTS version.
-    # RADTTS is more recent than mellotron from the same author so let's assume this method is better.
+    # NOTE (Sam): this is the RADTTS version - more recent than mellotron from the same author.
     # NOTE (Sam): in contrast to get_gst, the computation here is kept in this file rather than a functional argument.
     def _get_f0(self, audiopath, audio):
         filename = "_".join(audiopath.split("/")[-3:])
@@ -215,7 +218,7 @@ class Data(Dataset):
             audiopath, text, speaker_id = audiopath_and_text
         speaker_id = self._speaker_id_map[speaker_id]
 
-        if self.load_texts:
+        if self.return_texts:
             text_sequence = torch.LongTensor(
                 text_to_sequence(
                     text,
@@ -230,7 +233,7 @@ class Data(Dataset):
                 )  # add a blank token, whose id number is len(symbols)
             data["text_sequence"] = text_sequence
 
-        if self.load_audio:
+        if self.return_mels:
             sampling_rate, wav_data = read(audiopath)
             # NOTE (Sam): is this the right normalization?  Should it be done here or in preprocessing.
             audio = torch.FloatTensor(wav_data)
@@ -245,16 +248,18 @@ class Data(Dataset):
 
         # TODO (Sam): treat these covariates more equivalently
         f0 = None
-        if self.compute_f0:
-            f0 = self._get_f0(self, audio)
-            data["f0"] = f0
+        if self.return_f0s:
+            if not self.load_f0s:
+                f0 = self._get_f0(self, audio)
+                data["f0"] = f0
 
-        if self.load_speaker_ids:
+        if self.return_speaker_ids:
             data["speaker_id"] = speaker_id
 
-        if self.compute_gst:
-            embedded_gst = self._get_gst([text])
-            data["embedded_gst"] = embedded_gst
+        if self.return_gsts:
+            if not self.load_gsts:
+                embedded_gst = self._get_gst([text])
+                data["embedded_gst"] = embedded_gst
 
         if self.audio_encoder_forward is not None:
             # NOTE (Sam): hardcoded for now.

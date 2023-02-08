@@ -193,12 +193,11 @@ DEFAULTS = HParams(
     #     {"until_step": None, "batch_size": 16, "n_frames_per_step": 1},
     # ],
     batch_size=16,
-    decay_start=15000,
-    decay_rate=8000,
     fp16_run=False,
     steps_per_sample=100,
     weight_decay=1e-6,
     sample_inference_speaker_ids=None,
+    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
     is_validate=True,
     learning_rate=1e-3,
     epochs=10,
@@ -212,8 +211,7 @@ DEFAULTS = HParams(
     lr_decay_start=15000,
     lr_decay_rate=216000,
     lr_decay_min=1e-5,
-    sample_inference_speaker_ids=None,
-    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
+    pos_weight=None,
 )
 
 config = DEFAULTS.values()

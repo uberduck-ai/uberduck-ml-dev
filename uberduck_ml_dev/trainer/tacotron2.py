@@ -60,8 +60,13 @@ class Tacotron2Trainer(TTSTrainer):
         self.lr_decay_start = self.hparams.lr_decay_start
         self.lr_decay_rate = self.hparams.lr_decay_rate
         self.lr_decay_min = self.hparams.lr_decay_min
-        # NOTE (Sam): there is a lot of ambiguity in how to name and initialize audio / speaker encoder and torchmoji
+        # NOTE (Sam): historically there is ambiguity in how to name and initialize audio / speaker encoder and torchmoji
+        # TODO (Sam): move naming to include / load / get / return / with etc. convension.
         self.has_audio_encoder = self.hparams.audio_encoder_path is not None
+        self.with_f0s = self.hparams.with_f0s
+        self.load_f0s = self.hparams.load_f0s
+        self.load_gsts = self.hparams.load_gsts
+        self.with_gsts = self.hparams.with_gsts
 
         if hasattr(self.hparams, "speaker_embeddings_path"):
             # TODO (Sam): move this to "load" type method in Data.
@@ -670,12 +675,12 @@ class Tacotron2Trainer(TTSTrainer):
         return {
             "audiopaths_and_text": self.training_audiopaths_and_text,
             # Text parameters
-            "return_texts": self.return_texts,
+            "return_texts": True,
             "text_cleaners": self.text_cleaners,
             "symbol_set": self.symbol_set,
             "p_arpabet": self.p_arpabet,
             # Audio parameters
-            "return_mels": self.return_mels,
+            "return_mels": True,
             "n_mel_channels": self.n_mel_channels,
             "sampling_rate": self.sampling_rate,
             "mel_fmin": self.mel_fmin,
@@ -688,30 +693,35 @@ class Tacotron2Trainer(TTSTrainer):
             "audio_encoder_forward": self.audio_encoder_forward,
             "speaker_embeddings": self.speaker_embeddings,
             # F0 parameters
-            "return_f0": self.with_f0,
-            "load_f0": self.load_f0,
-            "compute_f0": self.compute_f0,
+            "return_f0s": self.with_f0s,
+            "load_f0s": self.load_f0s,
             # GST parameters
-            "return_gst": self.with_gst,
-            "load_gst": self.load_gst,
-            "compute_gst": self.compute_gst,
+            "return_gsts": self.with_gsts,
+            "load_gsts": self.load_gsts,
             "get_gst": self.get_gst,
         }
 
     @property
     def collate_args(self):
         return {
-            "return_f0s": self.with_f0,
-            "return_gsts": self.with_gst,
+            "return_f0s": self.with_f0s,
+            "return_gsts": self.with_gsts,
             "return_mels": True,
             "return_text_sequences": True,
-            "return_audio_encodings": self.with_audio_encoding,
+            "return_audio_encodings": self.has_audio_encoder,  # with_audio_encoding may be a better name
             "cudnn_enabled": self.cudnn_enabled,
-            "n_frames_per_step": self.n_frames_per_step,
         }
 
 
 config = TRAINER_DEFAULTS.values()
 config.update(TACOTRON2_DEFAULTS.values())
-config.update({"n_frames_per_step_initial": 1})
+config.update(
+    {
+        "load_f0s": False,
+        "load_gsts": False,
+        "with_f0s": False,
+        "with_gsts": False,
+        "get_gst": None,
+    }
+)
 DEFAULTS = HParams(**config)

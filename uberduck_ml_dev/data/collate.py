@@ -7,13 +7,14 @@ class Collate:
     def __init__(
         self,
         n_frames_per_step: int = 1,
+        cudnn_enabled: bool = False,
+        # NOTE (Sam): these used to be computed in every batch.
         return_f0s: bool = False,
         return_mels: bool = True,
         return_text_sequences: bool = True,
         return_speaker_ids: bool = True,
         return_gsts: bool = True,
         return_audio_encodings: bool = False,
-        cudnn_enabled: bool = False,
     ):
         self.n_frames_per_step = n_frames_per_step
         self.return_f0s = return_f0s
