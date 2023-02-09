@@ -19,6 +19,7 @@ from .components.encoders.tacotron2 import Encoder
 from .components.postnet import Postnet
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 from .common import WIN_LENGTH, HOP_LENGTH, SAMPLING_RATE, FILTER_LENGTH, N_MEL_CHANNELS
+
 TEACHER_FORCED = "teacher-forced"
 LEFT_TEACHER_FORCED = "left-teacher-forced"
 DOUBLE_TEACHER_FORCED = "double-teacher-forced"
@@ -84,7 +85,6 @@ DEFAULTS = HParams(
     mel_fmax=8000,
     mel_fmin=0,
     n_frames_per_step_initial=1,
-    win_length=1024,
     # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename.
     # TODO (Sam): Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     gst_type=None,
