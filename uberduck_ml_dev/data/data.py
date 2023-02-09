@@ -15,9 +15,18 @@ from ..utils.utils import (
 )
 from .utils import oversample, _orig_to_dense_speaker_id
 from ..text.util import text_to_sequence
-from ..models.common import FILTER_LENGTH, HOP_LENGTH, WIN_LENGTH
-from ..models.tacotron2 import N_MEL_CHANNELS
+from ..models.common import (
+    FILTER_LENGTH,
+    HOP_LENGTH,
+    WIN_LENGTH,
+    SAMPLING_RATE,
+    N_MEL_CHANNELS,
+)
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
+
+# TODO (Sam): move these to defaults
+F0_MIN = 80
+F0_MAX = 640
 
 # NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available)
 # However, factor out components of this dataloader (e.g. get mels, get pitch) and merging classes as needed would be preferable.
@@ -27,7 +36,7 @@ class Data(Dataset):
     def __init__(
         self,
         audiopaths_and_text: Optional[
-            str
+            List[str]
         ] = None,  # TODO (Sam): consider removing triplicate audiopaths_and_text argument
         oversample_weights=None,
         # Text parameters
@@ -40,7 +49,6 @@ class Data(Dataset):
         # Audio parameters
         return_mels=True,
         audiopaths: Optional[List[str]] = None,
-        load_audios: bool = False,
         n_mel_channels: Optional[int] = N_MEL_CHANNELS,
         sampling_rate: Optional[int] = 22050,
         mel_fmin: Optional[float] = 0.0,
@@ -54,9 +62,11 @@ class Data(Dataset):
         # Pitch parameters
         # TODO (Sam): consider use_f0 = load_f0 or compute_f0
         return_f0s: bool = False,
+        f0_cache_path: Optional[str] = None,
+        use_log_f0: Optional[bool] = True,
         load_f0s: bool = False,
-        f0_min: Optional[int] = 80,
-        f0_max: Optional[int] = 880,
+        f0_min: Optional[int] = F0_MIN,
+        f0_max: Optional[int] = F0_MAX,
         # Torchmoji parameters
         return_gsts: bool = False,
         load_gsts=False,  # TODO (Sam): check this against existing crust models
@@ -83,15 +93,31 @@ class Data(Dataset):
             self.audiopaths_and_text = oversample(
                 load_filepaths_and_text(audiopaths_and_text), oversample_weights
             )
+        if hasattr(self, "audiopaths_and_text"):
+            self.audiopaths = [i[0] for i in self.audiopaths_and_text]
+        else:
+            self.audiopaths = audiopaths
 
+        # TODO (Sam): make this assignment automatic
         self.return_texts = return_texts
         self.return_mels = return_mels
         self.return_f0s = return_f0s
+        self.f0_cache_path = f0_cache_path
         self.load_f0s = load_f0s
         self.return_gsts = return_gsts
         self.load_gsts = load_gsts
         self.return_speaker_ids = return_speaker_ids
         self.load_speaker_ids = load_speaker_ids
+        # NOTE (Sam): these are somewhat nongeneric parameters to audio loading
+        # It isn't clear how to handle them for both text inference and pitch saving.
+        self.sampling_rate = sampling_rate
+        self.filter_length = filter_length
+        self.hop_length = hop_length
+        self.max_wav_value = max_wav_value
+        # NOTE (Sam): its unclear if these are necessary for load_f0 only
+        self.f0_min = f0_min
+        self.f0_max = f0_max
+        self.use_log_f0 = use_log_f0
 
         if self.return_mels:
             self.stft = MelSTFT(
@@ -105,16 +131,9 @@ class Data(Dataset):
                 padding=padding,
             )
             self.max_wav_value = max_wav_value
-            self.sampling_rate = sampling_rate
-            self.filter_length = filter_length
-            self.hop_length = hop_length
+
             self.mel_fmin = mel_fmin
             self.mel_fmax = mel_fmax
-
-            if self.audiopaths_and_text:
-                self.audiopaths = [i[0] for i in self.audiopaths_and_text]
-            else:
-                self.audiopaths = audiopaths
 
         if self.return_texts:
             self.text_cleaners = text_cleaners
@@ -122,24 +141,22 @@ class Data(Dataset):
             self.symbol_set = symbol_set
             self.intersperse_text = intersperse_text
             self.intersperse_token = intersperse_token
-            if self.audiopaths_and_text:
+            # NOTE (Sam): this could be moved outside of return text if text statistics analogous to text as f0 is to audio are computed.
+            if hasattr(self, "audiopaths_and_text"):
                 self.texts = [i[1] for i in self.audiopaths_and_text]
             else:
                 self.texts = texts
 
-        if self.return_f0s:
-            # NOTE (Sam): its unclear if these are necessary for load_f0 only
-            self.f0_min = f0_min
-            self.f0_max = f0_max
-
         if self.return_gsts and not self.load_gsts:
             self.get_gst = get_gst
 
+        if self.return_f0s:
+            os.makedirs(self.f0_cache_path, exist_ok=True)
         # NOTE (Sam): right now only old audiopaths_and_text based loading is supported.
         # TODO (Sam): think more carefully about how the audio_encoder interface should work.
         if self.return_speaker_ids:
             if self.load_speaker_ids:
-                if self.audiopaths_and_text:
+                if hasattr(self, "audiopaths_and_text"):
                     speaker_ids = [i[2] for i in self.audiopaths_and_text]
                     self._speaker_id_map = _orig_to_dense_speaker_id(speaker_ids)
             # else could be speaker classification positions for example.
@@ -152,7 +169,7 @@ class Data(Dataset):
     # NOTE (Sam): in contrast to get_gst, the computation here is kept in this file rather than a functional argument.
     def _get_f0(self, audiopath, audio):
         filename = "_".join(audiopath.split("/")[-3:])
-        f0_path = os.path.join(self.betabinom_cache_path, filename)
+        f0_path = os.path.join(self.f0_cache_path, filename)
         f0_path += "_f0_sr{}_fl{}_hl{}_f0min{}_f0max{}_log{}.pt".format(
             self.sampling_rate,
             self.filter_length,
@@ -162,6 +179,7 @@ class Data(Dataset):
             self.use_log_f0,
         )
 
+        # NOTE (Sam): this is inhereted from RAD TTS and redundant with load_f0 syntax.
         dikt = None
         if os.path.exists(f0_path):
             try:
@@ -191,13 +209,16 @@ class Data(Dataset):
             raise Exception("STOP, BROKEN F0 {}".format(audiopath))
 
         f0 = self.f0_normalize(f0)
-        if self.distance_tx_unvoiced:
-            mask = f0 <= 0.0
-            distance_map = np.log(distance_transform(mask))
-            distance_map[distance_map <= 0] = 0.0
-            f0 = f0 - distance_map
 
         return f0
+
+    def f0_normalize(self, x):
+        if self.use_log_f0:
+            mask = x >= self.f0_min
+            x[mask] = torch.log(x[mask])
+            x[~mask] = 0.0
+
+        return x
 
     # TODO (Sam): rename this!
     def _get_gst(self, text):
@@ -216,7 +237,8 @@ class Data(Dataset):
         data = {}
         if audiopath_and_text is not None:
             audiopath, text, speaker_id = audiopath_and_text
-        speaker_id = self._speaker_id_map[speaker_id]
+        if speaker_id is not None:
+            speaker_id = self._speaker_id_map[speaker_id]
 
         if self.return_texts:
             text_sequence = torch.LongTensor(
@@ -233,7 +255,7 @@ class Data(Dataset):
                 )  # add a blank token, whose id number is len(symbols)
             data["text_sequence"] = text_sequence
 
-        if self.return_mels:
+        if audiopath is not None:
             sampling_rate, wav_data = read(audiopath)
             # NOTE (Sam): is this the right normalization?  Should it be done here or in preprocessing.
             audio = torch.FloatTensor(wav_data)
@@ -241,6 +263,8 @@ class Data(Dataset):
                 np.abs(audio).max() * 2
             )  # NOTE (Sam): just must be < 1.
             audio_norm = audio_norm.unsqueeze(0)
+
+        if self.return_mels:
 
             melspec = self.stft.mel_spectrogram(audio_norm)
             melspec = torch.squeeze(melspec, 0)
@@ -250,7 +274,8 @@ class Data(Dataset):
         f0 = None
         if self.return_f0s:
             if not self.load_f0s:
-                f0 = self._get_f0(self, audio)
+                assert audiopath is not None
+                f0 = self._get_f0(audiopath, audio_norm[0])
                 data["f0"] = f0
 
         if self.return_speaker_ids:
@@ -269,15 +294,15 @@ class Data(Dataset):
         return data
 
     def __getitem__(self, idx):
-        """Return data for a single audio file + transcription."""
+        """Return data for a single data point."""
         try:
-            if self.audiopaths_and_text:
+
+            if hasattr(self, "audiopaths_and_text"):
                 data = self._get_data(self.audiopaths_and_text[idx])
-            else:
+            # NOTE (Sam): accomodate more options as needed.
+            elif hasattr(self, "audiopaths"):
                 data = self._get_data(
                     audiopath=self.audiopaths[idx],
-                    text=self.texts[idx],
-                    speaker_id=self.speaker_ids[idx],
                 )
         except Exception as e:
             print(f"Error while getting data: index = {idx}")
@@ -286,9 +311,20 @@ class Data(Dataset):
         return data
 
     def __len__(self):
+
         if self.debug and self.debug_dataset_size:
-            return min(self.debug_dataset_size, len(self.audiopaths_and_text))
-        return len(self.audiopaths_and_text)
+            debug_dataset_size = self.debug_dataset_size
+        # TODO (Sam): this is a bit unfinished. Assert equals for separate arguments of text and audio.
+        nfiles = []
+        if hasattr(self, "audiopaths_and_text"):
+            nfiles.append(len(self.audiopaths_and_text))
+        elif hasattr(self, "audiopaths"):
+            nfiles.append(len(self.audiopaths))
+        assert len(set(nfiles)) == 1, "All dataset sizes must be equal"
+        nfiles = nfiles[0]
+        if self.debug and self.debug_dataset_size:
+            return min(debug_dataset_size, nfiles)
+        return nfiles
 
     def sample_test_batch(self, size):
         idx = np.random.choice(range(len(self)), size=size, replace=False)
@@ -300,16 +336,17 @@ class Data(Dataset):
     def get_f0_pvoiced(
         self,
         audio,
-        sampling_rate=22050,
-        frame_length=1024,
-        hop_length=256,
-        f0_min=100,
-        f0_max=300,
+        sampling_rate=SAMPLING_RATE,
+        frame_length=FILTER_LENGTH,
+        hop_length=HOP_LENGTH,
+        f0_min=F0_MIN,
+        f0_max=F0_MAX,
     ):
 
-        audio_norm = audio / self.max_wav_value
+        # audio_norm = audio / self.max_wav_value
         f0, voiced_mask, p_voiced = pyin(
-            audio_norm,
+            # audio_norm,
+            audio,
             f0_min,
             f0_max,
             sampling_rate,

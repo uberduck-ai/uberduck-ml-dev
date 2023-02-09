@@ -449,8 +449,6 @@ class Tacotron2Trainer(TTSTrainer):
 
         start_time, previous_start_time = time.perf_counter(), time.perf_counter()
         for epoch in range(start_epoch, self.epochs):
-            if self.distributed_run:
-                sampler.set_epoch(epoch)
             for batch_idx, batch in enumerate(train_loader):
                 self.global_step += 1
 
@@ -706,11 +704,6 @@ class Tacotron2Trainer(TTSTrainer):
     @property
     def collate_args(self):
         return {
-            "return_f0s": self.with_f0s,
-            "return_gsts": self.with_gsts,
-            "return_mels": True,
-            "return_text_sequences": True,
-            "return_audio_encodings": self.has_audio_encoder,  # with_audio_encoding may be a better name
             "cudnn_enabled": self.cudnn_enabled,
         }
 

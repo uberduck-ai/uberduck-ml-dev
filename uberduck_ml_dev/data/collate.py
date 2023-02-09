@@ -8,21 +8,8 @@ class Collate:
         self,
         n_frames_per_step: int = 1,
         cudnn_enabled: bool = False,
-        # NOTE (Sam): these used to be computed in every batch.
-        return_f0s: bool = False,
-        return_mels: bool = True,
-        return_text_sequences: bool = True,
-        return_speaker_ids: bool = True,
-        return_gsts: bool = False,
-        return_audio_encodings: bool = False,
     ):
         self.n_frames_per_step = n_frames_per_step
-        self.return_f0s = return_f0s
-        self.return_mels = return_mels
-        self.return_text_sequences = return_text_sequences
-        self.return_speaker_ids = return_speaker_ids
-        self.return_gsts = return_gsts
-        self.return_audio_encodings = return_audio_encodings
         self.cudnn_enabled = cudnn_enabled
 
     def set_frames_per_step(self, n_frames_per_step):
@@ -43,17 +30,24 @@ class Collate:
         ------
         """
 
-        input_lengths = torch.LongTensor([len(x["text_sequence"]) for x in batch])
-        max_input_len = max(input_lengths)
-        n_mel_channels = batch[0]["mel"].size(0)
-        max_target_len = max([x["mel"].size(1) for x in batch])
-        if self.return_text_sequences:
+        return_f0s = "f0" in batch[0]
+        return_mels = "mel" in batch[0]
+        return_text_sequences = "text_sequence" in batch[0]
+        return_speaker_ids = "speaker_id" in batch[0]
+        return_gsts = "embedded_gst" in batch[0]
+        return_audio_encodings = "audio_encoding" in batch[0]
+
+        if return_text_sequences:
+            input_lengths = torch.LongTensor([len(x["text_sequence"]) for x in batch])
+            max_input_len = max(input_lengths)
             text_padded = torch.LongTensor(len(batch), max_input_len)
             text_padded.zero_()
         else:
             text_padded = None
-
-        if self.return_mels:
+            input_lengths = None
+        if return_mels:
+            n_mel_channels = batch[0]["mel"].size(0)
+            max_target_len = max([x["mel"].size(1) for x in batch])
             mel_padded = torch.FloatTensor(len(batch), n_mel_channels, max_target_len)
             mel_padded.zero_()
             output_lengths = torch.LongTensor(len(batch))
@@ -64,23 +58,25 @@ class Collate:
             output_lengths = None
             gate_padded = None
 
-        if self.return_speaker_ids:
+        if return_speaker_ids:
             speaker_ids = torch.LongTensor(len(batch))
         else:
             speaker_ids = None
-        if self.return_f0s:
+        # TODO (Sam): add f0.
+        if return_f0s:
+            max_target_len = max([x["f0"].size(0) for x in batch])
             f0_padded = torch.FloatTensor(len(batch), 1, max_target_len)
             f0_padded.zero_()
         else:
             f0_padded = None
-        if self.return_gsts:
+        if return_gsts:
             embedded_gsts = torch.FloatTensor(
                 np.array([sample["embedded_gst"] for sample in batch])
             )
         else:
             embedded_gsts = None
 
-        if self.return_audio_encodings:
+        if return_audio_encodings:
             audio_encodings = torch.FloatTensor(
                 torch.cat([sample["audio_encoding"] for sample in batch])
             )
@@ -88,20 +84,19 @@ class Collate:
             audio_encodings = None
 
         for i, sample in enumerate(batch):
-            if self.return_mels:
+            if return_mels:
                 mel = sample["mel"]
                 mel_padded[i, :, : mel.size(1)] = mel
                 gate_padded[i, mel.size(1) - 1 :] = 1
                 output_lengths[i] = mel.size(1)
-            if self.return_speaker_ids:
+            if return_speaker_ids:
                 speaker_ids[i] = sample["speaker_id"]
-            if self.return_f0s:
-                f0_padded[i, :, : mel.size(1)] = sample["f0"]
-            if self.return_text_sequences:
+            if return_f0s:
+                f0 = sample["f0"]
+                f0_padded[i, :, : f0.size(0)] = f0
+            if return_text_sequences:
                 text = sample["text_sequence"]
                 text_padded[i, : text.size(0)] = text
-            else:
-                text_padded = None
 
         output = Batch(
             text_int_padded=text_padded,

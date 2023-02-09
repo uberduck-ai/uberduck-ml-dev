@@ -107,9 +107,12 @@ class LocationLayer(nn.Module):
         processed_attention = self.location_dense(processed_attention)
         return processed_attention
 
+
 FILTER_LENGTH = 1024
 HOP_LENGTH = 256
 WIN_LENGTH = 1024
+N_MEL_CHANNELS = 80
+SAMPLING_RATE = 22050
 # NOTE (Sam): STFTs should get their own file in common folder
 class STFT:
     """adapted from Prem Seetharaman's https://github.com/pseeth/pytorch-stft"""
@@ -259,11 +262,11 @@ class STFT:
 class MelSTFT:
     def __init__(
         self,
-        filter_length=1024,
-        hop_length=256,
+        filter_length=FILTER_LENGTH,
+        hop_length=HOP_LENGTH,
         win_length=1024,
-        n_mel_channels=80,
-        sampling_rate=22050,
+        n_mel_channels=N_MEL_CHANNELS,
+        sampling_rate=SAMPLING_RATE,
         mel_fmin=0.0,
         mel_fmax=8000.0,
         device="cpu",

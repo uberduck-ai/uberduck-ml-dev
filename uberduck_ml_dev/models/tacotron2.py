@@ -18,7 +18,7 @@ from .components.decoders.tacotron2 import Decoder
 from .components.encoders.tacotron2 import Encoder
 from .components.postnet import Postnet
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
-
+from .common import WIN_LENGTH, HOP_LENGTH, SAMPLING_RATE, FILTER_LENGTH, N_MEL_CHANNELS
 TEACHER_FORCED = "teacher-forced"
 LEFT_TEACHER_FORCED = "left-teacher-forced"
 DOUBLE_TEACHER_FORCED = "double-teacher-forced"
@@ -36,7 +36,6 @@ SPEAKER_ENCODER = "speaker_encoder"
 TORCHMOJI_ENCODER = "torchmoji_encoder"
 AUDIO_ENCODER = "audio_encoder"
 GLOBAL_ENCODERS = [SPEAKER_ENCODER, TORCHMOJI_ENCODER, AUDIO_ENCODER]
-N_MEL_CHANNELS = 80
 ENGLISH_CLEANERS = "english_cleaners"
 
 DEFAULTS = HParams(
@@ -73,12 +72,13 @@ DEFAULTS = HParams(
     ref_enc_strides=[2, 2],
     ref_enc_pad=[1, 1],
     # Audio parameters
-    n_mel_channels=N_MEL_CHANNELS,
-    filter_length=1024,
-    hop_length=256,
     ref_enc_gru_size=128,
     num_heads=8,
-    sampling_rate=22050,
+    sampling_rate=SAMPLING_RATE,
+    n_mel_channels=N_MEL_CHANNELS,
+    hop_length=HOP_LENGTH,
+    win_length=WIN_LENGTH,
+    filter_length=FILTER_LENGTH,
     checkpoint_name=None,
     max_wav_value=32768.0,
     mel_fmax=8000,
