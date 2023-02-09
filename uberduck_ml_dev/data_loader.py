@@ -3,17 +3,14 @@ __all__ = [
     "prepare_input_sequence",
 ]
 
+# TODO (Sam): move these to text.
 
-from typing import List
-
-import numpy as np
 import torch
 
 from .text.symbols import (
     NVIDIA_TACO2_SYMBOLS,
 )
 from .text.util import text_to_sequence
-from .data.batch import Batch
 
 
 def pad_sequences(batch):
@@ -27,16 +24,6 @@ def pad_sequences(batch):
         text_padded[i, : text.size(0)] = text
 
     return text_padded, input_lengths
-
-
-# def map_text_encodings(encoding_1, encoding_2):
-#     """Create a matrix associating graphemes/phonemes in encoding_1 with graphemes/phonemes in encoding_2."""
-#     if set([encoding_1, encoding_2]) == set([TALKNET_SYMBOLS, NVIDIA_TACO2_SYMBOLS])
-#         encoding_map = torch.zeros(len(TALKNET_SYMBOLS), len(NVIDIA_TACO2_SYMBOLS))
-#         if encoding_2 == NVIDIA_TACO2_SYMBOLS:
-#             return encoding_map.t()
-#         else:
-#             return encoding_map
 
 
 def prepare_input_sequence(

@@ -113,6 +113,7 @@ HOP_LENGTH = 256
 WIN_LENGTH = 1024
 N_MEL_CHANNELS = 80
 SAMPLING_RATE = 22050
+
 # NOTE (Sam): STFTs should get their own file in common folder
 class STFT:
     """adapted from Prem Seetharaman's https://github.com/pseeth/pytorch-stft"""
@@ -259,16 +260,20 @@ class STFT:
         return reconstruction
 
 
+MEL_FMIN = 0.0
+MEL_FMAX = 8000.0
+
+
 class MelSTFT:
     def __init__(
         self,
         filter_length=FILTER_LENGTH,
         hop_length=HOP_LENGTH,
-        win_length=1024,
+        win_length=WIN_LENGTH,
         n_mel_channels=N_MEL_CHANNELS,
         sampling_rate=SAMPLING_RATE,
-        mel_fmin=0.0,
-        mel_fmax=8000.0,
+        mel_fmin=MEL_FMIN,
+        mel_fmax=MEL_FMAX,
         device="cpu",
         padding=None,
         rank=None,

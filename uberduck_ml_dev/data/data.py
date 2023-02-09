@@ -24,14 +24,12 @@ from ..models.common import (
 )
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 
-# TODO (Sam): move these to defaults
 F0_MIN = 80
 F0_MAX = 640
 
-# NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available)
-# However, factor out components of this dataloader (e.g. get mels, get pitch) and merging classes as needed would be preferable.
-# e.g. https://www.daniweb.com/programming/software-development/code/283396/merging-class-instances although I'm not quite sure.
-# NOTE (Sam): "load" means load from file, "compute" means compute in dataloader.
+# NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available).
+# However, functional factorization of this dataloader (e.g. get_mels) and merging classes as needed would be preferable.
+# NOTE (Sam): "load" means load from file. "return" means return to collate. "get" is a functional element.  "has" and "with" are tbd equivalent in trainer/model.
 class Data(Dataset):
     def __init__(
         self,
@@ -75,19 +73,19 @@ class Data(Dataset):
         return_speaker_ids: bool = True,
         load_speaker_ids: bool = True,
         speaker_ids: Optional[List[str]] = None,
-        # TODO (Sam): add include/compute syntax to these embeddings.  They are an alternative to load_speaker_ids
+        # TODO (Sam): extend include/compute syntax to these embeddings.
         audio_encoder_forward=None,
         speaker_embeddings=None,
         # Control parameters
         debug: bool = False,
-        debug_dataset_size: int = None,  # NOTE (Sam): is this optional?
-        # oversample_weights: Optional[Dict] = None,  # TODO (Sam): type this.
+        debug_dataset_size: int = None,
     ):
         super().__init__()
         self.debug = debug
         self.debug_dataset_size = debug_dataset_size
 
         # TODO (Sam): refactor support for oversampling to make generic across data types.
+        # NOTE (Sam): right now only old audiopaths_and_text based loading is supported for training.
         if audiopaths_and_text:
             oversample_weights = {}
             self.audiopaths_and_text = oversample(
@@ -108,13 +106,11 @@ class Data(Dataset):
         self.load_gsts = load_gsts
         self.return_speaker_ids = return_speaker_ids
         self.load_speaker_ids = load_speaker_ids
-        # NOTE (Sam): these are somewhat nongeneric parameters to audio loading
-        # It isn't clear how to handle them for both text inference and pitch saving.
+        # NOTE (Sam): these are parameters for both audio loading and inference.
         self.sampling_rate = sampling_rate
         self.filter_length = filter_length
         self.hop_length = hop_length
         self.max_wav_value = max_wav_value
-        # NOTE (Sam): its unclear if these are necessary for load_f0 only
         self.f0_min = f0_min
         self.f0_max = f0_max
         self.use_log_f0 = use_log_f0
@@ -152,8 +148,7 @@ class Data(Dataset):
 
         if self.return_f0s:
             os.makedirs(self.f0_cache_path, exist_ok=True)
-        # NOTE (Sam): right now only old audiopaths_and_text based loading is supported.
-        # TODO (Sam): think more carefully about how the audio_encoder interface should work.
+
         if self.return_speaker_ids:
             if self.load_speaker_ids:
                 if hasattr(self, "audiopaths_and_text"):
@@ -220,10 +215,6 @@ class Data(Dataset):
 
         return x
 
-    # TODO (Sam): rename this!
-    def _get_gst(self, text):
-        return self.get_gst(text)
-
     def _get_audio_encoding(self, audio):
         return self.audio_encoder_forward(audio)
 
@@ -270,7 +261,6 @@ class Data(Dataset):
             melspec = torch.squeeze(melspec, 0)
             data["mel"] = melspec
 
-        # TODO (Sam): treat these covariates more equivalently
         f0 = None
         if self.return_f0s:
             if not self.load_f0s:
@@ -283,11 +273,11 @@ class Data(Dataset):
 
         if self.return_gsts:
             if not self.load_gsts:
-                embedded_gst = self._get_gst([text])
+                embedded_gst = self.get_gst([text])
                 data["embedded_gst"] = embedded_gst
 
         if self.audio_encoder_forward is not None:
-            # NOTE (Sam): hardcoded for now.
+            # NOTE (Sam): hardcoded for now for single speaker.
             audio_encoding = rearrange(self.speaker_embeddings, "o s -> 1 o s")
             data["audio_encoding"] = audio_encoding
 
@@ -299,7 +289,7 @@ class Data(Dataset):
 
             if hasattr(self, "audiopaths_and_text"):
                 data = self._get_data(self.audiopaths_and_text[idx])
-            # NOTE (Sam): accomodate more options as needed.
+            # TODO (Sam): accomodate more options as needed.
             elif hasattr(self, "audiopaths"):
                 data = self._get_data(
                     audiopath=self.audiopaths[idx],
@@ -343,9 +333,7 @@ class Data(Dataset):
         f0_max=F0_MAX,
     ):
 
-        # audio_norm = audio / self.max_wav_value
         f0, voiced_mask, p_voiced = pyin(
-            # audio_norm,
             audio,
             f0_min,
             f0_max,

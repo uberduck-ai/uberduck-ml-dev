@@ -60,8 +60,8 @@ class Tacotron2Trainer(TTSTrainer):
         self.lr_decay_start = self.hparams.lr_decay_start
         self.lr_decay_rate = self.hparams.lr_decay_rate
         self.lr_decay_min = self.hparams.lr_decay_min
-        # NOTE (Sam): historically there is ambiguity in how to name and initialize audio / speaker encoder and torchmoji
-        # TODO (Sam): move naming to include / load / get / return / with etc. convension.
+        # NOTE (Sam): there is ambiguity in naming and loading of model arguments.
+        # TODO (Sam): move naming to load / get / return / (with = has) etc. convention.
         self.has_audio_encoder = self.hparams.audio_encoder_path is not None
         self.with_f0s = self.hparams.with_f0s
         self.load_f0s = self.hparams.load_f0s
@@ -394,7 +394,7 @@ class Tacotron2Trainer(TTSTrainer):
             ),
         )
 
-    def initialize_loader(self, include_f0: bool = False, n_frames_per_step: int = 1):
+    def initialize_loader(self):
         train_set = Data(
             **self.training_dataset_args,
             debug=self.debug,

@@ -62,7 +62,6 @@ class Collate:
             speaker_ids = torch.LongTensor(len(batch))
         else:
             speaker_ids = None
-        # TODO (Sam): add f0.
         if return_f0s:
             max_target_len = max([x["f0"].size(0) for x in batch])
             f0_padded = torch.FloatTensor(len(batch), 1, max_target_len)

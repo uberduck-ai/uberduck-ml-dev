@@ -18,7 +18,15 @@ from .components.decoders.tacotron2 import Decoder
 from .components.encoders.tacotron2 import Encoder
 from .components.postnet import Postnet
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
-from .common import WIN_LENGTH, HOP_LENGTH, SAMPLING_RATE, FILTER_LENGTH, N_MEL_CHANNELS
+from .common import (
+    WIN_LENGTH,
+    HOP_LENGTH,
+    SAMPLING_RATE,
+    FILTER_LENGTH,
+    N_MEL_CHANNELS,
+    MEL_FMAX,
+    MEL_FMIN,
+)
 
 TEACHER_FORCED = "teacher-forced"
 LEFT_TEACHER_FORCED = "left-teacher-forced"
@@ -38,6 +46,7 @@ TORCHMOJI_ENCODER = "torchmoji_encoder"
 AUDIO_ENCODER = "audio_encoder"
 GLOBAL_ENCODERS = [SPEAKER_ENCODER, TORCHMOJI_ENCODER, AUDIO_ENCODER]
 ENGLISH_CLEANERS = "english_cleaners"
+MAX_WAV_VALUE = 32768.0
 
 DEFAULTS = HParams(
     fp16_run=False,
@@ -81,9 +90,9 @@ DEFAULTS = HParams(
     win_length=WIN_LENGTH,
     filter_length=FILTER_LENGTH,
     checkpoint_name=None,
-    max_wav_value=32768.0,
-    mel_fmax=8000,
-    mel_fmin=0,
+    max_wav_value=MAX_WAV_VALUE,
+    mel_fmax=MEL_FMAX,
+    mel_fmin=MEL_FMIN,
     n_frames_per_step_initial=1,
     # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename.
     # TODO (Sam): Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
