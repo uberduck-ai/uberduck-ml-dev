@@ -1,6 +1,7 @@
 import pandas as pd
 import torch
 
+import ray
 from ray.air import session, Checkpoint
 from ray.air.config import ScalingConfig
 import ray.train as train
@@ -13,9 +14,11 @@ from uberduck_ml_dev.losses import Tacotron2Loss
 from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS
 from uberduck_ml_dev.data.collate import Collate
 
+ray.init("ray://uberduck-1")
 
-# config = TACOTRON2_TRAINER_DEFAULTS.values()
-# config["with_gsts"] = False
+
+config = DEFAULTS.values()
+config["with_gsts"] = False
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
@@ -81,7 +84,7 @@ if __name__ == "__main__":
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={"lr": 1e-3, "batch_size": 16, "epochs": 1},
-        scaling_config=ScalingConfig(num_workers=1, use_gpu=True),
+        scaling_config=ScalingConfig(num_workers=4, use_gpu=True),
         datasets={"train": ray_dataset},
     )
     result = trainer.fit()
