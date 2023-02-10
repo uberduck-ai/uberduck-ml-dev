@@ -14,7 +14,7 @@ from ..utils.utils import (
     intersperse,
 )
 from .utils import oversample, _orig_to_dense_speaker_id
-from ..text.util import text_to_sequence
+from ..text.utils import text_to_sequence
 from ..models.common import (
     FILTER_LENGTH,
     HOP_LENGTH,

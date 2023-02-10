@@ -27,7 +27,7 @@ from ..utils.plot import (
     plot_gate_outputs,
     plot_spectrogram,
 )
-from ..text.util import text_to_sequence, random_utterance
+from ..text.utils import text_to_sequence, random_utterance
 from .base import TTSTrainer
 from ..losses import Tacotron2Loss
 from ..data.data import Data
