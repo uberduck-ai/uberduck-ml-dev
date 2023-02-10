@@ -1,6 +1,7 @@
 import pandas as pd
 import torch
 
+import ray
 from ray.air import session, Checkpoint
 from ray.air.config import ScalingConfig
 import ray.train as train
@@ -9,12 +10,14 @@ import ray.data
 from ray.data.datasource import FastFileMetadataProvider
 
 # from ..trainer.tacotron2 import Tacotron2Trainer, DEFAULTS as TACOTRON2_TRAINER_DEFAULTS
-from ..losses import Tacotron2Loss
+from uberduck_ml_dev.losses import Tacotron2Loss
 from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS
 from uberduck_ml_dev.data.collate import Collate
 
+ray.init("ray://uberduck-1")
 
-config = TACOTRON2_TRAINER_DEFAULTS.values()
+
+config = DEFAULTS.values()
 config["with_gsts"] = False
 
 def get_ray_dataset():
@@ -25,6 +28,7 @@ def get_ray_dataset():
         header=None,
         names=["path", "transcript"],
     )
+    lj_df = lj_df.head(100)
     paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
     transcripts = lj_df.transcript.tolist()
 
@@ -38,7 +42,7 @@ def get_ray_dataset():
     audio_ds = audio_ds.map_batches(lambda x:x, batch_format="pyarrow", batch_size=None)
     transcripts_ds = transcripts_ds.map_batches(lambda x:x, batch_format="pyarrow", batch_size=None)
 
-    ouput_dataset = transcripts_ds.zip(audio_ds)
+    output_dataset = transcripts_ds.zip(audio_ds)
     return output_dataset
 
 
@@ -79,7 +83,7 @@ if __name__ == "__main__":
     ray_dataset = get_ray_dataset()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={"lr": 1e-3, "batch_size": 16, "epochs" 1},
+        train_loop_config={"lr": 1e-3, "batch_size": 16, "epochs": 1},
         scaling_config=ScalingConfig(num_workers=4, use_gpu=True),
         datasets={"train": ray_dataset},
     )
