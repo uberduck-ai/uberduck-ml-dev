@@ -13,8 +13,9 @@ from ray.data.datasource import FastFileMetadataProvider
 from uberduck_ml_dev.losses import Tacotron2Loss
 from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS
 from uberduck_ml_dev.data.collate import Collate
+from uberduck_ml_dev.data.batch import Batch
 
-ray.init("ray://uberduck-1")
+# ray.init("ray://uberduck-1")
 
 
 config = DEFAULTS.values()
@@ -52,23 +53,22 @@ def train_func(config: dict):
     epochs = config["epochs"]
     batch_size_per_worker = batch_size // session.get_world_size()
     is_cuda = torch.cuda.is_available()
-
-    criterion = Tacotron2Loss(
-        pos_weight=DEFAULTS.pos_weight
-    )  # keep higher than 5 to make clips not stretch on
+    # keep pos_weight higher than 5 to make clips not stretch on
+    criterion = Tacotron2Loss(pos_weight=None)
     model = Tacotron2(DEFAULTS)
     model = train.torch.prepare_model(model)
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=lr,
-        weight_decay=DEFAULTS.weight_decay,
+        weight_decay=1e-6,
     )
     collate_fn = Collate(cudnn_enabled=is_cuda)
     dataset_shard = session.get_dataset_shard("train")
     for epoch in range(epochs):
         model.train()
-        for batches in dataset_shard.iter_torch_batches(batch_size=batch_size):
+        for batch in dataset_shard.iter_batches(batch_size=batch_size):
             print("batch")
+            print(type(batch))
         session.report(
             {},
             checkpoint=Checkpoint.from_dict(
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={"lr": 1e-3, "batch_size": 16, "epochs": 1},
-        scaling_config=ScalingConfig(num_workers=4, use_gpu=True),
+        scaling_config=ScalingConfig(num_workers=2, use_gpu=True),
         datasets={"train": ray_dataset},
     )
     result = trainer.fit()
