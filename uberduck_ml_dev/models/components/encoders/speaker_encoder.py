@@ -10,6 +10,7 @@ from einops import rearrange
 def get_speaker_encoding_for_dataset(
     speaker_encoding_path, filelist_path, embedding_dim, speaker_encoder_path
 ):
+    # NOTE (Sam): this will not work rn unless the model has already been downloaded.
     classifier = EncoderClassifier.from_hparams(source=speaker_encoder_path)
 
     audio_file_paths = pd.read_csv(filelist_path, header=None, sep="|")[0]

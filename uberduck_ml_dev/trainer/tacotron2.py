@@ -7,11 +7,9 @@ import torch
 
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-from torch.cuda.amp import GradScaler
-from torch.nn.parallel import DistributedDataParallel as DDP
 from speechbrain.pretrained import EncoderClassifier
 
-from ..data_loader import TextMelDataset, TextMelCollate
+from ..data.collate import Collate
 from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
 from ..utils.utils import reduce_tensor
@@ -31,8 +29,8 @@ from ..utils.plot import (
 )
 from ..text.util import text_to_sequence, random_utterance
 from .base import TTSTrainer
-from ..data_loader import TextMelDataset, TextMelCollate
 from ..losses import Tacotron2Loss
+from ..data.data import Data
 
 
 class Tacotron2Trainer(TTSTrainer):
@@ -62,11 +60,18 @@ class Tacotron2Trainer(TTSTrainer):
         self.lr_decay_start = self.hparams.lr_decay_start
         self.lr_decay_rate = self.hparams.lr_decay_rate
         self.lr_decay_min = self.hparams.lr_decay_min
-        # NOTE (Sam): there is a lot of ambiguity in how to name and initialize audio / speaker encoder and torchmoji
+        # NOTE (Sam): there is ambiguity in naming and loading of model arguments.
+        # TODO (Sam): move naming to load / get / return / (with = has) etc. convention.
         self.has_audio_encoder = self.hparams.audio_encoder_path is not None
+        self.with_f0s = self.hparams.with_f0s
+        self.load_f0s = self.hparams.load_f0s
+        self.load_gsts = self.hparams.load_gsts
+        self.with_gsts = (
+            self.hparams.with_gsts
+        )  # NOTE (Sam): should this be singular or plural?
 
         if hasattr(self.hparams, "speaker_embeddings_path"):
-
+            # TODO (Sam): move this to "load" type method in Data.
             get_speaker_encoding_for_dataset(
                 self.hparams.speaker_embeddings_path,
                 self.training_audiopaths_and_text,
@@ -77,9 +82,9 @@ class Tacotron2Trainer(TTSTrainer):
             self.speaker_embeddings = torch.load(self.hparams.speaker_embeddings_path)
         else:
             self.speaker_embeddings = None
-        # NOTE (Sam): gst_type == torchmoji and with_gst are currently redundant although syntactically different.
-        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder)
-        if self.hparams.get("with_gst"):
+        # NOTE (Sam): gst_type == torchmoji and with_gst are currently redundant.
+        # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder).
+        if self.hparams.get("with_gsts"):
             assert self.hparams.get(
                 "torchmoji_vocabulary_file"
             ), "torchmoji_vocabulary_file must be set"
@@ -93,9 +98,9 @@ class Tacotron2Trainer(TTSTrainer):
                 self.hparams.get("torchmoji_model_file"),
             )
             # TODO (Sam): rename gst to gsts[0].
-            self.compute_gst = lambda texts: self.torchmoji.encode_texts(texts)
+            self.get_gst = lambda texts: self.torchmoji.encode_texts(texts)
         else:
-            self.compute_gst = None
+            self.get_gst = None
 
         # TODO (Sam): datapoint specific encoder is really unused as of now.
         if self.has_audio_encoder:
@@ -225,8 +230,8 @@ class Tacotron2Trainer(TTSTrainer):
                 transcription = random_utterance()
 
             # NOTE (Sam): treat global encoders equivalently.
-            if self.compute_gst:
-                gst_embedding = torch.FloatTensor(self.compute_gst([transcription]))
+            if self.with_gsts and not self.load_gsts:
+                gst_embedding = torch.FloatTensor(self.get_gst([transcription]))
             else:
                 gst_embedding = None
             # NOTE (Sam): audio_encoder of data points is logically like teacher forcing since it acts on the ys.
@@ -389,22 +394,18 @@ class Tacotron2Trainer(TTSTrainer):
             ),
         )
 
-    def initialize_loader(self, include_f0: bool = False, n_frames_per_step: int = 1):
-        train_set = TextMelDataset(
+    def initialize_loader(self):
+        train_set = Data(
             **self.training_dataset_args,
             debug=self.debug,
             debug_dataset_size=self.batch_size,
         )
-        val_set = TextMelDataset(
+        val_set = Data(
             **self.val_dataset_args,
             debug=self.debug,
             debug_dataset_size=self.batch_size,
         )
-        collate_fn = TextMelCollate(
-            n_frames_per_step=n_frames_per_step,
-            include_f0=include_f0,  # unused
-            cudnn_enabled=self.cudnn_enabled,
-        )
+        collate_fn = Collate(**self.collate_args)
         sampler = None
         train_loader = DataLoader(
             train_set,
@@ -448,8 +449,6 @@ class Tacotron2Trainer(TTSTrainer):
 
         start_time, previous_start_time = time.perf_counter(), time.perf_counter()
         for epoch in range(start_epoch, self.epochs):
-            if self.distributed_run:
-                sampler.set_epoch(epoch)
             for batch_idx, batch in enumerate(train_loader):
                 self.global_step += 1
 
@@ -675,8 +674,13 @@ class Tacotron2Trainer(TTSTrainer):
     def training_dataset_args(self):
         return {
             "audiopaths_and_text": self.training_audiopaths_and_text,
+            # Text parameters
+            "return_texts": True,
             "text_cleaners": self.text_cleaners,
+            "symbol_set": self.symbol_set,
             "p_arpabet": self.p_arpabet,
+            # Audio parameters
+            "return_mels": True,
             "n_mel_channels": self.n_mel_channels,
             "sampling_rate": self.sampling_rate,
             "mel_fmin": self.mel_fmin,
@@ -684,16 +688,35 @@ class Tacotron2Trainer(TTSTrainer):
             "filter_length": self.filter_length,
             "hop_length": self.hop_length,
             "win_length": self.win_length,
-            "symbol_set": self.symbol_set,
             "max_wav_value": self.max_wav_value,
-            "pos_weight": self.pos_weight,
-            "compute_gst": self.compute_gst,
+            # Speaker embedding parameters
             "audio_encoder_forward": self.audio_encoder_forward,
             "speaker_embeddings": self.speaker_embeddings,
+            # F0 parameters
+            "return_f0s": self.with_f0s,
+            "load_f0s": self.load_f0s,
+            # GST parameters
+            "return_gsts": self.with_gsts,
+            "load_gsts": self.load_gsts,
+            "get_gst": self.get_gst,
+        }
+
+    @property
+    def collate_args(self):
+        return {
+            "cudnn_enabled": self.cudnn_enabled,
         }
 
 
 config = TRAINER_DEFAULTS.values()
 config.update(TACOTRON2_DEFAULTS.values())
-config.update({"sample_inference_text": "Duck party on aisle 6."})
+config.update(
+    {
+        "load_f0s": False,
+        "load_gsts": False,
+        "with_f0s": False,
+        "with_gsts": False,
+        "get_gst": None,
+    }
+)
 DEFAULTS = HParams(**config)
