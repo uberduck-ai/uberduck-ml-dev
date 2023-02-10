@@ -1,13 +1,11 @@
 import json
-import random
-from collections import Counter
 
 import torch
 from einops import rearrange
 import torch
 import numpy as np
 
-from uberduck_ml_dev.data_loader import prepare_input_sequence
+from uberduck_ml_dev.text.utils import prepare_input_sequence
 from uberduck_ml_dev.models.tacotron2 import Tacotron2, INFERENCE, LEFT_TEACHER_FORCED
 from uberduck_ml_dev.trainer.tacotron2 import (
     Tacotron2Trainer,

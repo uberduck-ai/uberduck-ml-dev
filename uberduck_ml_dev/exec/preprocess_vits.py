@@ -4,7 +4,7 @@ __all__ = ["batch", "flatten"]
 import argparse
 from functools import reduce
 
-from ..text.util import batch_clean_text, clean_text
+from ..text.utils import batch_clean_text, clean_text
 from ..utils.utils import load_filepaths_and_text
 
 
