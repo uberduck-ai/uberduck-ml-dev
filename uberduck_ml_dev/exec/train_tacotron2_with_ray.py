@@ -1,5 +1,8 @@
+from io import BytesIO
+import numpy as np
 import pandas as pd
 import torch
+from scipy.io import wavfile
 
 import ray
 from ray.air import session, Checkpoint
@@ -14,12 +17,54 @@ from uberduck_ml_dev.losses import Tacotron2Loss
 from uberduck_ml_dev.models.tacotron2 import Tacotron2, DEFAULTS
 from uberduck_ml_dev.data.collate import Collate
 from uberduck_ml_dev.data.batch import Batch
-
-# ray.init("ray://uberduck-1")
-
+from uberduck_ml_dev.text.utils import text_to_sequence
+from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS
+from uberduck_ml_dev.models.common import MelSTFT
 
 config = DEFAULTS.values()
 config["with_gsts"] = False
+
+stft = MelSTFT(
+    filter_length=DEFAULTS.filter_length,
+    hop_length=DEFAULTS.hop_length,
+    win_length=DEFAULTS.win_length,
+    n_mel_channels=DEFAULTS.n_mel_channels,
+    sampling_rate=DEFAULTS.sampling_rate,
+    mel_fmin=DEFAULTS.mel_fmin,
+    mel_fmax=DEFAULTS.mel_fmax,
+    padding=None,
+)
+
+def ray_df_to_batch(df):
+    transcripts = df.transcript.tolist()
+    audio_bytes_list = df.audio_bytes.tolist()
+
+    collate_fn = Collate(cudnn_enabled=torch.cuda.is_available())
+    collate_input = []
+    for transcript, audio_bytes in zip(transcripts, audio_bytes_list):
+        bio = BytesIO(audio_bytes)
+        sr, wav_data = wavfile.read(bio)
+        audio = torch.FloatTensor(wav_data)
+        audio_norm = audio / (np.abs(audio).max() * 2)
+        audio_norm = audio_norm.unsqueeze(0)
+        text_sequence = torch.LongTensor(
+            text_to_sequence(
+                transcript,
+                ["english_cleaners"],
+                1.0,
+                symbol_set=NVIDIA_TACO2_SYMBOLS,
+            )
+        )
+        melspec = stft.mel_spectrogram(audio_norm)
+        melspec = torch.squeeze(melspec, 0)
+        collate_input.append(
+            dict(
+                text_sequence=text_sequence,
+                mel=melspec,
+            )
+        )
+    return collate_fn(collate_input)
+
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
@@ -29,7 +74,7 @@ def get_ray_dataset():
         header=None,
         names=["path", "transcript"],
     )
-    lj_df = lj_df.head(100)
+    lj_df = lj_df # .head(1000)
     paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
     transcripts = lj_df.transcript.tolist()
 
@@ -44,15 +89,18 @@ def get_ray_dataset():
     transcripts_ds = transcripts_ds.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
 
     output_dataset = transcripts_ds.zip(audio_ds)
+    output_dataset = output_dataset.map_batches(lambda table: table.rename(columns={"value": "transcript", "value_1": "audio_bytes"}))
     return output_dataset
 
 
 def train_func(config: dict):
+    print("CUDA AVAILABLE: ", torch.cuda.is_available())
     batch_size = config["batch_size"]
     lr = config["lr"]
     epochs = config["epochs"]
     batch_size_per_worker = batch_size // session.get_world_size()
     is_cuda = torch.cuda.is_available()
+    DEFAULTS.cudnn_enabled = is_cuda
     # keep pos_weight higher than 5 to make clips not stretch on
     criterion = Tacotron2Loss(pos_weight=None)
     model = Tacotron2(DEFAULTS)
@@ -64,11 +112,35 @@ def train_func(config: dict):
     )
     collate_fn = Collate(cudnn_enabled=is_cuda)
     dataset_shard = session.get_dataset_shard("train")
+    global_step = 0
     for epoch in range(epochs):
         model.train()
-        for batch in dataset_shard.iter_batches(batch_size=batch_size):
-            print("batch")
-            print(type(batch))
+        for ray_batch_df in dataset_shard.iter_batches(batch_size=batch_size):
+            global_step += 1
+            model.zero_grad()
+            model_input = ray_df_to_batch(ray_batch_df)
+            model_output = model(
+                input_text=model_input["text_int_padded"],
+                input_lengths=model_input["input_lengths"],
+                speaker_ids=model_input["speaker_ids"],
+                embedded_gst=model_input["gst"],
+                targets=model_input["mel_padded"],
+                audio_encoding=model_input["audio_encodings"],
+                output_lengths=model_input["output_lengths"],
+            )
+
+            target = model_input.subset(["gate_target", "mel_padded"])
+            mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
+                model_output=model_output, target=target,
+            )
+            loss = mel_loss + gate_loss
+            print(f"Loss: {loss}")
+            session.report(dict(loss=loss.item()))
+            grad_norm= torch.nn.utils.clip_grad_norm(
+                model.parameters(), 1.0
+            )
+            optimizer.step()
+
         session.report(
             {},
             checkpoint=Checkpoint.from_dict(
