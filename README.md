@@ -6,21 +6,12 @@
 
 The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The main reasons to use this repository instead are
 
-- simple use of fill-populating and rhythm predicting inference
+- simple fill-populating and rhythm predicting inference
 - vocoders!
 - more languages
 - improved performance in fine tuning using additive covariates
 - improved tensorboard logging
-- and more!
-
-We support all types of categorical covariates!
-- Multispeaker training (functioning) <br>
-- Torchmoji conditioning (functioning)  <br>
-- Audio/speaker embedding (functioning) <br>
-- Pitch conditioning (in progress) <br>
-- SRMR and MOSNet conditioning (in progress) <br>
-- Pitch support/RADTTS integration in progress <br>
-
+- all types of categorical covariates (see below)
 
 ## Usage
 
@@ -51,7 +42,19 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 
 ## Development
 
-We love contributions!  To install in development mode, run
+We love contributions!  
+
+We are trying to add RAD TTS support.  The status of covariate support is currently.
+
+- Multispeaker  (functioning) <br>
+- Torchmoji conditioning (functioning)  <br>
+- Audio/speaker embedding (functioning) <br>
+- Pitch conditioning (in progress) <br>
+- SRMR and MOSNet conditioning (in progress) <br>
+- Pitch support/RADTTS integration (in progress) <br>
+
+
+To install in development mode, run
 
 ```bash
 pip install pre-commit black # install the required development dependencies in a virtual environment
