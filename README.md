@@ -12,6 +12,7 @@ The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron. 
 - improved performance in fine tuning using additive covariates
 - improved tensorboard logging
 - all types of categorical covariates (see below)
+- refactored, production tested code
 
 ## Usage
 
