@@ -6,11 +6,13 @@ from scipy.io import wavfile
 
 import ray
 from ray.air import session, Checkpoint
-from ray.air.config import ScalingConfig
-import ray.train as train
-from ray.train.torch import TorchTrainer
+from ray.air.config import ScalingConfig, RunConfig
+from ray.air.integrations.wandb import WandbLoggerCallback
 import ray.data
 from ray.data.datasource import FastFileMetadataProvider
+import ray.train as train
+from ray.train.torch import TorchTrainer
+
 
 # from ..trainer.tacotron2 import Tacotron2Trainer, DEFAULTS as TACOTRON2_TRAINER_DEFAULTS
 from uberduck_ml_dev.losses import Tacotron2Loss
@@ -115,7 +117,7 @@ def train_func(config: dict):
     global_step = 0
     for epoch in range(epochs):
         model.train()
-        for ray_batch_df in dataset_shard.iter_batches(batch_size=batch_size):
+        for ray_batch_df in dataset_shard.iter_batches(batch_size=batch_size_per_worker):
             global_step += 1
             model.zero_grad()
             model_input = ray_df_to_batch(ray_batch_df)
@@ -134,6 +136,7 @@ def train_func(config: dict):
                 model_output=model_output, target=target,
             )
             loss = mel_loss + gate_loss
+            loss.backward()
             print(f"Loss: {loss}")
             session.report(dict(loss=loss.item()))
             grad_norm= torch.nn.utils.clip_grad_norm(
@@ -155,8 +158,17 @@ if __name__ == "__main__":
     ray_dataset = get_ray_dataset()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={"lr": 1e-3, "batch_size": 16, "epochs": 1},
-        scaling_config=ScalingConfig(num_workers=2, use_gpu=True),
+        train_loop_config={"lr": 1e-3, "batch_size": 24, "epochs": 10},
+        scaling_config=ScalingConfig(num_workers=3, use_gpu=True),
+        run_config=RunConfig(
+            callbacks=[
+                WandbLoggerCallback(
+                    project="voice-cloning",
+                    save_checkpoints=True,
+                )
+            ]
+
+        ),
         datasets={"train": ray_dataset},
     )
     result = trainer.fit()
