@@ -16,11 +16,13 @@ The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron. 
 
 ## Usage
 
-The easiest ways to try us out are the colab notebooks, but if you want to install, run 
+The notebooks are the easiest ways to try us out.
 
 ### Installation
 
-```
+If you want to install on your own machine, create a virtual environment and install like 
+
+```bash
 conda create -n 'uberduck-ml-dev' python=3.8
 source activate uberduck-ml-dev
 pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
@@ -28,13 +30,13 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 
 ### Training
 
-Please see the unit tests subfolder for examples of up to date training and inference invocation.
+Please see the tests subfolder for examples of up to date training and inference invocation.
 
 ## Development
 
 We love contributions!  
 
-We are trying to add RAD TTS support.  The status of covariate support is currently.
+We are adding RAD TTS support.  Covariate support currently are
 
 - Multispeaker  (functioning) <br>
 - Torchmoji conditioning (functioning)  <br>
@@ -43,20 +45,21 @@ We are trying to add RAD TTS support.  The status of covariate support is curren
 - SRMR and MOSNet conditioning (in progress) <br>
 - Pitch support/RADTTS integration (in progress) <br>
 
+### Installation
 
 To install in development mode, run
 
 ```bash
-pip install pre-commit black # install the required development dependencies in a virtual environment
-git clone git@github.com:uberduck-ai/uberduck-ml-dev.git # clone the repository:
+pip install pre-commit black # format your code on commit by installing black!
+git clone git@github.com:uberduck-ai/uberduck-ml-dev.git
 cd uberduck-ml-dev
-pre-commit install # Install required Git hooks:
+pre-commit install # Install required Git hooks
 python setup.py develop # Install the library
 ```
 
 ### 🚩 Testing
 
-In an environment with uberduck-ml-dev installed, run 
+In an environment or image with uberduck-ml-dev installed in the uberduck-ml-dev root folder, run 
 
 ```bash
 python -m pytest
