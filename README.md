@@ -4,15 +4,23 @@
 
 ## Overview
 
-The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The states of the various latent space features are
+The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The main reasons to use this repository instead are
 
-- Multispeaker training (functioning, beneficial) <br>
+- simple use of fill-populating and rhythm predicting inference
+- vocoders!
+- more languages
+- improved performance in fine tuning using additive covariates
+- improved tensorboard logging
+- and more!
+
+We support all types of categorical covariates!
+- Multispeaker training (functioning) <br>
 - Torchmoji conditioning (functioning)  <br>
 - Audio/speaker embedding (functioning) <br>
-- Pitch conditioning (non functioning) <br>
-- SRMR and MOSNet conditioning (non functioning) <br>
+- Pitch conditioning (in progress) <br>
+- SRMR and MOSNet conditioning (in progress) <br>
+- Pitch support/RADTTS integration in progress <br>
 
-It also includes teacher forcing type methods for prosody matching, as well as language, tensorboard, and torchscript support, and improvements to the learning rate scheduling.
 
 ## Usage
 
