@@ -11,7 +11,7 @@ The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron. 
 - more languages
 - improved performance in fine tuning using additive covariates
 - improved tensorboard logging
-- all types of categorical covariates (see below)
+- all types of categorical covariates either supported or in progress (multispeaker, torchmoji, signal-to-noise ration, zero shot, pitch support)
 - sensibly refactored, production tested code
 
 ## Usage
@@ -34,16 +34,7 @@ Please see the tests subfolder for examples of up to date training and inference
 
 ## Development
 
-We love contributions!  
-
-We are adding RAD TTS support.  Covariate support currently are
-
-- Multispeaker  (functioning) <br>
-- Torchmoji conditioning (functioning)  <br>
-- Audio/speaker embedding (functioning) <br>
-- Pitch conditioning (in progress) <br>
-- SRMR and MOSNet conditioning (in progress) <br>
-- Pitch support/RADTTS integration (in progress) <br>
+We love contributions! Feel free to reach out to discuss contribution.
 
 ### Installation
 
