@@ -59,6 +59,7 @@ To install in development mode, run
 ```bash
 pip install pre-commit black # install the required development dependencies in a virtual environment
 git clone git@github.com:uberduck-ai/uberduck-ml-dev.git # clone the repository:
+cd uberduck-ml-dev
 pre-commit install # Install required Git hooks:
 python setup.py develop # Install the library
 ```
