@@ -27,18 +27,7 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 
 ### Training
 
-
-1. Create your training config and filelists. Use the training configs in the `configs` directory as a starting point, e.g. [this one](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/configs/tacotron2_config.json).
-2. (Optional) Download torchmoji models if training with Torchmoji GST.
-
-   ```bash
-   wget "https://github.com/johnpaulbin/torchMoji/releases/download/files/pytorch_model.bin" -O pytorch_model.bin
-   wget "https://raw.githubusercontent.com/johnpaulbin/torchMoji/master/model/vocabulary.json" -O vocabulary.json
-   ```
-3. Start training. Example invocation for Tacotron2 training:
-   ```bash
-   python -m uberduck_ml_dev.exec.train_tacotron2 --config tacotron2_config.json
-   ```
+Please see the unit tests subfolder for examples of up to date training and inference invocation.
 
 ## Development
 
