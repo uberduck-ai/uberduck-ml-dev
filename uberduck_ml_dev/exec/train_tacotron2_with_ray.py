@@ -76,7 +76,8 @@ def get_ray_dataset():
         header=None,
         names=["path", "transcript"],
     )
-    lj_df = lj_df # .head(1000)
+    # lj_df = lj_df # .head(1000)
+    lj_df = lj_df.head(1000)
     paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
     transcripts = lj_df.transcript.tolist()
 
@@ -100,7 +101,6 @@ def train_func(config: dict):
     batch_size = config["batch_size"]
     lr = config["lr"]
     epochs = config["epochs"]
-    batch_size_per_worker = batch_size // session.get_world_size()
     is_cuda = torch.cuda.is_available()
     DEFAULTS.cudnn_enabled = is_cuda
     # keep pos_weight higher than 5 to make clips not stretch on
@@ -117,7 +117,8 @@ def train_func(config: dict):
     global_step = 0
     for epoch in range(epochs):
         model.train()
-        for ray_batch_df in dataset_shard.iter_batches(batch_size=batch_size_per_worker):
+        session.report(dict(lr=lr, epochs=epochs, workers=session.get_world_size()))
+        for ray_batch_df in dataset_shard.iter_batches(batch_size=batch_size):
             global_step += 1
             model.zero_grad()
             model_input = ray_df_to_batch(ray_batch_df)
@@ -138,7 +139,7 @@ def train_func(config: dict):
             loss = mel_loss + gate_loss
             loss.backward()
             print(f"Loss: {loss}")
-            session.report(dict(loss=loss.item()))
+            session.report(dict(loss=loss.item(), epoch=epoch))
             grad_norm= torch.nn.utils.clip_grad_norm(
                 model.parameters(), 1.0
             )
@@ -158,8 +159,8 @@ if __name__ == "__main__":
     ray_dataset = get_ray_dataset()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={"lr": 1e-3, "batch_size": 24, "epochs": 10},
-        scaling_config=ScalingConfig(num_workers=3, use_gpu=True),
+        train_loop_config={"lr": 1e-3, "batch_size": 8, "epochs": 10},
+        scaling_config=ScalingConfig(num_workers=4, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)),
         run_config=RunConfig(
             callbacks=[
                 WandbLoggerCallback(
