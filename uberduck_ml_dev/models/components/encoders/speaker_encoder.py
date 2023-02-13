@@ -3,7 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 import torchaudio
 import numpy as np
-from speechbrain.pretrained import EncoderClassifier
+# from speechbrain.pretrained import EncoderClassifier
 from einops import rearrange
 
 # TODO (Sam): move this to a proper model.
