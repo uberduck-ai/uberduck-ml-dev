@@ -22,9 +22,11 @@ __all__ = [
     "LRELU_SLOPE",
 ]
 
+import math
+
+
 import numpy as np
 from numpy import finfo
-
 from scipy.signal import get_window
 import torch
 from torch.autograd import Variable
@@ -36,6 +38,7 @@ from librosa.filters import mel as librosa_mel
 from librosa.util import pad_center, tiny
 
 from ..utils.utils import *
+from .transforms import piecewise_rational_quadratic_transform
 
 
 class Conv1d(nn.Module):
@@ -615,11 +618,6 @@ class DDSConv(nn.Module):
         return x * x_mask
 
 
-# Cell
-
-import math
-
-from .transforms import piecewise_rational_quadratic_transform
 
 
 class ConvFlow(nn.Module):
