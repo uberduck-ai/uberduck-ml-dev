@@ -1,13 +1,15 @@
 from io import BytesIO
+
 import numpy as np
 import pandas as pd
 import torch
 from scipy.io import wavfile
+import wandb
 
 import ray
 from ray.air import session, Checkpoint
 from ray.air.config import ScalingConfig, RunConfig
-from ray.air.integrations.wandb import WandbLoggerCallback
+from ray.air.integrations.wandb import WandbLoggerCallback, setup_wandb
 import ray.data
 from ray.data.datasource import FastFileMetadataProvider
 import ray.train as train
@@ -22,6 +24,9 @@ from uberduck_ml_dev.data.batch import Batch
 from uberduck_ml_dev.text.utils import text_to_sequence
 from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS
 from uberduck_ml_dev.models.common import MelSTFT
+# from uberduck_ml_dev.utils.plot import save_figure_to_numpy
+# from uberduck_ml_dev.utils.utils import reduce_tensor
+from uberduck_ml_dev.monitoring.statistics import get_alignment_metrics
 
 config = DEFAULTS.values()
 config["with_gsts"] = False
@@ -76,7 +81,6 @@ def get_ray_dataset():
         header=None,
         names=["path", "transcript"],
     )
-    # lj_df = lj_df # .head(1000)
     lj_df = lj_df.head(1000)
     paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
     transcripts = lj_df.transcript.tolist()
@@ -95,14 +99,58 @@ def get_ray_dataset():
     output_dataset = output_dataset.map_batches(lambda table: table.rename(columns={"value": "transcript", "value_1": "audio_bytes"}))
     return output_dataset
 
+def log(
+    model,
+    X,
+    y_pred,
+    y,
+    loss,
+    mel_loss,
+    gate_loss,
+    mel_loss_batch,
+    gate_loss_batch,
+    grad_norm,
+    epoch,
+    global_step,
+    steps_per_sample
+):
+    metrics = {
+        "Loss/train": loss.item(),
+        "MelLoss/train": mel_loss.item(),
+        "GateLoss/train": gate_loss.item(),
+        "GradNorm": grad_norm.item(),
+        epoch: epoch,
+    }
+    batch_levels = X["speaker_ids"]
+    batch_levels_unique = torch.unique(batch_levels)
+    for l in batch_levels_unique:
+        mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
+        metrics[f"MelLoss/train/speaker{l.item()}"] = mlb
+        glb = gate_loss_batch[torch.where(batch_levels == l)[0]].mean()
+        metrics[f"GateLoss/train/speaker{l.item()}"] = glb
+        metrics[f"Loss/train/speaker{l.item()}"] = mlb + glb
+    if global_step % steps_per_sample:
+        alignment_metrics = get_alignment_metrics(y_pred["alignments"])
+        alignment_diagonalness = alignment_metrics["diagonalness"]
+        wandb.log({
+            "AlignmentDiagonalness/train": wandb.Image(alignment_diagonalness)
+
+        })
+
+
 
 def train_func(config: dict):
+    setup_wandb(config)
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
+    is_cuda = torch.cuda.is_available()
+    DEFAULTS.cudnn_enabled = is_cuda
+    device = train.torch.get_device()
+    DEFAULTS.device = device
+    torch.cuda.set_device(device)
+    torch.cuda.empty_cache()
     batch_size = config["batch_size"]
     lr = config["lr"]
     epochs = config["epochs"]
-    is_cuda = torch.cuda.is_available()
-    DEFAULTS.cudnn_enabled = is_cuda
     # keep pos_weight higher than 5 to make clips not stretch on
     criterion = Tacotron2Loss(pos_weight=None)
     model = Tacotron2(DEFAULTS)
@@ -139,10 +187,31 @@ def train_func(config: dict):
             loss = mel_loss + gate_loss
             loss.backward()
             print(f"Loss: {loss}")
-            session.report(dict(loss=loss.item(), epoch=epoch))
             grad_norm= torch.nn.utils.clip_grad_norm(
                 model.parameters(), 1.0
             )
+            log(
+                model,
+                model_input,
+                model_output,
+                target,
+                loss,
+                mel_loss,
+                gate_loss,
+                mel_loss_batch,
+                gate_loss_batch,
+                grad_norm,
+                epoch,
+                global_step,
+                DEFAULTS.steps_per_sample,
+            )
+            # session.report({
+            #     "Loss/train": loss.item(),
+            #     "MelLoss/train": mel_loss.item(),
+            #     "GateLoss/train": gate_loss.item(),
+            #     "GradNorm": grad_norm.item(),
+            #     epoch: epoch,
+            # })
             optimizer.step()
 
         session.report(
@@ -159,7 +228,7 @@ if __name__ == "__main__":
     ray_dataset = get_ray_dataset()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={"lr": 1e-3, "batch_size": 8, "epochs": 10},
+        train_loop_config={"lr": 1e-3, "batch_size": 5, "epochs": 100},
         scaling_config=ScalingConfig(num_workers=4, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)),
         run_config=RunConfig(
             callbacks=[

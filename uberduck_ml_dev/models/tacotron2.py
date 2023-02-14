@@ -7,7 +7,7 @@ import torch
 from torch.nn import functional as F
 from typing import Optional
 
-from speechbrain.pretrained import EncoderClassifier
+# from speechbrain.pretrained import EncoderClassifier
 
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
