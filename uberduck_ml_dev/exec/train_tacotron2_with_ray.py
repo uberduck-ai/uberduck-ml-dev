@@ -234,7 +234,6 @@ def train_func(config: dict):
         lr=lr,
         weight_decay=1e-6,
     )
-    collate_fn = Collate(cudnn_enabled=is_cuda)
     dataset_shard = session.get_dataset_shard("train")
     global_step = 0
     for epoch in range(epochs):
