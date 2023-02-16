@@ -366,22 +366,9 @@ class SynthesizerTrn(nn.Module):
         neg_cent4 = torch.sum(-0.5 * (m_p**2) * o_scale, [1]).unsqueeze(-1)
         neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
         attn = monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1)).unsqueeze(1).detach()
-    # with torch.no_grad():
-    #   # negative cross-entropy
-    #   s_p_sq_r = torch.exp(-2 * logs_p) # [b, d, t]
-    #   neg_cent1 = torch.sum(-0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True) # [b, 1, t_s]
-    #   neg_cent2 = torch.matmul(-0.5 * (z_p ** 2).transpose(1, 2), s_p_sq_r) # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
-    #   neg_cent3 = torch.matmul(z_p.transpose(1, 2), (m_p * s_p_sq_r)) # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
-    #   neg_cent4 = torch.sum(-0.5 * (m_p ** 2) * s_p_sq_r, [1], keepdim=True) # [b, 1, t_s]
-    #   neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
 
-    #   attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
-    #   attn = monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1)).unsqueeze(1).detach()
-
-    # oh okay, obviously w ends up problematic.
     w = attn.sum(3)
     if self.use_sdp:
-      print("WTF SHAPES: ", x.shape, x_mask.shape)
       l_length = self.dp(x, x_mask, w, g=g)
       l_length = l_length / torch.sum(x_mask)
     else:
@@ -390,8 +377,6 @@ class SynthesizerTrn(nn.Module):
       l_length = torch.sum((logw - logw_)**2, [1,2]) / torch.sum(x_mask) # for averaging 
 
     # expand prior
-    # m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
-    # logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
     m_p = torch.einsum("klmn, kjm -> kjn", [attn, m_p])
     logs_p = torch.einsum("klmn, kjm -> kjn", [attn, logs_p])
 

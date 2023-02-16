@@ -15,6 +15,7 @@ import ray.data
 from ray.data.datasource import FastFileMetadataProvider
 import ray.train as train
 from ray.train.torch import TorchTrainer
+from ray.tune import SyncConfig
 
 
 from uberduck_ml_dev.models import vits
@@ -173,42 +174,42 @@ config["with_gsts"] = False
 # )
 
 
-def sample_inference(model):
-    with torch.no_grad():
-        transcription = random_utterance()
-        utterance = torch.LongTensor(
-            text_to_sequence(
-                transcription,
-                ["english_cleaners"],
-                p_arpabet=1.0,
-                symbol_set=NVIDIA_TACO2_SYMBOLS,
-            )
-        )[None]
-
-        input_lengths = torch.LongTensor([utterance.shape[1]])
-        speaker_id_tensor = None  # torch.LongTensor([speaker_id])
-
-        if torch.cuda.is_available():
-            utterance = utterance.cuda()
-            input_lengths = input_lengths.cuda()
-            gst_embedding = None
-            speaker_id_tensor = None  # speaker_id_tensor.cuda()
-
-        model.eval()
-        model_output = model.forward(
-            input_text=utterance,
-            input_lengths=input_lengths,
-            speaker_ids=speaker_id_tensor,
-            # NOTE (Sam): this is None if using old multispeaker training, not None if using new pretrained encoder.
-            audio_encoding=None,  # speaker_embedding,
-            embedded_gst=None,  # gst_embedding,
-            mode=INFERENCE,
-        )
-        model.train()
-        audio = sample(model_output["mel_outputs_postnet"][0])
-        if (audio.size(0) == 1 or audio.size(0) == 2) and audio.size(1) > 2:
-            audio = audio.transpose(0, 1)
-        return audio
+# def sample_inference(model):
+#     with torch.no_grad():
+#         transcription = random_utterance()
+#         utterance = torch.LongTensor(
+#             text_to_sequence(
+#                 transcription,
+#                 ["english_cleaners"],
+#                 p_arpabet=1.0,
+#                 symbol_set=NVIDIA_TACO2_SYMBOLS,
+#             )
+#         )[None]
+# 
+#         input_lengths = torch.LongTensor([utterance.shape[1]])
+#         speaker_id_tensor = None  # torch.LongTensor([speaker_id])
+# 
+#         if torch.cuda.is_available():
+#             utterance = utterance.cuda()
+#             input_lengths = input_lengths.cuda()
+#             gst_embedding = None
+#             speaker_id_tensor = None  # speaker_id_tensor.cuda()
+# 
+#         model.eval()
+#         model_output = model.forward(
+#             input_text=utterance,
+#             input_lengths=input_lengths,
+#             speaker_ids=speaker_id_tensor,
+#             # NOTE (Sam): this is None if using old multispeaker training, not None if using new pretrained encoder.
+#             audio_encoding=None,  # speaker_embedding,
+#             embedded_gst=None,  # gst_embedding,
+#             mode=INFERENCE,
+#         )
+#         model.train()
+#         audio = sample(model_output["mel_outputs_postnet"][0])
+#         if (audio.size(0) == 1 or audio.size(0) == 2) and audio.size(1) > 2:
+#             audio = audio.transpose(0, 1)
+#         return audio
 
 
 def ray_df_to_batch(df):
@@ -248,7 +249,7 @@ def get_ray_dataset():
         header=None,
         names=["path", "transcript"],
     )
-    lj_df = lj_df.head(100)
+    # lj_df = lj_df.head(100)
     paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
     transcripts = lj_df.transcript.tolist()
 
@@ -274,98 +275,93 @@ def get_ray_dataset():
     )
     return output_dataset
 
-
-def log(
-    model,
-    X,
-    y_pred,
-    y,
-    loss,
-    mel_loss,
-    gate_loss,
-    mel_loss_batch,
-    gate_loss_batch,
-    grad_norm,
-    epoch,
-    global_step,
-    steps_per_sample,
-):
-    metrics = {
-        "Loss/train": loss.item(),
-        "MelLoss/train": mel_loss.item(),
-        "GateLoss/train": gate_loss.item(),
-        "GradNorm": grad_norm.item(),
-        "epoch": epoch,
-    }
-    batch_levels = X["speaker_ids"]
-    batch_levels_unique = torch.unique(batch_levels) if batch_levels else []
-    for l in batch_levels_unique:
-        mlb = mel_loss_batch[torch.where(batch_levels == l)[0]].mean()
-        metrics[f"MelLoss/train/speaker{l.item()}"] = mlb
-        glb = gate_loss_batch[torch.where(batch_levels == l)[0]].mean()
-        metrics[f"GateLoss/train/speaker{l.item()}"] = glb
-        metrics[f"Loss/train/speaker{l.item()}"] = mlb + glb
+@torch.no_grad()
+def log(metrics, gen_audio=None, gt_audio=None):
+    wandb_metrics = dict(metrics)
+    if gen_audio is not None:
+        wandb_metrics.update({
+            "gen/audio": wandb.Audio(gen_audio, sample_rate=22050)
+        })
+    if gt_audio is not None:
+        wandb_metrics.update({
+            "gt/audio": wandb.Audio(gt_audio, sample_rate=22050)
+        })
     session.report(metrics)
-    if global_step % steps_per_sample == 0:
-        alignment_metrics = get_alignment_metrics(y_pred["alignments"])
-        alignment_diagonalness = alignment_metrics["diagonalness"]
-        alignment_max = alignment_metrics["max"]
-        if session.get_world_rank() == 0 or session.get_world_size() == 1:
-            teacher_forced = sample(y_pred["mel_outputs_postnet"][0]).transpose(0, 1)
-            sample_audio = sample_inference(model)
-            wandb_metrics = dict(metrics)
-            input_length = X["input_lengths"][0].item()
-            output_length = X["output_lengths"][0].item()
-            mel_target = y["mel_padded"][0]
-            wandb_metrics.update(
-                {
-                    "AlignmentDiagonalness/train": alignment_diagonalness.item(),
-                    "AlignmentMax/train": alignment_max.item(),
-                    "MelPredicted/train": wandb.Image(
-                        save_figure_to_numpy(
-                            plot_spectrogram(
-                                y_pred["mel_outputs_postnet"][0].data.cpu()
-                            )
-                        )
-                    ),
-                    "MelTarget/train": wandb.Image(
-                        save_figure_to_numpy(plot_spectrogram(mel_target.data.cpu()))
-                    ),
-                    "TargetAudio/train": wandb.Audio(
-                        sample(mel_target).transpose(0, 1), sample_rate=22050
-                    ),
-                    "Gate/train": wandb.Image(
-                        save_figure_to_numpy(
-                            plot_gate_outputs(
-                                gate_targets=y["gate_target"][0].data.cpu(),
-                                gate_outputs=y_pred["gate_predicted"][0].data.cpu(),
-                            )
-                        )
-                    ),
-                    "Attention/train": wandb.Image(
-                        save_figure_to_numpy(
-                            plot_attention(
-                                y_pred["alignments"][0].data.cpu().transpose(0, 1),
-                                encoder_length=input_length,
-                                decoder_length=output_length,
-                            )
-                        )
-                    ),
-                    "SampleInference": wandb.Audio(sample_audio, sample_rate=22050),
-                    "AudioTeacherForced/train": wandb.Audio(
-                        teacher_forced, sample_rate=22050
-                    ),
-                }
-            )
-            wandb.log(wandb_metrics)
+    if session.get_world_rank() == 0:
+        wandb.log(wandb_metrics)
+
+def _train_step(batch, generator, discriminator, optim_g, optim_d, global_step, steps_per_sample, scaler):
+    optim_d.zero_grad()
+    optim_g.zero_grad()
+    # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
+    with autocast():
+        (x, x_lengths, spec, spec_lengths, y, y_lengths) = [
+            to_gpu(el) for el in ray_df_to_batch(batch)
+        ]
+        generator_output = generator(x, x_lengths, spec, spec_lengths)
+        y_hat, l_length, attn, ids_slice, x_mask, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q) = generator_output
+
+        mel = spec_to_mel_torch(spec)
+        hop_length = DATA_CONFIG["hop_length"]
+        segment_size = TRAIN_CONFIG["segment_size"]
+        y_mel = slice_segments(mel, ids_slice, segment_size // hop_length)
+
+        y_hat_mel = mel_spectrogram_torch(y_hat)
+
+        y = slice_segments(y, ids_slice * hop_length, segment_size)
+
+        discriminator_output = discriminator(y, y_hat.detach())
+        y_d_hat_r, y_d_hat_g, _, _ = discriminator_output
+
+        with autocast(enabled=False):
+            # Generator step
+            loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
+            loss_disc_all = loss_disc
+    optim_d.zero_grad()
+    scaler.scale(loss_disc_all).backward()
+    scaler.unscale_(optim_d)
+    grad_norm_d = clip_grad_value_(discriminator.parameters(), 100)
+    scaler.step(optim_d)
+
+    with autocast():
+        # Discriminator step
+        y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(y, y_hat)
+        with autocast(enabled=False):
+            loss_dur = torch.sum(l_length.float())
+            loss_mel = F.l1_loss(y_mel, y_hat_mel) * TRAIN_CONFIG["c_mel"]
+            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * TRAIN_CONFIG["c_kl"]
+            loss_fm = feature_loss(fmap_r, fmap_g)
+            loss_gen, losses_gen = generator_loss(y_d_hat_g)
+            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
+    optim_g.zero_grad()
+    scaler.scale(loss_gen_all).backward()
+    scaler.unscale_(optim_g)
+    grad_norm_g = clip_grad_value_(generator.parameters(), 100)
+    scaler.step(optim_g)
+    scaler.update()
+
+    metrics = {
+        "loss_disc": loss_disc.item(),
+        "loss_gen_all": loss_gen_all.item(),
+        "loss_gen": loss_gen.item(),
+        "loss_fm": loss_fm.item(),
+        "loss_dur": loss_dur.item(),
+        "loss_kl": loss_kl.item(),
+    }
+    if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
+        log(metrics, y_hat[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32"), y[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32"))
+    else:
+        log(metrics)
+    print(f"Disc Loss: {loss_disc_all.item()}. Gen Loss: {loss_gen_all.item()}")
 
 
 def train_func(config: dict):
-    # setup_wandb(config, project="vits-ray")
+    setup_wandb(config, project="vits-ray", rank_zero_only=False)
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
     is_cuda = torch.cuda.is_available()
     epochs = config["epochs"]
     batch_size = config["batch_size"]
+    steps_per_sample = config["batch_size"]
     is_cuda = torch.cuda.is_available()
     generator = SynthesizerTrn(
         n_vocab=len(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS]),
@@ -390,78 +386,47 @@ def train_func(config: dict):
     )
     dataset_shard = session.get_dataset_shard("train")
     global_step = 0
+    scaler = GradScaler()
     for epoch in range(epochs):
         for batch_idx, ray_batch_df in enumerate(
             dataset_shard.iter_batches(batch_size=batch_size)
         ):
+            torch.cuda.empty_cache()
+            _train_step(ray_batch_df, generator, discriminator, optim_g, optim_d, global_step, steps_per_sample, scaler)
             global_step += 1
-            optim_g.zero_grad()
-            optim_d.zero_grad()
-            # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
-            (x, x_lengths, spec, spec_lengths, y, y_lengths) = [
-                to_gpu(el) for el in ray_df_to_batch(ray_batch_df)
-            ]
-
-            # NOTE(zach): spec might need to be a regular spec, not a mel.
-            generator_output = generator(x, x_lengths, spec, spec_lengths)
-            y_hat, l_length, attn, ids_slice, x_mask, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q) = generator_output
-
-            mel = spec_to_mel_torch(spec)
-            hop_length = DATA_CONFIG["hop_length"]
-            segment_size = TRAIN_CONFIG["segment_size"]
-            y_mel = slice_segments(mel, ids_slice, segment_size // hop_length)
-
-            y_hat_mel = mel_spectrogram_torch(y_hat)
-
-            y = slice_segments(y, ids_slice * hop_length, segment_size)
-
-            discriminator_output = discriminator(y, y_hat.detach())
-            y_d_hat_r, y_d_hat_g, _, _ = discriminator_output
-
-            # Generator step
-            loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
-            loss_disc_all = loss_disc
-            loss_disc_all.backward()
-            grad_norm_d = clip_grad_value_(discriminator.parameters(), 100)
-            optim_d.step()
-
-            # Discriminator step
-            y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(y, y_hat)
-            loss_dur = torch.sum(l_length.float())
-            loss_mel = F.l1_loss(y_mel, y_hat_mel) * TRAIN_CONFIG["c_mel"]
-            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * TRAIN_CONFIG["c_kl"]
-            loss_fm = feature_loss(fmap_r, fmap_g)
-            loss_gen, losses_gen = generator_loss(y_d_hat_g)
-            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
-            loss_gen_all.backward()
-            grad_norm_g = clip_grad_value_(generator.parameters(), 100)
-            optim_g.step()
-
-            
-
-            metrics = {
-                "loss_disc": loss_disc.item(),
-                "loss_gen_all": loss_gen_all.item(),
-                "loss_gen": loss_gen.item(),
-                "loss_fm": loss_fm.item(),
-                "loss_dur": loss_dur.item(),
-                "loss_kl": loss_kl.item(),
-            }
-            session.report(metrics)
-            print(metrics)
-            print(f"Disc Loss: {loss_disc_all.item()}. Gen Loss: {loss_gen_all.item()}")
+        session.report(
+            {},
+            checkpoint=Checkpoint.from_dict(
+                dict(
+                    epoch=epoch,
+                    global_step=global_step,
+                    generator=generator.state_dict(),
+                    discriminator=discriminator.state_dict(),
+                )
+            )
+        )
 
 
 if __name__ == "__main__":
-    print("loading dataset")
+    print("Loading dataset")
     ray_dataset = get_ray_dataset()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={"epochs": 1, "batch_size": 16},
+        train_loop_config={
+            "epochs": 1,
+            "batch_size": 2,
+            "steps_per_sample": 20,
+        },
         scaling_config=ScalingConfig(
-            num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=4, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+        ),
+        run_config=RunConfig(
+            sync_config=SyncConfig(
+                upload_dir="s3://uberduck-anyscale-data/checkpoints"
+            )
         ),
         datasets={"train": ray_dataset},
     )
+    print("Starting trainer")
     result = trainer.fit()
     print(f"Last result: {result.metrics}")
