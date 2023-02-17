@@ -1,3 +1,4 @@
+import csv
 from io import BytesIO
 
 import numpy as np
@@ -14,6 +15,7 @@ import ray.data
 from ray.data.datasource import FastFileMetadataProvider
 import ray.train as train
 from ray.train.torch import TorchTrainer
+from ray.tune.syncer import SyncConfig
 
 
 from uberduck_ml_dev.losses import Tacotron2Loss
@@ -122,9 +124,10 @@ def get_ray_dataset():
         "https://uberduck-audio-files.s3.us-west-2.amazonaws.com/LJSpeech/metadata.csv",
         sep="|",
         header=None,
+        quoting=csv.QUOTE_NONE,
         names=["path", "transcript"],
     )
-    lj_df = lj_df.head(1000)
+    # lj_df = lj_df.head(100)
     paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
     transcripts = lj_df.transcript.tolist()
 
@@ -217,7 +220,7 @@ def train_func(config: dict):
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
     is_cuda = torch.cuda.is_available()
     DEFAULTS.cudnn_enabled = is_cuda
-    DEFAULTS.steps_per_sample = 5
+    DEFAULTS.steps_per_sample = 100
     device = train.torch.get_device()
     DEFAULTS.device = device
     torch.cuda.set_device(device)
@@ -226,7 +229,7 @@ def train_func(config: dict):
     lr = config["lr"]
     epochs = config["epochs"]
     # keep pos_weight higher than 5 to make clips not stretch on
-    criterion = Tacotron2Loss(pos_weight=None)
+    criterion = Tacotron2Loss(pos_weight=10)
     model = Tacotron2(DEFAULTS)
     model = train.torch.prepare_model(model)
     optimizer = torch.optim.Adam(
@@ -241,6 +244,7 @@ def train_func(config: dict):
         model.train()
         session.report(dict(lr=lr, epochs=epochs, workers=session.get_world_size()))
         for ray_batch_df in dataset_shard.iter_batches(batch_size=batch_size):
+            torch.cuda.empty_cache()
             global_step += 1
             model.zero_grad()
             model_input = ray_df_to_batch(ray_batch_df)
@@ -264,6 +268,7 @@ def train_func(config: dict):
             grad_norm= torch.nn.utils.clip_grad_norm(
                 model.parameters(), 1.0
             )
+            optimizer.step()
             log(
                 model,
                 model_input,
@@ -279,7 +284,6 @@ def train_func(config: dict):
                 global_step,
                 DEFAULTS.steps_per_sample,
             )
-            optimizer.step()
 
         session.report(
             {},
@@ -295,8 +299,11 @@ if __name__ == "__main__":
     ray_dataset = get_ray_dataset()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={"lr": 1e-3, "batch_size": 5, "epochs": 100},
-        scaling_config=ScalingConfig(num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)),
+        train_loop_config={"lr": 1e-3, "batch_size": 24, "epochs": 5},
+        scaling_config=ScalingConfig(num_workers=4, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)),
+        run_config=RunConfig(
+            sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
+        ),
         datasets={"train": ray_dataset},
     )
     result = trainer.fit()
