@@ -1,3 +1,4 @@
+import csv
 from io import BytesIO
 
 import numpy as np
@@ -247,6 +248,7 @@ def get_ray_dataset():
         "https://uberduck-audio-files.s3.us-west-2.amazonaws.com/LJSpeech/metadata.csv",
         sep="|",
         header=None,
+        quoting=csv.QUOTE_NONE,
         names=["path", "transcript"],
     )
     # lj_df = lj_df.head(100)
@@ -413,12 +415,12 @@ if __name__ == "__main__":
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={
-            "epochs": 1,
-            "batch_size": 2,
-            "steps_per_sample": 20,
+            "epochs": 100,
+            "batch_size": 32,
+            "steps_per_sample": 100,
         },
         scaling_config=ScalingConfig(
-            num_workers=4, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=10, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
         ),
         run_config=RunConfig(
             sync_config=SyncConfig(

@@ -137,11 +137,11 @@ def dynamic_range_decompression(x, C=1):
 def to_gpu(x):
 
     if x is not None:
-        x = x.contiguous()
+        # x = x.contiguous()
 
         if torch.cuda.is_available():
             x = x.cuda(non_blocking=True)
-            x = torch.autograd.Variable(x)
+            # x = torch.autograd.Variable(x)
 
     return x
 
