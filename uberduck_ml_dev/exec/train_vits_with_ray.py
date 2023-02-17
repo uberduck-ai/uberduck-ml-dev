@@ -212,6 +212,27 @@ config["with_gsts"] = False
 #             audio = audio.transpose(0, 1)
 #         return audio
 
+def sample_inference(generator):
+    sample_text = random_utterance()
+    text_sequence = torch.LongTensor(
+        intersperse(
+            text_to_sequence(
+                sample_text,
+                ["english_cleaners"],
+                1.0,
+                symbol_set=NVIDIA_TACO2_SYMBOLS,
+            ),
+            0,
+        )
+    ).unsqueeze(0)
+    text_sequence = text_sequence.cuda()
+    text_lengths = torch.LongTensor([text_sequence.shape[-1]]).cuda()
+    audio, *_ = generator.infer(text_sequence, text_lengths)
+    audio = audio.data.squeeze().cpu().numpy()
+    return audio
+
+
+
 
 def ray_df_to_batch(df):
     transcripts = df.transcript.tolist()
@@ -278,7 +299,7 @@ def get_ray_dataset():
     return output_dataset
 
 @torch.no_grad()
-def log(metrics, gen_audio=None, gt_audio=None):
+def log(metrics, gen_audio=None, gt_audio=None, sample_audio=None):
     wandb_metrics = dict(metrics)
     if gen_audio is not None:
         wandb_metrics.update({
@@ -288,9 +309,14 @@ def log(metrics, gen_audio=None, gt_audio=None):
         wandb_metrics.update({
             "gt/audio": wandb.Audio(gt_audio, sample_rate=22050)
         })
+    if sample_audio is not None:
+        wandb_metrics.update({
+            "sample_inference": wandb.Audio(sample_audio, rate=22050)
+        })
     session.report(metrics)
     if session.get_world_rank() == 0:
         wandb.log(wandb_metrics)
+
 
 def _train_step(batch, generator, discriminator, optim_g, optim_d, global_step, steps_per_sample, scaler):
     optim_d.zero_grad()
@@ -351,7 +377,13 @@ def _train_step(batch, generator, discriminator, optim_g, optim_d, global_step, 
         "loss_kl": loss_kl.item(),
     }
     if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
-        log(metrics, y_hat[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32"), y[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32"))
+        gen_audio = y_hat[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32")
+        gt_audio = y[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32")
+        generator.eval()
+        sample_audio = sample_inference(generator)
+        generator.train()
+
+        log(metrics, gen_audio, gt_audio, sample_audio)
     else:
         log(metrics)
     print(f"Disc Loss: {loss_disc_all.item()}. Gen Loss: {loss_gen_all.item()}")
@@ -374,6 +406,17 @@ def train_func(config: dict):
     generator = train.torch.prepare_model(generator)
     discriminator = MultiPeriodDiscriminator(MODEL_CONFIG["use_spectral_norm"])
     discriminator = train.torch.prepare_model(discriminator)
+
+    checkpoint = session.get_checkpoint()
+    if checkpoint is None:
+        global_step = 0
+        start_epoch = 0
+    else:
+        global_step = checkpoint["global_step"]
+        start_epoch = checkpoint["epoch"]
+        generator.load_state_dict(checkpoint["generator"])
+        discriminator.load_state_dict(checkpoint["discriminator"])
+    
     optim_g = torch.optim.AdamW(
         generator.parameters(),
         TRAIN_CONFIG["learning_rate"],
@@ -389,7 +432,7 @@ def train_func(config: dict):
     dataset_shard = session.get_dataset_shard("train")
     global_step = 0
     scaler = GradScaler()
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, start_epoch + epochs):
         for batch_idx, ray_batch_df in enumerate(
             dataset_shard.iter_batches(batch_size=batch_size)
         ):
@@ -412,12 +455,19 @@ def train_func(config: dict):
 if __name__ == "__main__":
     print("Loading dataset")
     ray_dataset = get_ray_dataset()
+    checkpoint_uri = (
+        "s3://uberduck-anyscale-data/checkpoints"
+        "/TorchTrainer_2023-02-16_20-39-13"
+        "/TorchTrainer_0763f_00000_0_2023-02-16_20-43-27"
+        "/checkpoint_000099/"
+    )
+    checkpoint = Checkpoint.from_uri(checkpoint_uri)
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={
             "epochs": 100,
             "batch_size": 32,
-            "steps_per_sample": 100,
+            "steps_per_sample": 200,
         },
         scaling_config=ScalingConfig(
             num_workers=10, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
@@ -428,6 +478,7 @@ if __name__ == "__main__":
             )
         ),
         datasets={"train": ray_dataset},
+        resume_from_checkpoint=checkpoint,
     )
     print("Starting trainer")
     result = trainer.fit()
