@@ -15,7 +15,7 @@ from ray.air.integrations.wandb import WandbLoggerCallback, setup_wandb
 import ray.data
 from ray.data.datasource import FastFileMetadataProvider
 import ray.train as train
-from ray.train.torch import TorchTrainer
+from ray.train.torch import TorchTrainer, TorchCheckpoint
 from ray.tune import SyncConfig
 
 
@@ -212,6 +212,7 @@ config["with_gsts"] = False
 #             audio = audio.transpose(0, 1)
 #         return audio
 
+@torch.no_grad()
 def sample_inference(generator):
     sample_text = random_utterance()
     text_sequence = torch.LongTensor(
@@ -227,7 +228,10 @@ def sample_inference(generator):
     ).unsqueeze(0)
     text_sequence = text_sequence.cuda()
     text_lengths = torch.LongTensor([text_sequence.shape[-1]]).cuda()
-    audio, *_ = generator.infer(text_sequence, text_lengths)
+    if hasattr(generator, "infer"):
+        audio, *_ = generator.infer(text_sequence, text_lengths)
+    else:
+        audio, *_ = generator.module.infer(text_sequence, text_lengths)
     audio = audio.data.squeeze().cpu().numpy()
     return audio
 
@@ -311,7 +315,7 @@ def log(metrics, gen_audio=None, gt_audio=None, sample_audio=None):
         })
     if sample_audio is not None:
         wandb_metrics.update({
-            "sample_inference": wandb.Audio(sample_audio, rate=22050)
+            "sample_inference": wandb.Audio(sample_audio, sample_rate=22050)
         })
     session.report(metrics)
     if session.get_world_rank() == 0:
@@ -412,10 +416,18 @@ def train_func(config: dict):
         global_step = 0
         start_epoch = 0
     else:
-        global_step = checkpoint["global_step"]
-        start_epoch = checkpoint["epoch"]
-        generator.load_state_dict(checkpoint["generator"])
-        discriminator.load_state_dict(checkpoint["discriminator"])
+        checkpoint_dict = checkpoint.to_dict()
+        global_step = checkpoint_dict["global_step"]
+        start_epoch = checkpoint_dict["epoch"]
+        def _fix_state_dict(sd):
+            return {k[7:]: v for k, v in sd.items()}
+        if session.get_world_size() > 1:
+            generator.load_state_dict(checkpoint_dict["generator"])
+            discriminator.load_state_dict(checkpoint_dict["discriminator"])
+        else:
+            generator.load_state_dict(_fix_state_dict(checkpoint_dict["generator"]))
+            discriminator.load_state_dict(_fix_state_dict(checkpoint_dict["discriminator"]))
+        del checkpoint_dict
     
     optim_g = torch.optim.AdamW(
         generator.parameters(),
@@ -451,6 +463,14 @@ def train_func(config: dict):
             )
         )
 
+class TorchCheckpointFixed(TorchCheckpoint):
+    def __setstate__(self, state: dict):
+        if "_data_dict" in state and state["_data_dict"]:
+            state = state.copy()
+            state["_data_dict"] = self._decode_data_dict(state["_data_dict"])
+        super(TorchCheckpoint, self).__setstate__(state)
+
+
 
 if __name__ == "__main__":
     print("Loading dataset")
@@ -461,11 +481,12 @@ if __name__ == "__main__":
         "/TorchTrainer_0763f_00000_0_2023-02-16_20-43-27"
         "/checkpoint_000099/"
     )
-    checkpoint = Checkpoint.from_uri(checkpoint_uri)
+    # checkpoint = Checkpoint.from_uri(checkpoint_uri)
+    checkpoint = TorchCheckpointFixed.from_uri(checkpoint_uri)
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={
-            "epochs": 100,
+            "epochs": 500,
             "batch_size": 32,
             "steps_per_sample": 200,
         },
