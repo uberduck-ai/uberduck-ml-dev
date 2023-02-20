@@ -23,6 +23,7 @@ class TTSTrainer:
     # Note (Sam): should migrate to Lightning.
     def __init__(self, hparams, rank=None, world_size=None, device=None):
         print("TTSTrainer start", time.perf_counter())
+
         torch.backends.cudnn_enabled = hparams.cudnn_enabled
 
         # NOTE (Sam): all hparams should be added to initializations and this next line removed.
@@ -157,9 +158,12 @@ class TTSTrainer:
         print("Starting warm_start", time.perf_counter())
         checkpoint = self.load_checkpoint()
         # TODO(zach): Once we are no longer using checkpoints of the old format, remove the conditional and use checkpoint["model"] only.
-        model_state_dict = (
-            checkpoint["model"] if "model" in checkpoint else checkpoint["state_dict"]
-        )
+        if "model" in checkpoint:
+            model_state_dict = checkpoint["model"]
+        elif "state_dict" in checkpoint:
+            model_state_dict = checkpoint["state_dict"]
+        else:
+            model_state_dict = checkpoint
         model.from_pretrained(
             model_dict=model_state_dict,
             device=self.device,
@@ -189,12 +193,11 @@ DEFAULTS = HParams(
     #     {"until_step": None, "batch_size": 16, "n_frames_per_step": 1},
     # ],
     batch_size=16,
-    decay_start=15000,
-    decay_rate=8000,
     fp16_run=False,
     steps_per_sample=100,
     weight_decay=1e-6,
     sample_inference_speaker_ids=None,
+    sample_inference_text="That quick beige fox jumped in the air loudly over the thin dog fence.",
     is_validate=True,
     learning_rate=1e-3,
     epochs=10,
@@ -208,6 +211,7 @@ DEFAULTS = HParams(
     lr_decay_start=15000,
     lr_decay_rate=216000,
     lr_decay_min=1e-5,
+    pos_weight=None,
 )
 
 config = DEFAULTS.values()

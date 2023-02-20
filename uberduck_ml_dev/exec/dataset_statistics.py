@@ -32,7 +32,7 @@ from ..data.statistics import (
     pace_phoneme,
     word_frequencies,
 )
-from ..text.util import clean_text, text_to_sequence
+from ..text.utils import clean_text, text_to_sequence
 from ..utils.audio import compute_yin
 
 

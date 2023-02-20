@@ -1,7 +1,7 @@
 __all__ = []
 
 
-from ..data_loader import prepare_input_sequence
+from ..text.utils import prepare_input_sequence
 
 
 def _get_inference(model, vocoder, texts, speaker_ids, symbol_set, arpabet, cpu_run):

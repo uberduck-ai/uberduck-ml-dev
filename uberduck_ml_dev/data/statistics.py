@@ -21,9 +21,9 @@ import seaborn as sns
 from wordcloud import WordCloud, STOPWORDS
 from wordfreq import word_frequency
 
-from ..text.util import text_to_sequence
+from ..text.utils import text_to_sequence
 
-# Cell
+# NOTE (Sam): this file could be refactored so that it doesn't contain both speechmetrics and wordfreqencies - very different types of statistics.
 
 
 def word_frequencies(text: str, language: str = "en") -> List[float]:

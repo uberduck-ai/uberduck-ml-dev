@@ -1,6 +1,8 @@
-from uberduck_ml_dev.data_loader import TextMelCollate, TextMelDataset, oversample
-from collections import Counter
 from torch.utils.data import DataLoader
+
+from uberduck_ml_dev.data.utils import oversample
+from uberduck_ml_dev.data.data import Data
+from uberduck_ml_dev.data.collate import Collate
 
 
 class TestTextMelCollation:
@@ -20,49 +22,28 @@ class TestTextMelCollation:
         ]
 
     def test_batch_structure(self):
-        ds = TextMelDataset(
+        ds = Data(
             "tests/fixtures/val.txt",
-            ["english_cleaners"],
-            0.0,
-            80,
-            22050,
-            0,
-            8000,
-            1024,
-            256,
-            padding=None,
-            win_length=1024,
             debug=True,
             debug_dataset_size=12,
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = TextMelCollate()
+        collate_fn = Collate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            assert len(batch) == 7
+            assert len(batch) == 9
 
     def test_batch_dimensions(self):
 
-        ds = TextMelDataset(
-            "tests/fixtures/val.txt",
-            ["english_cleaners"],
-            0.0,
-            80,
-            22050,
-            0,
-            8000,
-            1024,
-            256,
-            padding=None,
-            win_length=1024,
+        ds = Data(
+            audiopaths_and_text="tests/fixtures/val.txt",
             debug=True,
             debug_dataset_size=12,
-            include_f0=True,
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = TextMelCollate(include_f0=True)
+        collate_fn = Collate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
             output_lengths = batch["output_lengths"]
@@ -71,37 +52,24 @@ class TestTextMelCollation:
             assert output_lengths.item() == 566
             assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
-            assert len(batch) == 7
+            assert len(batch) == 9
 
     def test_batch_dimensions_partial(self):
 
-        ds = TextMelDataset(
+        ds = Data(
             "tests/fixtures/val.txt",
-            ["english_cleaners"],
-            0.0,
-            80,
-            22050,
-            0,
-            8000,
-            1024,
-            256,
-            padding=None,
-            win_length=1024,
             debug=True,
             debug_dataset_size=12,
-            include_f0=True,
             symbol_set="default",
         )
         assert len(ds) == 1
-        collate_fn = TextMelCollate(n_frames_per_step=5, include_f0=True)
+        collate_fn = Collate(n_frames_per_step=5)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
 
-            assert batch["output_lengths"].item() == 566, batch["output_lengths"].item()
-            assert batch["mel_padded"].size(2) == 570, print(
-                "actual shape: ", batch["mel_padded"].shape
-            )
-            assert batch["gate_target"].size(1) == 570, print(
-                "actual shape: ", batch["gate_target"].shape
-            )
-            assert len(batch) == 7
+            assert batch["output_lengths"].item() == 566
+            assert (
+                batch["mel_padded"].size(2) == 566
+            )  # I'm not sure why this was 570 - maybe 566 + 5 (i.e. the n_frames_per_step)
+            assert batch["gate_target"].size(1) == 566
+            assert len(batch) == 9

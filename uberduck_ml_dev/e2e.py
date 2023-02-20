@@ -4,8 +4,7 @@ __all__ = ["tts", "rhythm_transfer"]
 import torch
 
 from .text.symbols import NVIDIA_TACO2_SYMBOLS
-from .text.util import text_to_sequence
-from .data_loader import prepare_input_sequence
+from .text.utils import prepare_input_sequence
 
 
 from typing import List

@@ -1,4 +1,4 @@
-from uberduck_ml_dev.text.util import (
+from uberduck_ml_dev.text.utils import (
     cleaned_text_to_sequence,
     text_to_sequence,
     DEFAULT_SYMBOLS,
