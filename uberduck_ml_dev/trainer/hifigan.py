@@ -1,36 +1,5 @@
 # TODO (Sam): Make this inherit from base trainer
 # NOTE (Sam): this is what coqui did - is it really the move?
-
-Skip to content
-Search or jump to…
-Pull requests
-Issues
-Codespaces
-Marketplace
-Explore
- 
-@sjkoelle 
-johnpaulbin
-/
-hifi-gan
-Public
-forked from SortAnon/hifi-gan
-Fork your own copy of johnpaulbin/hifi-gan
-Code
-Pull requests
-Actions
-Projects
-Security
-Insights
-hifi-gan/train.py /
-@johnpaulbin
-johnpaulbin Update train.py
-Latest commit d65f62d on Jun 3, 2022
- History
- 3 contributors
-@johnpaulbin@SortAnon@jik876
-284 lines (230 sloc)  12.4 KB
-
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import itertools
