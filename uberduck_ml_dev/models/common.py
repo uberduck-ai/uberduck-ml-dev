@@ -295,7 +295,11 @@ class MelSTFT:
             padding=padding,
         )
         mel_basis = librosa_mel(
-            sampling_rate, filter_length, n_mel_channels, mel_fmin, mel_fmax
+            sr=sampling_rate,
+            n_fft=filter_length,
+            n_mels=n_mel_channels,
+            fmin=mel_fmin,
+            fmax=mel_fmax
         )
         mel_basis = torch.from_numpy(mel_basis).float()
         if device == "cuda":
@@ -998,7 +1002,12 @@ def mel_spectrogram_torch(
     fmax_dtype_device = str(fmax) + "_" + dtype_device
     wnsize_dtype_device = str(win_size) + "_" + dtype_device
     if fmax_dtype_device not in mel_basis:
-        mel = librosa_mel(sampling_rate, n_fft, num_mels, fmin, fmax)
+        mel = librosa_mel(
+            sr=sampling_rate, n_fft=n_fft,
+            n_mels=num_mels,
+            fmin=fmin,
+            fmax=fmax,
+        )
         mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
             dtype=y.dtype, device=y.device
         )
@@ -1044,7 +1053,13 @@ def spec_to_mel_torch(spec, n_fft=FILTER_LENGTH, num_mels=N_MEL_CHANNELS, sampli
     dtype_device = str(spec.dtype) + '_' + str(spec.device)
     fmax_dtype_device = str(fmax) + '_' + dtype_device
     if fmax_dtype_device not in mel_basis:
-        mel = librosa_mel(sampling_rate, n_fft, num_mels, fmin, fmax)
+        mel = librosa_mel(
+            sr=sampling_rate,
+            n_fft=n_fft,
+            n_mels=num_mels,
+            fmin=fmin,
+            fmax=fmax,
+        )
         mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(dtype=spec.dtype, device=spec.device)
     spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
 

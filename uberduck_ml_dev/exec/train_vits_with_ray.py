@@ -460,7 +460,7 @@ def train_func(config: dict):
         if session.get_world_size() > 1:
             generator_sd = checkpoint_dict["generator"]
             if use_audio_embedding:
-                emb_state_dict = {f"emb_audio.{k}": v for k, v in generator.emb_audio.state_dict().items()}
+                emb_state_dict = {f"module.emb_audio.{k}": v for k, v in generator.module.emb_audio.state_dict().items()}
                 generator_sd.update(emb_state_dict)
             # NOTE(zach): Pass strict=False due to different nuber of gin_channels
             generator.load_state_dict(generator_sd, strict=False)
