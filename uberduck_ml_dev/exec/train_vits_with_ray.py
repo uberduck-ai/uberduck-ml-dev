@@ -1,9 +1,11 @@
+import tempfile
 import csv
 from io import BytesIO
 
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from scipy.io import wavfile
 import wandb
 from torch.cuda.amp import autocast, GradScaler
@@ -40,6 +42,8 @@ from uberduck_ml_dev.text.utils import random_utterance
 from uberduck_ml_dev.utils.utils import intersperse, to_gpu, slice_segments, clip_grad_value_
 from uberduck_ml_dev.losses import discriminator_loss, generator_loss, kl_loss, feature_loss
 
+def _fix_state_dict(sd):
+    return {k[7:]: v for k, v in sd.items()}
 
 class TextAudioCollate:
     """Zero-pads model inputs and targets"""
@@ -69,6 +73,7 @@ class TextAudioCollate:
         text_padded = torch.LongTensor(len(batch), max_text_len)
         spec_padded = torch.FloatTensor(len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
+        audio_embs = torch.FloatTensor(len(batch), 512)
         text_padded.zero_()
         spec_padded.zero_()
         wav_padded.zero_()
@@ -87,6 +92,9 @@ class TextAudioCollate:
             wav_padded[i, :, : wav.size(1)] = wav
             wav_lengths[i] = wav.size(1)
 
+            audio_emb = row[3]
+            audio_embs[i, :] = audio_emb
+
         if self.return_ids:
             return (
                 text_padded,
@@ -104,6 +112,7 @@ class TextAudioCollate:
             spec_lengths,
             wav_padded,
             wav_lengths,
+            F.normalize(audio_embs),
         )
 
 
@@ -174,46 +183,8 @@ config["with_gsts"] = False
 #     padding=None,
 # )
 
-
-# def sample_inference(model):
-#     with torch.no_grad():
-#         transcription = random_utterance()
-#         utterance = torch.LongTensor(
-#             text_to_sequence(
-#                 transcription,
-#                 ["english_cleaners"],
-#                 p_arpabet=1.0,
-#                 symbol_set=NVIDIA_TACO2_SYMBOLS,
-#             )
-#         )[None]
-# 
-#         input_lengths = torch.LongTensor([utterance.shape[1]])
-#         speaker_id_tensor = None  # torch.LongTensor([speaker_id])
-# 
-#         if torch.cuda.is_available():
-#             utterance = utterance.cuda()
-#             input_lengths = input_lengths.cuda()
-#             gst_embedding = None
-#             speaker_id_tensor = None  # speaker_id_tensor.cuda()
-# 
-#         model.eval()
-#         model_output = model.forward(
-#             input_text=utterance,
-#             input_lengths=input_lengths,
-#             speaker_ids=speaker_id_tensor,
-#             # NOTE (Sam): this is None if using old multispeaker training, not None if using new pretrained encoder.
-#             audio_encoding=None,  # speaker_embedding,
-#             embedded_gst=None,  # gst_embedding,
-#             mode=INFERENCE,
-#         )
-#         model.train()
-#         audio = sample(model_output["mel_outputs_postnet"][0])
-#         if (audio.size(0) == 1 or audio.size(0) == 2) and audio.size(1) > 2:
-#             audio = audio.transpose(0, 1)
-#         return audio
-
 @torch.no_grad()
-def sample_inference(generator):
+def sample_inference(generator, audio_embedding=None):
     sample_text = random_utterance()
     text_sequence = torch.LongTensor(
         intersperse(
@@ -228,10 +199,12 @@ def sample_inference(generator):
     ).unsqueeze(0)
     text_sequence = text_sequence.cuda()
     text_lengths = torch.LongTensor([text_sequence.shape[-1]]).cuda()
+    if audio_embedding is not None:
+        audio_embedding = audio_embedding.cuda()
     if hasattr(generator, "infer"):
-        audio, *_ = generator.infer(text_sequence, text_lengths)
+        audio, *_ = generator.infer(text_sequence, text_lengths, audio_embedding=audio_embedding)
     else:
-        audio, *_ = generator.module.infer(text_sequence, text_lengths)
+        audio, *_ = generator.module.infer(text_sequence, text_lengths, audio_embedding=audio_embedding)
     audio = audio.data.squeeze().cpu().numpy()
     return audio
 
@@ -241,15 +214,22 @@ def sample_inference(generator):
 def ray_df_to_batch(df):
     transcripts = df.transcript.tolist()
     audio_bytes_list = df.audio_bytes.tolist()
+    if hasattr(df, "emb_path"):
+        emb_bytes_list = df.emb_path.tolist()
+    else:
+        emb_bytes_list = [None for _ in transcripts]
+
 
     collate_fn = TextAudioCollate()
     collate_input = []
-    for transcript, audio_bytes in zip(transcripts, audio_bytes_list):
+    for transcript, audio_bytes, emb_bytes in zip(transcripts, audio_bytes_list, emb_bytes_list):
+        # Audio
         bio = BytesIO(audio_bytes)
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / (np.abs(audio).max() * 2)
         audio_norm = audio_norm.unsqueeze(0)
+        # Text
         text_sequence = torch.LongTensor(
             intersperse(
                 text_to_sequence(
@@ -261,16 +241,70 @@ def ray_df_to_batch(df):
                 0,
             )
         )
+        # Spectrogram
         spec = spectrogram_torch(audio_norm)
         spec = torch.squeeze(spec, 0)
-        collate_input.append((text_sequence, spec, audio_norm))
+        # Audio embedding
+        if emb_bytes is None:
+            audio_emb = None
+        else:
+            bio = BytesIO(emb_bytes)
+            audio_emb = torch.load(bio)
+
+        collate_input.append((text_sequence, spec, audio_norm, audio_emb))
     return collate_fn(collate_input)
+
+def get_ray_dataset_with_embedding():
+    lj_df = pd.read_csv(
+        "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/vctk_mic1/all_with_embs.txt",
+        sep="|",
+        header=None,
+        quoting=3,
+        names=["path", "speaker_id", "transcript", "dataset_audio_file_id", "emb_path"],
+    )
+    lj_df = lj_df.head(1000)
+    # print(lj_df.head(3))
+    # paths = ("s3://uberduck-audio-files/LJSpeech/" + lj_df.path).tolist()
+    paths = lj_df.path.tolist()
+    transcripts = lj_df.transcript.tolist()
+    dataset_audio_files = lj_df.dataset_audio_file_id.tolist()
+    emb_paths = lj_df.emb_path.tolist()
+
+    parallelism_length = len(paths)
+    audio_ds = ray.data.read_binary_files(
+        paths,
+        parallelism=parallelism_length,
+        meta_provider=FastFileMetadataProvider(),
+    )
+    transcripts_ds = ray.data.from_items(transcripts, parallelism=parallelism_length)
+    dataset_audio_file_ids = ray.data.from_items(dataset_audio_files, parallelism=parallelism_length)
+    paths = ray.data.from_items(paths, parallelism=parallelism_length)
+    emb_paths_ds = ray.data.read_binary_files(
+        emb_paths,
+        parallelism=parallelism_length,
+        meta_provider=FastFileMetadataProvider(),
+    )
+    
+    audio_ds = audio_ds.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
+    transcripts_ds = transcripts_ds.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
+    dataset_audio_file_ids = dataset_audio_file_ids.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
+    paths_ds = paths.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
+    emb_paths_ds = emb_paths_ds.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
+
+    output_dataset = transcripts_ds.zip(audio_ds).zip(dataset_audio_file_ids).zip(paths_ds).zip(emb_paths_ds)
+    output_dataset = output_dataset.map_batches(lambda table: table.rename(columns={
+        "value": "transcript", "value_1": "audio_bytes", "value_2": "dataset_audio_file_id",
+        "value_3": "path",
+        "value_4": "emb_path",
+    }))
+    return output_dataset
 
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
         # "s3://uberduck-audio-files/LJSpeech/metadata.csv",
-        "https://uberduck-audio-files.s3.us-west-2.amazonaws.com/LJSpeech/metadata.csv",
+        # "https://uberduck-audio-files.s3.us-west-2.amazonaws.com/LJSpeech/metadata.csv",
+        "https://uberduck-datasets-dirty.s3.amazonaws.com/vctk_mic1/all_with_embs.txt",
         sep="|",
         header=None,
         quoting=csv.QUOTE_NONE,
@@ -327,10 +361,10 @@ def _train_step(batch, generator, discriminator, optim_g, optim_d, global_step, 
     optim_g.zero_grad()
     # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
     with autocast():
-        (x, x_lengths, spec, spec_lengths, y, y_lengths) = [
+        (x, x_lengths, spec, spec_lengths, y, y_lengths, audio_embs) = [
             to_gpu(el) for el in ray_df_to_batch(batch)
         ]
-        generator_output = generator(x, x_lengths, spec, spec_lengths)
+        generator_output = generator(x, x_lengths, spec, spec_lengths, audio_embedding=audio_embs)
         y_hat, l_length, attn, ids_slice, x_mask, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q) = generator_output
 
         mel = spec_to_mel_torch(spec)
@@ -384,7 +418,7 @@ def _train_step(batch, generator, discriminator, optim_g, optim_d, global_step, 
         gen_audio = y_hat[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32")
         gt_audio = y[0][0][:y_lengths[0]].data.cpu().numpy().astype("float32")
         generator.eval()
-        sample_audio = sample_inference(generator)
+        sample_audio = sample_inference(generator, audio_embedding=audio_embs[0].unsqueeze(0))
         generator.train()
 
         log(metrics, gen_audio, gt_audio, sample_audio)
@@ -400,12 +434,16 @@ def train_func(config: dict):
     epochs = config["epochs"]
     batch_size = config["batch_size"]
     steps_per_sample = config["batch_size"]
+    use_audio_embedding = config["use_audio_embedding"],
+    gin_channels = config["gin_channels"]
     is_cuda = torch.cuda.is_available()
     generator = SynthesizerTrn(
         n_vocab=len(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS]),
         spec_channels=DATA_CONFIG["filter_length"] // 2 + 1,
         segment_size=TRAIN_CONFIG["segment_size"] // DATA_CONFIG["hop_length"],
         **MODEL_CONFIG,
+        use_audio_embedding=use_audio_embedding,
+        gin_channels=gin_channels,
     )
     generator = train.torch.prepare_model(generator)
     discriminator = MultiPeriodDiscriminator(MODEL_CONFIG["use_spectral_norm"])
@@ -419,13 +457,21 @@ def train_func(config: dict):
         checkpoint_dict = checkpoint.to_dict()
         global_step = checkpoint_dict["global_step"]
         start_epoch = checkpoint_dict["epoch"]
-        def _fix_state_dict(sd):
-            return {k[7:]: v for k, v in sd.items()}
         if session.get_world_size() > 1:
-            generator.load_state_dict(checkpoint_dict["generator"])
+            generator_sd = checkpoint_dict["generator"]
+            if use_audio_embedding:
+                emb_state_dict = {f"emb_audio.{k}": v for k, v in generator.emb_audio.state_dict().items()}
+                generator_sd.update(emb_state_dict)
+            # NOTE(zach): Pass strict=False due to different nuber of gin_channels
+            generator.load_state_dict(generator_sd, strict=False)
             discriminator.load_state_dict(checkpoint_dict["discriminator"])
         else:
-            generator.load_state_dict(_fix_state_dict(checkpoint_dict["generator"]))
+            generator_sd = _fix_state_dict(checkpoint_dict["generator"])
+            if use_audio_embedding:
+                emb_state_dict = {f"emb_audio.{k}": v for k, v in generator.emb_audio.state_dict().items()}
+                generator_sd.update(emb_state_dict)
+            # NOTE(zach): Pass strict=False due to different nuber of gin_channels
+            generator.load_state_dict(generator_sd, strict=False)
             discriminator.load_state_dict(_fix_state_dict(checkpoint_dict["discriminator"]))
         del checkpoint_dict
     
@@ -451,17 +497,22 @@ def train_func(config: dict):
             torch.cuda.empty_cache()
             _train_step(ray_batch_df, generator, discriminator, optim_g, optim_d, global_step, steps_per_sample, scaler)
             global_step += 1
-        session.report(
-            {},
-            checkpoint=Checkpoint.from_dict(
+        # TODO(zach): Also save wandb artifact here.
+        checkpoint = Checkpoint.from_dict(
                 dict(
                     epoch=epoch,
                     global_step=global_step,
                     generator=generator.state_dict(),
                     discriminator=discriminator.state_dict(),
                 )
-            )
+
         )
+        session.report({}, checkpoint=checkpoint)
+        artifact = wandb.Artifact(f"artifact_epoch{epoch}_step{global_step}", "model")
+        with tempfile.TemporaryDirectory() as tempdirname:
+            checkpoint.to_directory(tempdirname)
+            artifact.add_dir(tempdirname)
+            wandb.log_artifact(artifact)
 
 class TorchCheckpointFixed(TorchCheckpoint):
     def __setstate__(self, state: dict):
@@ -474,24 +525,24 @@ class TorchCheckpointFixed(TorchCheckpoint):
 
 if __name__ == "__main__":
     print("Loading dataset")
-    ray_dataset = get_ray_dataset()
-    checkpoint_uri = (
-        "s3://uberduck-anyscale-data/checkpoints"
-        "/TorchTrainer_2023-02-16_20-39-13"
-        "/TorchTrainer_0763f_00000_0_2023-02-16_20-43-27"
-        "/checkpoint_000099/"
-    )
+    # ray_dataset = get_ray_dataset()
+    ray_dataset = get_ray_dataset_with_embedding()
+    checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-02-17_17-49-00/TorchTrainer_6a5ed_00000_0_2023-02-17_17-52-52/checkpoint_000598/"
     # checkpoint = Checkpoint.from_uri(checkpoint_uri)
     checkpoint = TorchCheckpointFixed.from_uri(checkpoint_uri)
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={
-            "epochs": 500,
+            # "epochs": 500,
+            "epochs": 10,
             "batch_size": 32,
             "steps_per_sample": 200,
+            "use_audio_embedding": True,
+            # NOTE(zach): Set this to 0 if use_audio_embedding is False.
+            "gin_channels": 512,
         },
         scaling_config=ScalingConfig(
-            num_workers=10, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
         ),
         run_config=RunConfig(
             sync_config=SyncConfig(

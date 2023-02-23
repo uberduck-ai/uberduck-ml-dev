@@ -16,7 +16,10 @@ from uberduck_ml_dev.models.components.encoders.duration import (
     StochasticDurationPredictor,
     DurationPredictor,
 )
-from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import ResNetSpeakerEncoder
+from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
+    ResNetSpeakerEncoder, DEFAULT_AUDIO_CONFIG as RESNET_SE_AUDIO_CONFIG,
+    load_pretrained, get_pretrained_model,
+)
 from uberduck_ml_dev.utils.utils import (
     init_weights,
     get_padding,
@@ -420,13 +423,6 @@ class SynthesizerTrn(nn.Module):
 
         self.use_sdp = use_sdp
 
-        if self.use_audio_embedding:
-            self.emb_audio = ResNetSpeakerEncoder(
-                input_dim=64,
-                proj_dim=512,
-                use_torch_spec=True,
-                log_input=True,
-            )
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -473,15 +469,17 @@ class SynthesizerTrn(nn.Module):
         # if n_speakers > 1:
         #     self.emb_g = nn.Embedding(n_speakers, gin_channels)
         if self.use_audio_embedding:
-            # TODO(zach): add d-vector embedding.
-            pass
+            self.emb_audio = get_pretrained_model()
+            for _param in self.emb_audio.parameters():
+                _param.requires_grad = False
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None):
+    def forward(self, x, x_lengths, y, y_lengths, sid=None, audio_embedding=None):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         # if self.n_speakers > 0:
         #     g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         if self.use_audio_embedding:
-            pass
+            # g = self.emb_audio(x).unsqueeze(-1)
+            g = audio_embedding.unsqueeze(-1)
         else:
             g = None
 
@@ -541,12 +539,16 @@ class SynthesizerTrn(nn.Module):
         noise_scale_w=1.0,
         max_len=None,
         durations=None,
+        zero_shot_input=None,
+        audio_embedding=None,
     ):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         # if self.n_speakers > 0:
         #     g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
-        if self.use_audio_embedding:
-            pass
+        if self.use_audio_embedding and audio_embedding is not None:
+            g = audio_embedding.unsqueeze(-1)
+        elif self.use_audio_embedding and zero_shot_input is not None:
+            g = self.emb_audio(zero_shot_input).unsqueeze(-1)
         else:
             g = None
 
