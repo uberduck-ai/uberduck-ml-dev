@@ -10,12 +10,13 @@ def log_sample_utterances(project = "my-project", name = "my-model", dataset = "
 
     wandb.init(project=project, name = name, job_type = "eval", config = {"architecture": architecture, "dataset": dataset})
     
-    for speaker_id in tqdm(speaker_ids):
-        to_log = []
-        for utterance in tqdm(UTTERANCES):
-            inference = inference_function(utterance, speaker_id)
-            to_log.append(wandb.Audio(inference, caption=f"audio_{utterance[:20]}", sample_rate=22050))
-            torch.cuda.empty_cache() # might not be necessary
-        wandb.log({f"audios_{speaker_id}": to_log})
+    with torch.no_grad():
+        for speaker_id in tqdm(speaker_ids):
+            to_log = []
+            for utterance in tqdm(UTTERANCES):
+                inference = inference_function(utterance, speaker_id)
+                to_log.append(wandb.Audio(inference, caption=utterance, sample_rate=22050))
+                torch.cuda.empty_cache() # might not be necessary
+            wandb.log({f"audios_{speaker_id}": to_log})
 
     wandb.finish()
