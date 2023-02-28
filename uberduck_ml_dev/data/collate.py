@@ -25,7 +25,7 @@ class Collate:
 
     # TODO (Sam): don't return None-valued keys at all.
     def __call__(self, batch):
-        """Collate's training batch from normalized text and mel-spectrogram
+        """Collate training batch from normalized text and mel-spectrogram.
         PARAMS
         ------
         """
