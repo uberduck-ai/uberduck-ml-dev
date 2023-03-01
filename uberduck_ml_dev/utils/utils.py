@@ -154,6 +154,18 @@ def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     mask = ids < lengths.unsqueeze(1)
     return mask
 
+def get_mask_from_lengths_radtts(lengths):
+    """Constructs binary mask from a 1D torch tensor of input lengths
+    Args:
+        lengths (torch.tensor): 1D tensor
+    Returns:
+        mask (torch.tensor): num_sequences x max_length x 1 binary tensor
+    """
+    max_len = torch.max(lengths).item()
+    ids = torch.arange(0, max_len, out=torch.cuda.LongTensor(max_len))
+    mask = (ids < lengths.unsqueeze(1)).bool()
+    return mask
+
 
 def reduce_tensor(tensor, n_gpus):
     rt = tensor.clone()
