@@ -17,6 +17,6 @@ def log_sample_utterances(project = "my-project", name = "my-model", dataset = "
                 inference = inference_function(utterance, speaker_id)
                 to_log.append(wandb.Audio(inference, caption=utterance, sample_rate=22050))
                 torch.cuda.empty_cache() # might not be necessary
-            wandb.log({f"audios_{speaker_id}": to_log})
+            wandb.log({f"Speaker {speaker_id}": to_log})
 
     wandb.finish()
