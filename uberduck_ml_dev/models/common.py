@@ -1090,3 +1090,433 @@ def spectrogram_torch(y, n_fft=FILTER_LENGTH, sampling_rate=SAMPLING_RATE, hop_s
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
+
+
+
+
+class ConvAttention(torch.nn.Module):
+    def __init__(self, n_mel_channels=80, n_text_channels=512,
+                 n_att_channels=80, temperature=1.0):
+        super(ConvAttention, self).__init__()
+        self.temperature = temperature
+        self.softmax = torch.nn.Softmax(dim=3)
+        self.log_softmax = torch.nn.LogSoftmax(dim=3)
+
+        self.key_proj = nn.Sequential(
+            ConvNorm(n_text_channels, n_text_channels*2, kernel_size=3,
+                     bias=True, w_init_gain='relu'),
+            torch.nn.ReLU(),
+            ConvNorm(n_text_channels*2, n_att_channels, kernel_size=1,
+                     bias=True))
+
+        self.query_proj = nn.Sequential(
+            ConvNorm(n_mel_channels, n_mel_channels*2, kernel_size=3,
+                     bias=True, w_init_gain='relu'),
+            torch.nn.ReLU(),
+            ConvNorm(n_mel_channels*2, n_mel_channels, kernel_size=1,
+                     bias=True),
+            torch.nn.ReLU(),
+            ConvNorm(n_mel_channels, n_att_channels, kernel_size=1, bias=True)
+        )
+
+    def run_padded_sequence(self, sorted_idx, unsort_idx, lens, padded_data,
+                            recurrent_model):
+        """Sorts input data by previded ordering (and un-ordering) and runs the
+        packed data through the recurrent model
+        Args:
+            sorted_idx (torch.tensor): 1D sorting index
+            unsort_idx (torch.tensor): 1D unsorting index (inverse of sorted_idx)
+            lens: lengths of input data (sorted in descending order)
+            padded_data (torch.tensor): input sequences (padded)
+            recurrent_model (nn.Module): recurrent model to run data through
+        Returns:
+            hidden_vectors (torch.tensor): outputs of the RNN, in the original,
+            unsorted, ordering
+        """
+
+        # sort the data by decreasing length using provided index
+        # we assume batch index is in dim=1
+        padded_data = padded_data[:, sorted_idx]
+        padded_data = nn.utils.rnn.pack_padded_sequence(padded_data, lens)
+        hidden_vectors = recurrent_model(padded_data)[0]
+        hidden_vectors, _ = nn.utils.rnn.pad_packed_sequence(hidden_vectors)
+        # unsort the results at dim=1 and return
+        hidden_vectors = hidden_vectors[:, unsort_idx]
+        return hidden_vectors
+
+    def forward(self, queries, keys, query_lens, mask=None, key_lens=None,
+                attn_prior=None):
+        """Attention mechanism for radtts. Unlike in Flowtron, we have no
+        restrictions such as causality etc, since we only need this during
+        training.
+        Args:
+            queries (torch.tensor): B x C x T1 tensor (likely mel data)
+            keys (torch.tensor): B x C2 x T2 tensor (text data)
+            query_lens: lengths for sorting the queries in descending order
+            mask (torch.tensor): uint8 binary mask for variable length entries
+                                 (should be in the T2 domain)
+        Output:
+            attn (torch.tensor): B x 1 x T1 x T2 attention mask.
+                                 Final dim T2 should sum to 1
+        """
+        temp = 0.0005
+        keys_enc = self.key_proj(keys)  # B x n_attn_dims x T2
+        # Beware can only do this since query_dim = attn_dim = n_mel_channels
+        queries_enc = self.query_proj(queries)
+
+        # Gaussian Isotopic Attention
+        # B x n_attn_dims x T1 x T2
+        attn = (queries_enc[:, :, :, None] - keys_enc[:, :, None])**2
+
+        # compute log-likelihood from gaussian
+        eps = 1e-8
+        attn = -temp * attn.sum(1, keepdim=True)
+        if attn_prior is not None:
+            attn = self.log_softmax(attn) + torch.log(attn_prior[:, None] + eps)
+
+        attn_logprob = attn.clone()
+
+        if mask is not None:
+            attn.data.masked_fill_(
+                mask.permute(0, 2, 1).unsqueeze(2), -float("inf"))
+
+        attn = self.softmax(attn)  # softmax along T2
+        return attn, 
+
+
+
+
+class AffineTransformationLayer(torch.nn.Module):
+    def __init__(self, n_mel_channels, n_context_dim, n_layers,
+                 affine_model='simple_conv', with_dilation=True, kernel_size=5,
+                 scaling_fn='exp', affine_activation='softplus',
+                 n_channels=1024, use_partial_padding=False):
+        super(AffineTransformationLayer, self).__init__()
+        if affine_model not in ("wavenet", "simple_conv"):
+            raise Exception("{} affine model not supported".format(affine_model))
+        if isinstance(scaling_fn, list):
+            if not all([x in ("translate", "exp", "tanh", "sigmoid") for x in scaling_fn]):
+                raise Exception("{} scaling fn not supported".format(scaling_fn))
+        else:
+            if scaling_fn not in ("translate", "exp", "tanh", "sigmoid"):
+                raise Exception("{} scaling fn not supported".format(scaling_fn))
+
+        self.affine_model = affine_model
+        self.scaling_fn = scaling_fn
+        if affine_model == 'wavenet':
+            self.affine_param_predictor = WN(
+                int(n_mel_channels/2), n_context_dim, n_layers=n_layers,
+                n_channels=n_channels, affine_activation=affine_activation,
+                use_partial_padding=use_partial_padding)
+        elif affine_model == 'simple_conv':
+            self.affine_param_predictor = SimpleConvNet(
+                int(n_mel_channels / 2), n_context_dim, n_mel_channels,
+                n_layers, with_dilation=with_dilation, kernel_size=kernel_size,
+                use_partial_padding=use_partial_padding)
+        self.n_mel_channels = n_mel_channels
+
+    def get_scaling_and_logs(self, scale_unconstrained):
+        if self.scaling_fn == 'translate':
+            s = torch.exp(scale_unconstrained*0)
+            log_s = scale_unconstrained*0
+        elif self.scaling_fn == 'exp':
+            s = torch.exp(scale_unconstrained)
+            log_s = scale_unconstrained  # log(exp
+        elif self.scaling_fn == 'tanh':
+            s = torch.tanh(scale_unconstrained) + 1 + 1e-6
+            log_s = torch.log(s)
+        elif self.scaling_fn == 'sigmoid':
+            s = torch.sigmoid(scale_unconstrained + 10) + 1e-6
+            log_s = torch.log(s)
+        elif isinstance(self.scaling_fn, list):
+            s_list, log_s_list = [], []
+            for i in range(scale_unconstrained.shape[1]):
+                scaling_i = self.scaling_fn[i]
+                if scaling_i == 'translate':
+                    s_i = torch.exp(scale_unconstrained[:i]*0)
+                    log_s_i = scale_unconstrained[:, i]*0
+                elif scaling_i == 'exp':
+                    s_i = torch.exp(scale_unconstrained[:, i])
+                    log_s_i = scale_unconstrained[:, i]
+                elif scaling_i == 'tanh':
+                    s_i = torch.tanh(scale_unconstrained[:, i]) + 1 + 1e-6
+                    log_s_i = torch.log(s_i)
+                elif scaling_i == 'sigmoid':
+                    s_i = torch.sigmoid(scale_unconstrained[:, i]) + 1e-6
+                    log_s_i = torch.log(s_i)
+                s_list.append(s_i[:, None])
+                log_s_list.append(log_s_i[:, None])
+            s = torch.cat(s_list, dim=1)
+            log_s = torch.cat(log_s_list, dim=1)
+        return s, log_s
+
+    def forward(self, z, context, inverse=False, seq_lens=None):
+        n_half = int(self.n_mel_channels / 2)
+        z_0, z_1 = z[:, :n_half], z[:, n_half:]
+        if self.affine_model == 'wavenet':
+            affine_params = self.affine_param_predictor(
+                (z_0, context), seq_lens=seq_lens)
+        elif self.affine_model == 'simple_conv':
+            z_w_context = torch.cat((z_0, context), 1)
+            affine_params = self.affine_param_predictor(
+                z_w_context, seq_lens=seq_lens)
+
+        scale_unconstrained = affine_params[:, :n_half, :]
+        b = affine_params[:, n_half:, :]
+        s, log_s = self.get_scaling_and_logs(scale_unconstrained)
+
+        if inverse:
+            z_1 = (z_1 - b) / s
+            z = torch.cat((z_0, z_1), dim=1)
+            return z
+        else:
+            z_1 = s * z_1 + b
+            z = torch.cat((z_0, z_1), dim=1)
+            return z, log_s
+
+
+class ExponentialClass(torch.nn.Module):
+    def __init__(self):
+        super(ExponentialClass, self).__init__()
+
+    def forward(self, x):
+        return torch.exp(x)
+
+
+class LengthRegulator(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, dur):
+        output = []
+        for x_i, dur_i in zip(x, dur):
+            expanded = self.expand(x_i, dur_i)
+            output.append(expanded)
+        output = self.pad(output)
+        return output
+
+    def expand(self, x, dur):
+        output = []
+        for i, frame in enumerate(x):
+            expanded_len = int(dur[i] + 0.5)
+            expanded = frame.expand(expanded_len, -1)
+            output.append(expanded)
+        output = torch.cat(output, 0)
+        return output
+
+    def pad(self, x):
+        output = []
+        max_len = max([x[i].size(0) for i in range(len(x))])
+        for i, seq in enumerate(x):
+            padded = F.pad(
+                seq, [0, 0, 0, max_len - seq.size(0)], 'constant', 0.0)
+            output.append(padded)
+        output = torch.stack(output)
+        return output
+
+
+class ConvNorm(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1,
+                 padding=None, dilation=1, bias=True, w_init_gain='linear',
+                 use_partial_padding=False, use_weight_norm=False):
+        super(ConvNorm, self).__init__()
+        if padding is None:
+            assert(kernel_size % 2 == 1)
+            padding = int(dilation * (kernel_size - 1) / 2)
+        self.kernel_size = kernel_size
+        self.dilation = dilation
+        self.use_partial_padding = use_partial_padding
+        self.use_weight_norm = use_weight_norm
+        conv_fn = torch.nn.Conv1d
+        if self.use_partial_padding:
+            conv_fn = pconv1d
+        self.conv = conv_fn(in_channels, out_channels,
+                            kernel_size=kernel_size, stride=stride,
+                            padding=padding, dilation=dilation,
+                            bias=bias)
+        torch.nn.init.xavier_uniform_(
+            self.conv.weight, gain=torch.nn.init.calculate_gain(w_init_gain))
+        if self.use_weight_norm:
+            self.conv = nn.utils.weight_norm(self.conv)
+
+    def forward(self, signal, mask=None):
+        if self.use_partial_padding:
+            conv_signal = self.conv(signal, mask)
+        else:
+            conv_signal = self.conv(signal)
+        if mask is not None:
+            # always re-zero output if mask is
+            # available to match zero-padding
+            conv_signal = conv_signal * mask
+        return conv_signal
+
+
+class Encoder(nn.Module):
+    """Encoder module:
+        - Three 1-d convolution banks
+        - Bidirectional LSTM
+    """
+    def __init__(self, encoder_n_convolutions=3, encoder_embedding_dim=512,
+                 encoder_kernel_size=5, norm_fn=nn.BatchNorm1d,
+                 lstm_norm_fn=None):
+        super(Encoder, self).__init__()
+
+        convolutions = []
+        for _ in range(encoder_n_convolutions):
+            conv_layer = nn.Sequential(
+                ConvNorm(encoder_embedding_dim,
+                         encoder_embedding_dim,
+                         kernel_size=encoder_kernel_size, stride=1,
+                         padding=int((encoder_kernel_size - 1) / 2),
+                         dilation=1, w_init_gain='relu',
+                         use_partial_padding=True),
+                norm_fn(encoder_embedding_dim, affine=True))
+            convolutions.append(conv_layer)
+        self.convolutions = nn.ModuleList(convolutions)
+
+        self.lstm = nn.LSTM(encoder_embedding_dim,
+                            int(encoder_embedding_dim / 2), 1,
+                            batch_first=True, bidirectional=True)
+        if lstm_norm_fn is not None:
+            if 'spectral' in lstm_norm_fn:
+                print("Applying spectral norm to text encoder LSTM")
+                lstm_norm_fn_pntr = torch.nn.utils.spectral_norm
+            elif 'weight' in lstm_norm_fn:
+                print("Applying weight norm to text encoder LSTM")
+                lstm_norm_fn_pntr = torch.nn.utils.weight_norm
+            self.lstm = lstm_norm_fn_pntr(self.lstm, 'weight_hh_l0')
+            self.lstm = lstm_norm_fn_pntr(self.lstm, 'weight_hh_l0_reverse')
+
+    @amp.autocast(False)
+    def forward(self, x, in_lens):
+        """
+        Args:
+            x (torch.tensor): N x C x L padded input of text embeddings
+            in_lens (torch.tensor): 1D tensor of sequence lengths
+        """
+        if x.size()[0] > 1:
+            x_embedded = []
+            for b_ind in range(x.size()[0]):  # TODO: improve speed
+                curr_x = x[b_ind:b_ind+1, :, :in_lens[b_ind]].clone()
+                for conv in self.convolutions:
+                    curr_x = F.dropout(F.relu(conv(curr_x)),
+                                       0.5, self.training)
+                x_embedded.append(curr_x[0].transpose(0, 1))
+            x = torch.nn.utils.rnn.pad_sequence(x_embedded, batch_first=True)
+        else:
+            for conv in self.convolutions:
+                x = F.dropout(F.relu(conv(x)), 0.5, self.training)
+            x = x.transpose(1, 2)
+
+        # recent amp change -- change in_lens to int
+        in_lens = in_lens.int().cpu()
+
+        x = nn.utils.rnn.pack_padded_sequence(x, in_lens, batch_first=True)
+
+        self.lstm.flatten_parameters()
+        outputs, _ = self.lstm(x)
+
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(
+            outputs, batch_first=True)
+
+        return outputs
+
+    @amp.autocast(False)
+    def infer(self, x):
+        for conv in self.convolutions:
+            x = F.dropout(F.relu(conv(x)), 0.5, self.training)
+
+        x = x.transpose(1, 2)
+        self.lstm.flatten_parameters()
+        outputs, _ = self.lstm(x)
+
+        return outputs
+
+
+class Invertible1x1ConvLUS(torch.nn.Module):
+    def __init__(self, c, cache_inverse=False):
+        super(Invertible1x1ConvLUS, self).__init__()
+        # Sample a random orthonormal matrix to initialize weights
+        W = torch.qr(torch.FloatTensor(c, c).normal_())[0]
+        # Ensure determinant is 1.0 not -1.0
+        if torch.det(W) < 0:
+            W[:, 0] = -1*W[:, 0]
+        p, lower, upper = torch.lu_unpack(*torch.lu(W))
+
+        self.register_buffer('p', p)
+        # diagonals of lower will always be 1s anyway
+        lower = torch.tril(lower, -1)
+        lower_diag = torch.diag(torch.eye(c, c))
+        self.register_buffer('lower_diag', lower_diag)
+        self.lower = nn.Parameter(lower)
+        self.upper_diag = nn.Parameter(torch.diag(upper))
+        self.upper = nn.Parameter(torch.triu(upper, 1))
+        self.cache_inverse = cache_inverse
+
+    @amp.autocast(False)
+    def forward(self, z, inverse=False):
+        U = torch.triu(self.upper, 1) + torch.diag(self.upper_diag)
+        L = torch.tril(self.lower, -1) + torch.diag(self.lower_diag)
+        W = torch.mm(self.p, torch.mm(L, U))
+        if inverse:
+            if not hasattr(self, 'W_inverse'):
+                # inverse computation
+                W_inverse = W.float().inverse()
+                if z.type() == 'torch.cuda.HalfTensor':
+                    W_inverse = W_inverse.half()
+
+                self.W_inverse = W_inverse[..., None]
+            z = F.conv1d(z, self.W_inverse, bias=None, stride=1, padding=0)
+            if not self.cache_inverse:
+                delattr(self, 'W_inverse')
+            return z
+        else:
+            W = W[..., None]
+            z = F.conv1d(z, W, bias=None, stride=1, padding=0)
+            log_det_W = torch.sum(torch.log(torch.abs(self.upper_diag)))
+            return z, log_det_W
+
+
+class Invertible1x1Conv(torch.nn.Module):
+    """
+    The layer outputs both the convolution, and the log determinant
+    of its weight matrix.  If inverse=True it does convolution with
+    inverse
+    """
+    def __init__(self, c, cache_inverse=False):
+        super(Invertible1x1Conv, self).__init__()
+        self.conv = torch.nn.Conv1d(c, c, kernel_size=1, stride=1, padding=0,
+                                    bias=False)
+
+        # Sample a random orthonormal matrix to initialize weights
+        W = torch.qr(torch.FloatTensor(c, c).normal_())[0]
+
+        # Ensure determinant is 1.0 not -1.0
+        if torch.det(W) < 0:
+            W[:, 0] = -1*W[:, 0]
+        W = W.view(c, c, 1)
+        self.conv.weight.data = W
+        self.cache_inverse = cache_inverse
+
+    def forward(self, z, inverse=False):
+        # DO NOT apply n_of_groups, as it doesn't account for padded sequences
+        W = self.conv.weight.squeeze()
+
+        if inverse:
+            if not hasattr(self, 'W_inverse'):
+                # Inverse computation
+                W_inverse = W.float().inverse()
+                if z.type() == 'torch.cuda.HalfTensor':
+                    W_inverse = W_inverse.half()
+
+                self.W_inverse = W_inverse[..., None]
+            z = F.conv1d(z, self.W_inverse, bias=None, stride=1, padding=0)
+            if not self.cache_inverse:
+                delattr(self, 'W_inverse')
+            return z
+        else:
+            # Forward computation
+            log_det_W = torch.logdet(W).clone()
+            z = self.conv(z)
+            return z, log_det_W
+
