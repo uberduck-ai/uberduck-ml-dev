@@ -20,11 +20,11 @@
 # DEALINGS IN THE SOFTWARE.
 import torch
 from torch import nn
-from common import Encoder, LengthRegulator, ConvAttention, Invertible1x1ConvLUS, Invertible1x1Conv, AffineTransformationLayer, LinearNorm, ExponentialClass
+from .common import Encoder, LengthRegulator, ConvAttention, Invertible1x1ConvLUS, Invertible1x1Conv, AffineTransformationLayer, LinearNorm, ExponentialClass
 # from common import get_mask_from_lengths
 from ..utils.utils import get_mask_from_lengths_radtts as get_mask_from_lengths
-from attribute_prediction_model import get_attribute_prediction_model
-from alignment import mas_width1 as mas
+from .components.attribute_prediction_model import get_attribute_prediction_model
+from .components.alignment import mas_width1 as mas
 
 
 class FlowStep(nn.Module):

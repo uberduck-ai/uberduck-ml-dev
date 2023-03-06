@@ -24,7 +24,6 @@ __all__ = [
 
 import math
 
-
 import numpy as np
 from numpy import finfo
 from scipy.signal import get_window
@@ -34,6 +33,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils import remove_weight_norm, weight_norm
 from torch.nn import init
+from torch.cuda import amp
 from librosa.filters import mel as librosa_mel
 from librosa.util import pad_center, tiny
 
@@ -1519,4 +1519,332 @@ class Invertible1x1Conv(torch.nn.Module):
             log_det_W = torch.logdet(W).clone()
             z = self.conv(z)
             return z, log_det_W
+
+
+class SimpleConvNet(torch.nn.Module):
+    def __init__(self, n_mel_channels, n_context_dim, final_out_channels,
+                 n_layers=2, kernel_size=5, with_dilation=True,
+                 max_channels=1024, zero_init=True, use_partial_padding=True):
+        super(SimpleConvNet, self).__init__()
+        self.layers = torch.nn.ModuleList()
+        self.n_layers = n_layers
+        in_channels = n_mel_channels + n_context_dim
+        out_channels = -1
+        self.use_partial_padding = use_partial_padding
+        for i in range(n_layers):
+            dilation = 2 ** i if with_dilation else 1
+            padding = int((kernel_size*dilation - dilation)/2)
+            out_channels = min(max_channels, in_channels * 2)
+            self.layers.append(ConvNorm(in_channels, out_channels,
+                                        kernel_size=kernel_size, stride=1,
+                                        padding=padding, dilation=dilation,
+                                        bias=True, w_init_gain='relu',
+                                        use_partial_padding=use_partial_padding))
+            in_channels = out_channels
+
+        self.last_layer = torch.nn.Conv1d(
+            out_channels, final_out_channels, kernel_size=1)
+
+        if zero_init:
+            self.last_layer.weight.data *= 0
+            self.last_layer.bias.data *= 0
+
+    def forward(self, z_w_context, seq_lens: torch.Tensor = None):
+        # seq_lens: tensor array of sequence sequence lengths
+        # output should be b x n_mel_channels x z_w_context.shape(2)
+        mask = None
+        if seq_lens is not None:
+            mask = get_mask_from_lengths(seq_lens).unsqueeze(1).float()
+
+        for i in range(self.n_layers):
+            z_w_context = self.layers[i](z_w_context, mask)
+            z_w_context = torch.relu(z_w_context)
+
+        z_w_context = self.last_layer(z_w_context)
+        return z_w_context
+
+
+
+# Affine Coupling Layers
+class SplineTransformationLayerAR(torch.nn.Module):
+    def __init__(self, n_in_channels, n_context_dim, n_layers,
+                 affine_model='simple_conv', kernel_size=1, scaling_fn='exp',
+                 affine_activation='softplus', n_channels=1024, n_bins=8,
+                 left=-6, right=6, bottom=-6, top=6, use_quadratic=False):
+        super(SplineTransformationLayerAR, self).__init__()
+        self.n_in_channels = n_in_channels  # input dimensions
+        self.left = left
+        self.right = right
+        self.bottom = bottom
+        self.top = top
+        self.n_bins = n_bins
+        self.spline_fn = piecewise_linear_transform
+        self.inv_spline_fn = piecewise_linear_inverse_transform
+        self.use_quadratic = use_quadratic
+
+        if self.use_quadratic:
+            self.spline_fn = unbounded_piecewise_quadratic_transform
+            self.inv_spline_fn = unbounded_piecewise_quadratic_transform
+            self.n_bins = 2 * self.n_bins + 1
+        final_out_channels = self.n_in_channels * self.n_bins
+
+        # autoregressive flow, kernel size 1 and no dilation
+        self.param_predictor = SimpleConvNet(
+            n_context_dim, 0, final_out_channels, n_layers,
+            with_dilation=False, kernel_size=1, zero_init=True,
+            use_partial_padding=False)
+
+        # output is unnormalized bin weights
+
+    def normalize(self, z, inverse):
+        # normalize to [0, 1]
+        if inverse:
+            z = (z - self.bottom) / (self.top - self.bottom)
+        else:
+            z = (z - self.left) / (self.right - self.left)
+
+        return z
+
+    def denormalize(self, z, inverse):
+        if inverse:
+            z = z * (self.right - self.left) + self.left
+        else:
+            z = z * (self.top - self.bottom) + self.bottom
+
+        return z
+
+    def forward(self, z, context, inverse=False):
+        b_s, c_s, t_s = z.size(0), z.size(1), z.size(2)
+
+        z = self.normalize(z, inverse)
+
+        if z.min() < 0.0 or z.max() > 1.0:
+            print('spline z scaled beyond [0, 1]', z.min(), z.max())
+
+
+        z_reshaped = z.permute(0, 2, 1).reshape(b_s * t_s, -1)
+        affine_params = self.param_predictor(context)
+        q_tilde = affine_params.permute(0, 2, 1).reshape(b_s * t_s, c_s, -1)
+        with amp.autocast(enabled=False):
+            if self.use_quadratic:
+                w = q_tilde[:, :, :self.n_bins // 2]
+                v = q_tilde[:, :, self.n_bins // 2:]
+                z_tformed, log_s = self.spline_fn(
+                    z_reshaped.float(), w.float(), v.float(), inverse=inverse)
+            else:
+                z_tformed, log_s = self.spline_fn(
+                    z_reshaped.float(), q_tilde.float())
+
+        z = z_tformed.reshape(b_s, t_s, -1).permute(0, 2, 1)
+        z = self.denormalize(z, inverse)
+        if inverse:
+            return z
+
+        log_s = log_s.reshape(b_s, t_s, -1)
+        log_s = log_s.permute(0, 2, 1)
+        log_s = log_s + c_s * (np.log(self.top - self.bottom) -
+                               np.log(self.right - self.left))
+        return z, log_s
+
+
+class DenseLayer(nn.Module):
+    def __init__(self, in_dim=1024, sizes=[1024, 1024]):
+        super(DenseLayer, self).__init__()
+        in_sizes = [in_dim] + sizes[:-1]
+        self.layers = nn.ModuleList(
+            [LinearNorm(in_size, out_size, bias=True)
+             for (in_size, out_size) in zip(in_sizes, sizes)])
+
+    def forward(self, x):
+        for linear in self.layers:
+            x = torch.tanh(linear(x))
+        return x
+
+from .components.splines import (piecewise_linear_transform,
+                     piecewise_linear_inverse_transform,
+                     unbounded_piecewise_quadratic_transform)
+                     
+class SplineTransformationLayer(torch.nn.Module):
+    def __init__(self, n_mel_channels, n_context_dim, n_layers,
+                 with_dilation=True, kernel_size=5,
+                 scaling_fn='exp', affine_activation='softplus',
+                 n_channels=1024, n_bins=8, left=-4, right=4, bottom=-4, top=4,
+                 use_quadratic=False):
+        super(SplineTransformationLayer, self).__init__()
+        self.n_mel_channels = n_mel_channels  # input dimensions
+        self.half_mel_channels = int(n_mel_channels/2)  # half, because we split
+        self.left = left
+        self.right = right
+        self.bottom = bottom
+        self.top = top
+        self.n_bins = n_bins
+        self.spline_fn = piecewise_linear_transform
+        self.inv_spline_fn = piecewise_linear_inverse_transform
+        self.use_quadratic = use_quadratic
+
+        if self.use_quadratic:
+            self.spline_fn = unbounded_piecewise_quadratic_transform
+            self.inv_spline_fn = unbounded_piecewise_quadratic_transform
+            self.n_bins = 2*self.n_bins+1
+        final_out_channels = self.half_mel_channels*self.n_bins
+
+        self.param_predictor = SimpleConvNet(
+            self.half_mel_channels, n_context_dim, final_out_channels,
+            n_layers, with_dilation=with_dilation, kernel_size=kernel_size,
+            zero_init=False)
+
+        # output is unnormalized bin weights
+
+    def forward(self, z, context, inverse=False, seq_lens=None):
+        b_s, c_s, t_s = z.size(0), z.size(1), z.size(2)
+
+        # condition on z_0, transform z_1
+        n_half = self.half_mel_channels
+        z_0, z_1 = z[:, :n_half], z[:, n_half:]
+
+        # normalize to [0,1]
+        if inverse:
+            z_1 = (z_1 - self.bottom)/(self.top - self.bottom)
+        else:
+            z_1 = (z_1 - self.left)/(self.right - self.left)
+
+        z_w_context = torch.cat((z_0, context), 1)
+        affine_params = self.param_predictor(z_w_context, seq_lens)
+        z_1_reshaped = z_1.permute(0, 2, 1).reshape(b_s*t_s, -1)
+        q_tilde = affine_params.permute(0, 2, 1).reshape(
+            b_s*t_s, n_half, self.n_bins)
+
+        with autocast(enabled=False):
+            if self.use_quadratic:
+                w = q_tilde[:, :, :self.n_bins//2]
+                v = q_tilde[:, :, self.n_bins//2:]
+                z_1_tformed, log_s = self.spline_fn(
+                    z_1_reshaped.float(), w.float(), v.float(),
+                    inverse=inverse)
+                if not inverse:
+                    log_s = torch.sum(log_s, 1)
+            else:
+                if inverse:
+                    z_1_tformed, _dc = self.inv_spline_fn(
+                        z_1_reshaped.float(), q_tilde.float(), False)
+                else:
+                    z_1_tformed, log_s = self.spline_fn(
+                        z_1_reshaped.float(), q_tilde.float())
+
+        z_1 = z_1_tformed.reshape(b_s, t_s, -1).permute(0, 2, 1)
+
+        # undo [0, 1] normalization
+        if inverse:
+            z_1 = z_1 * (self.right - self.left) + self.left
+            z = torch.cat((z_0, z_1), dim=1)
+            return z
+        else:  # training
+            z_1 = z_1 * (self.top - self.bottom) + self.bottom
+            z = torch.cat((z_0, z_1), dim=1)
+            log_s = log_s.reshape(b_s, t_s).unsqueeze(1) + \
+                n_half*(np.log(self.top - self.bottom) -
+                        np.log(self.right-self.left))
+            return z, log_s
+
+
+class ConvLSTMLinear(nn.Module):
+    def __init__(self, in_dim, out_dim, n_layers=2, n_channels=256,
+                 kernel_size=3, p_dropout=0.1, lstm_type='bilstm',
+                 use_linear=True):
+        super(ConvLSTMLinear, self).__init__()
+        self.out_dim = out_dim
+        self.lstm_type = lstm_type
+        self.use_linear = use_linear
+        self.dropout = nn.Dropout(p=p_dropout)
+
+        convolutions = []
+        for i in range(n_layers):
+            conv_layer = ConvNorm(
+                in_dim if i == 0 else n_channels, n_channels,
+                kernel_size=kernel_size, stride=1,
+                padding=int((kernel_size - 1) / 2), dilation=1,
+                w_init_gain='relu')
+            conv_layer = torch.nn.utils.weight_norm(
+                conv_layer.conv, name='weight')
+            convolutions.append(conv_layer)
+
+        self.convolutions = nn.ModuleList(convolutions)
+
+        if not self.use_linear:
+            n_channels = out_dim
+
+        if self.lstm_type != '':
+            use_bilstm = False
+            lstm_channels = n_channels
+            if self.lstm_type == 'bilstm':
+                use_bilstm = True
+                lstm_channels = int(n_channels // 2)
+
+            self.bilstm = nn.LSTM(n_channels, lstm_channels, 1,
+                                  batch_first=True, bidirectional=use_bilstm)
+            lstm_norm_fn_pntr = nn.utils.spectral_norm
+            self.bilstm = lstm_norm_fn_pntr(self.bilstm, 'weight_hh_l0')
+            if self.lstm_type == 'bilstm':
+                self.bilstm = lstm_norm_fn_pntr(self.bilstm, 'weight_hh_l0_reverse')
+
+        if self.use_linear:
+            self.dense = nn.Linear(n_channels, out_dim)
+
+    def run_padded_sequence(self, context, lens):
+        context_embedded = []
+        for b_ind in range(context.size()[0]):  # TODO: speed up
+            curr_context = context[b_ind:b_ind+1, :, :lens[b_ind]].clone()
+            for conv in self.convolutions:
+                curr_context = self.dropout(F.relu(conv(curr_context)))
+            context_embedded.append(curr_context[0].transpose(0, 1))
+        context = torch.nn.utils.rnn.pad_sequence(
+            context_embedded, batch_first=True)
+        return context
+
+    def run_unsorted_inputs(self, fn, context, lens):
+        lens_sorted, ids_sorted = torch.sort(lens, descending=True)
+        unsort_ids = [0] * lens.size(0)
+        for i in range(len(ids_sorted)):
+            unsort_ids[ids_sorted[i]] = i
+        lens_sorted = lens_sorted.long().cpu()
+
+        context = context[ids_sorted]
+        context = nn.utils.rnn.pack_padded_sequence(
+            context, lens_sorted, batch_first=True)
+        context = fn(context)[0]
+        context = nn.utils.rnn.pad_packed_sequence(
+            context, batch_first=True)[0]
+
+        # map back to original indices
+        context = context[unsort_ids]
+        return context
+
+    def forward(self, context, lens):
+        if context.size()[0] > 1:
+            context = self.run_padded_sequence(context, lens)
+            # to B, D, T
+            context = context.transpose(1, 2)
+        else:
+            for conv in self.convolutions:
+                context = self.dropout(F.relu(conv(context)))
+
+        if self.lstm_type != '':
+            context = context.transpose(1, 2)
+            self.bilstm.flatten_parameters()
+            if lens is not None:
+                context = self.run_unsorted_inputs(self.bilstm, context, lens)
+            else:
+                context = self.bilstm(context)[0]
+            context = context.transpose(1, 2)
+
+        x_hat = context
+        if self.use_linear:
+            x_hat = self.dense(context.transpose(1, 2)).transpose(1, 2)
+
+        return x_hat
+
+    def infer(self, z, txt_enc, spk_emb):
+        x_hat = self.forward(txt_enc, spk_emb)['x_hat']
+        x_hat = self.feature_processing.denormalize(x_hat)
+        return x_hat
 
