@@ -153,8 +153,6 @@ MODEL_CONFIG = {
     "use_spectral_norm": False,
 }
 DATA_CONFIG = {
-    "training_files": "filelists/ljs_audio_text_train_filelist.txt.cleaned",
-    "validation_files": "filelists/ljs_audio_text_val_filelist.txt.cleaned",
     "text_cleaners": ["english_cleaners2"],
     "max_wav_value": 32768.0,
     "sampling_rate": 22050,
@@ -179,7 +177,7 @@ TRAIN_CONFIG = {
     "eps": 1e-9,
     "batch_size": 64,
     "fp16_run": True,
-    "lr_decay": 0.999875,
+    "lr_decay": 0.9999875,
     "segment_size": 8192,
     "init_lr_ratio": 1,
     "warmup_epochs": 0,
@@ -268,7 +266,8 @@ def ray_df_to_batch(df):
 
 def get_ray_dataset_with_embedding():
     lj_df = pd.read_csv(
-        "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/vctk_mic1/all_with_embs.txt",
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/vctk_mic1/all_with_embs.txt",
+        "https://uberduck-datasets-dirty.s3.amazonaws.com/vctk-plus-va/list-with-emb-2023-03-06.txt",
         sep="|",
         header=None,
         quoting=3,
@@ -282,12 +281,13 @@ def get_ray_dataset_with_embedding():
     dataset_audio_files = lj_df.dataset_audio_file_id.tolist()
     emb_paths = lj_df.emb_path.tolist()
 
-    parallelism_length = 400  # len(paths)
+    parallelism_length = 500  # len(paths)  # 400
     audio_ds = ray.data.read_binary_files(
         paths,
         parallelism=parallelism_length,
-        meta_provider=FastFileMetadataProvider(),
-        ray_remote_args={"num_cpus": 0.2},
+        # meta_provider=FastFileMetadataProvider(),
+        # NOTE(zach): my hypothesis is that settings this too low causes aws timeouts.
+        ray_remote_args={"num_cpus": 0.1},
     )
     transcripts_ds = ray.data.from_items(transcripts, parallelism=parallelism_length)
     dataset_audio_file_ids = ray.data.from_items(
@@ -297,8 +297,8 @@ def get_ray_dataset_with_embedding():
     emb_paths_ds = ray.data.read_binary_files(
         emb_paths,
         parallelism=parallelism_length,
-        meta_provider=FastFileMetadataProvider(),
-        ray_remote_args={"num_cpus": 0.2},
+        # meta_provider=FastFileMetadataProvider(),
+        ray_remote_args={"num_cpus": 0.1},
     )
 
     audio_ds = audio_ds.map_batches(
@@ -489,7 +489,11 @@ def _train_step(
 
 
 def train_func(config: dict):
-    setup_wandb(config, project="vits-ray", rank_zero_only=False)
+    setup_wandb(
+        config,
+        project="yourtts-replication",
+        rank_zero_only=False,
+    )
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
     is_cuda = torch.cuda.is_available()
     epochs = config["epochs"]
@@ -567,12 +571,12 @@ def train_func(config: dict):
     )
     scheduler_g = ExponentialLR(
         optim_g,
-        TRAIN_CONFIG["learning_rate_decay"],
+        TRAIN_CONFIG["lr_decay"],
         last_epoch=-1,
     )
     scheduler_d = ExponentialLR(
         optim_d,
-        TRAIN_CONFIG["learning_rate_decay"],
+        TRAIN_CONFIG["lr_decay"],
         last_epoch=-1,
     )
     dataset_shard = session.get_dataset_shard("train")
@@ -596,17 +600,17 @@ def train_func(config: dict):
                 scheduler_d,
             )
             global_step += 1
+        checkpoint = Checkpoint.from_dict(
+            dict(
+                epoch=epoch,
+                global_step=global_step,
+                generator=generator.state_dict(),
+                discriminator=discriminator.state_dict(),
+            )
+        )
+        session.report({}, checkpoint=checkpoint)
         if session.get_world_rank() == 0:
             # TODO(zach): Also save wandb artifact here.
-            checkpoint = Checkpoint.from_dict(
-                dict(
-                    epoch=epoch,
-                    global_step=global_step,
-                    generator=generator.state_dict(),
-                    discriminator=discriminator.state_dict(),
-                )
-            )
-            session.report({}, checkpoint=checkpoint)
             artifact = wandb.Artifact(
                 f"artifact_epoch{epoch}_step{global_step}", "model"
             )
@@ -643,7 +647,7 @@ if __name__ == "__main__":
             "gin_channels": 512,
         },
         scaling_config=ScalingConfig(
-            num_workers=10, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=5, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
         ),
         run_config=RunConfig(
             sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
