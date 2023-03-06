@@ -97,10 +97,12 @@ DEFAULTS = HParams(
     # TODO (Sam): Treat all "GSTs" (emotion, speaker, quality) generically.  Rename.
     # TODO (Sam): Need heirarchical defaulting structure so that this is listed as a default param if gst_type is not None
     gst_type=None,
-    with_gst=False,
+    # TODO (Sam): figure out if singular or plural.
+    # I thought singular in trainer plural here but that may be overcomplicated.
+    with_gsts=False,
     gst_dim=2304,
     # f0 parameters
-    with_f0=False,
+    with_f0s=False,
     # Speaker encoder parameters
     n_speakers=1,
     speaker_embedding_dim=128,
@@ -138,7 +140,7 @@ class Tacotron2(TTSModel):
         self.encoder_embedding_dim = hparams.encoder_embedding_dim
         # TODO (Sam): make these names match
         self.has_speaker_embedding = hparams.has_speaker_embedding
-        self.with_gst = hparams.with_gst
+        self.with_gst = hparams.with_gsts
 
         self.cudnn_enabled = hparams.cudnn_enabled
 

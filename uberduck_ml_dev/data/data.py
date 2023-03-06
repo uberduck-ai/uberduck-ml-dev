@@ -163,7 +163,7 @@ class Data(Dataset):
     # NOTE (Sam): this is the RADTTS version - more recent than mellotron from the same author.
     # NOTE (Sam): in contrast to get_gst, the computation here is kept in this file rather than a functional argument.
     def _get_f0(self, audiopath, audio):
-        filename = "_".join(audiopath.split("/")[-3:])
+        filename = "_".join(audiopath.split("/")).split(".wav")[0]
         f0_path = os.path.join(self.f0_cache_path, filename)
         f0_path += "_f0_sr{}_fl{}_hl{}_f0min{}_f0max{}_log{}.pt".format(
             self.sampling_rate,
