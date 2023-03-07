@@ -342,6 +342,7 @@ class DataCollate():
             mel_padded[i, :, :mel.size(1)] = mel
             if batch[ids_sorted_decreasing[i]]['f0'] is not None:
                 f0 = batch[ids_sorted_decreasing[i]]['f0']
+                # print(f0.shape, f0_padded.shape)
                 f0_padded[i, :len(f0)] = f0
 
             if batch[ids_sorted_decreasing[i]]['voiced_mask'] is not None:
@@ -358,7 +359,7 @@ class DataCollate():
 
             output_lengths[i] = mel.size(1)
             speaker_ids[i] = batch[ids_sorted_decreasing[i]]['speaker_id']
-            audiopath = batch[ids_sorted_decreasing[i]]['audiopath']
+            audiopath = 'whocares'#batch[ids_sorted_decreasing[i]]['audiopath']
             audiopaths.append(audiopath)
             cur_attn_prior = batch[ids_sorted_decreasing[i]]['attn_prior']
             if cur_attn_prior is None:
@@ -379,6 +380,102 @@ class DataCollate():
                 'energy_avg': energy_avg_padded
                 }
 
+max_wav_value = 32768
+from librosa import pyin
+def get_f0_pvoiced(audio, sampling_rate=22050, frame_length=1024,
+                    hop_length=256, f0_min=100, f0_max=300):
+
+    audio_norm = audio / max_wav_value
+    f0, voiced_mask, p_voiced = pyin(
+        y = audio_norm, fmin = f0_min, fmax = f0_max, sr = sampling_rate,
+        frame_length=frame_length, win_length=frame_length // 2,
+        hop_length=hop_length)
+    f0[~voiced_mask] = 0.0
+    f0 = torch.FloatTensor(f0)
+    p_voiced = torch.FloatTensor(p_voiced)
+    voiced_mask = torch.FloatTensor(voiced_mask)
+    return f0, voiced_mask, p_voiced
+
+
+    
+use_scaled_energy = True
+def energy_avg_normalize(x):
+    if  use_scaled_energy == True:
+        x = (x + 20.0) / 20.0
+    return x
+    
+def get_energy_average(mel):
+    energy_avg = mel.mean(0)
+    energy_avg = energy_avg_normalize(energy_avg)
+    return energy_avg
+
+import os
+import pickle as pkl
+from scipy.stats import betabinom
+
+def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.05):
+    P = phoneme_count
+    M = mel_count
+    x = np.arange(0, P)
+    mel_text_probs = []
+    for i in range(1, M + 1):
+        a, b = scaling_factor * i, scaling_factor * (M + 1 - i)
+        rv = betabinom(P - 1, a, b)
+        mel_i_prob = rv.pmf(x)
+        mel_text_probs.append(mel_i_prob)
+    return torch.tensor(np.array(mel_text_probs))
+
+
+def get_attention_prior(n_tokens, n_frames):
+    # cache the entire attn_prior by filename
+    # if self.use_attn_prior_masking:
+    filename = "{}_{}".format(n_tokens, n_frames)
+    betabinom_cache_path = 'yourmom'
+    if not os.path.exists(betabinom_cache_path):
+        os.makedirs(betabinom_cache_path, exist_ok=False)
+    prior_path = os.path.join(betabinom_cache_path, filename)
+    prior_path += "_prior.pth"
+    # if self.lmdb_cache_path != "":
+    #     attn_prior = pkl.loads(
+    #         self.cache_data_lmdb.get(prior_path.encode("ascii"))
+    #     )
+    if os.path.exists(prior_path):
+        attn_prior = torch.load(prior_path)
+    else:
+        attn_prior = beta_binomial_prior_distribution(
+            n_tokens, n_frames, scaling_factor = 0.05
+        )
+        torch.save(attn_prior, prior_path)
+    # else:
+        # attn_prior = torch.ones(n_frames, n_tokens)  # all ones baseline
+
+    return attn_prior
+
+def f0_normalize( x, f0_min):
+    # if self.use_log_f0:
+    # mask = x >= f0_min
+    # x[mask] = torch.log(x[mask])
+    # x[~mask] = 0.0
+
+    return x
+    
+from uberduck_ml_dev.data.audio_processing import TacotronSTFT
+stft = TacotronSTFT(
+    filter_length=data_config['filter_length'],
+    hop_length=data_config['hop_length'],
+    win_length=data_config['win_length'],
+    sampling_rate=22050,
+    n_mel_channels=data_config['n_mel_channels'],
+    mel_fmin=data_config['mel_fmin'],
+    mel_fmax=data_config['mel_fmax'],
+)
+
+def get_speaker_id(speaker):
+
+    return torch.LongTensor([speaker])
+
+from uberduck_ml_dev.models.common import get_mel
+
 
 def ray_df_to_batch_radtts(df):
     transcripts = df.transcript.tolist()
@@ -394,7 +491,7 @@ def ray_df_to_batch_radtts(df):
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / (np.abs(audio).max() * 2)
-        audio_norm = audio_norm.unsqueeze(0)
+        # audio_norm = audio_norm.unsqueeze(0)
         # Text
         text_sequence = torch.LongTensor(
             intersperse(
@@ -408,11 +505,21 @@ def ray_df_to_batch_radtts(df):
             )
         )
         # Spectrogram
-        mel = spectrogram_torch(audio_norm)
-        mel = torch.squeeze(spec, 0)
 
-        collate_input.append({'text_sequence': text_sequence, 'mel':mel, 'speaker_id': speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg))
+        mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
+        mel = torch.squeeze(mel, 0)
+        f0, voiced_mask, p_voiced = get_f0_pvoiced(
+            audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)   
+        f0 = f0_normalize(f0, f0_min = data_config['f0_min'])
+        energy_avg = get_energy_average(mel)
+        attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
+
+        speaker_id =  get_speaker_id(speaker_id)
+        # print(type(mel))
+        # print(type(text_sequence), type (speaker_id), type(f0), type (p_voiced), type(voiced_mask), type(energy_avg), type(attn_prior))
+        collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior})
     return collate_fn(collate_input)
+
 
 
 def get_ray_dataset():
@@ -470,18 +577,19 @@ def get_ray_dataset():
 
 @torch.no_grad()
 def log(metrics, gen_audio=None, gt_audio=None, sample_audio=None):
-    wandb_metrics = dict(metrics)
-    if gen_audio is not None:
-        wandb_metrics.update({"gen/audio": wandb.Audio(gen_audio, sample_rate=22050)})
-    if gt_audio is not None:
-        wandb_metrics.update({"gt/audio": wandb.Audio(gt_audio, sample_rate=22050)})
-    if sample_audio is not None:
-        wandb_metrics.update(
-            {"sample_inference": wandb.Audio(sample_audio, sample_rate=22050)}
-        )
-    session.report(metrics)
-    if session.get_world_rank() == 0:
-        wandb.log(wandb_metrics)
+    pass
+    # wandb_metrics = dict(metrics)
+    # if gen_audio is not None:
+    #     wandb_metrics.update({"gen/audio": wandb.Audio(gen_audio, sample_rate=22050)})
+    # if gt_audio is not None:
+    #     wandb_metrics.update({"gt/audio": wandb.Audio(gt_audio, sample_rate=22050)})
+    # if sample_audio is not None:
+    #     wandb_metrics.update(
+    #         {"sample_inference": wandb.Audio(sample_audio, sample_rate=22050)}
+    #     )
+    # session.report(metrics)
+    # if session.get_world_rank() == 0:
+    #     wandb.log(wandb_metrics)
 
 
 def _train_step(
@@ -507,11 +615,22 @@ def _train_step(
     optim.zero_grad()
     # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
     with autocast():
-        (mel, speaker_ids, text, in_lens, out_lens, attn_prior,
-             f0, voiced_mask, p_voiced, energy_avg,
-             audiopaths) = [
-            to_gpu(el) for el in ray_df_to_batch_radtts(batch)
-        ]
+        batch_dict = ray_df_to_batch_radtts(batch)
+        mel = to_gpu(batch_dict['mel'])
+        speaker_ids = to_gpu(batch_dict['speaker_ids'])
+        attn_prior = to_gpu(batch_dict['attn_prior'])
+        f0 = to_gpu(batch_dict['f0'])
+        voiced_mask = to_gpu(batch_dict['voiced_mask'])
+        p_voiced = to_gpu(batch_dict['p_voiced'])
+        text = to_gpu(batch_dict['text'])
+        in_lens = to_gpu(batch_dict['input_lengths'])
+        out_lens = to_gpu(batch_dict['output_lengths'])
+        energy_avg = to_gpu(batch_dict['energy_avg'])
+        # (mel, speaker_ids, text, in_lens, out_lens, attn_prior,
+        #      f0, voiced_mask, p_voiced, energy_avg,
+        #      audiopaths) = [
+        #     to_gpu(el) for el in 
+        # ]
         outputs = model(
                     mel, speaker_ids, text, in_lens, out_lens,
                     binarize_attention=binarize, attn_prior=attn_prior,
@@ -541,6 +660,7 @@ def _train_step(
     scaler.unscale_(optim)
     clip_grad_value_(model.parameters(), 100)
     scaler.step(optim)
+    scaler.update()
     scheduler.step()
 
 
@@ -554,9 +674,10 @@ def _train_step(
         )
         model.train()
 
-        log(metrics, gen_audio, gt_audio, sample_audio)
+        # log(metrics, gen_audio, gt_audio, sample_audio)
     else:
-        log(metrics)
+        # log(metrics)
+        pass
     print(f"Loss: {loss.item()}")
 
 
@@ -574,7 +695,7 @@ def train_func(config: dict):
     model = RADTTS(
         **model_config,
     )
-    model = train.torch.prepare_model(model)
+    model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
     # discriminator = MultiPeriodDiscriminator(MODEL_CONFIG["use_spectral_norm"])
     # discriminator = train.torch.prepare_model(discriminator)
 

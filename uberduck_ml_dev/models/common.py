@@ -1157,8 +1157,18 @@ def spectrogram_torch(y, n_fft=FILTER_LENGTH, sampling_rate=SAMPLING_RATE, hop_s
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
 
-
-
+# TODO (Sam): unite the get_mel methods
+def get_mel(audio, max_wav_value, stft):
+    audio_norm = audio / max_wav_value
+    audio_norm = audio_norm.unsqueeze(0)
+    audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
+    melspec = stft.mel_spectrogram(audio_norm)
+    melspec = torch.squeeze(melspec, 0)
+    # if self.do_mel_scaling:
+    #     melspec = (melspec + 5.5) / 2
+    # if self.mel_noise_scale > 0:
+    #     melspec += torch.randn_like(melspec) * self.mel_noise_scale
+    return melspec
 
 class ConvAttention(torch.nn.Module):
     def __init__(self, n_mel_channels=80, n_text_channels=512,
@@ -1247,7 +1257,7 @@ class ConvAttention(torch.nn.Module):
                 mask.permute(0, 2, 1).unsqueeze(2), -float("inf"))
 
         attn = self.softmax(attn)  # softmax along T2
-        return attn, 
+        return attn, attn_logprob
 
 
 
