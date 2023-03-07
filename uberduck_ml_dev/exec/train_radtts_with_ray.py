@@ -52,61 +52,214 @@ def _load_checkpoint_dict():
     return checkpoint_dict
 
 
-MODEL_CONFIG = {
-    "inter_channels": 192,
-    "hidden_channels": 192,
-    "filter_channels": 768,
-    "n_heads": 2,
-    "n_layers": 6,
-    "kernel_size": 3,
-    "p_dropout": 0.1,
-    "resblock": "1",
-    "resblock_kernel_sizes": [3, 7, 11],
-    "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-    "upsample_rates": [8, 8, 2, 2],
-    "upsample_initial_channel": 512,
-    "upsample_kernel_sizes": [16, 16, 4, 4],
-    "n_layers_q": 3,
-    "use_spectral_norm": False,
-}
-DATA_CONFIG = {
-    "training_files": "filelists/ljs_audio_text_train_filelist.txt.cleaned",
-    "validation_files": "filelists/ljs_audio_text_val_filelist.txt.cleaned",
-    "text_cleaners": ["english_cleaners2"],
-    "max_wav_value": 32768.0,
-    "sampling_rate": 22050,
-    "filter_length": 1024,
-    "hop_length": 256,
-    "win_length": 1024,
-    "n_mel_channels": 80,
-    "mel_fmin": 0.0,
-    "mel_fmax": None,
-    "add_blank": True,
-    "n_speakers": 0,
-    "cleaned_text": True,
+# MODEL_CONFIG = {
+#     "inter_channels": 192,
+#     "hidden_channels": 192,
+#     "filter_channels": 768,
+#     "n_heads": 2,
+#     "n_layers": 6,
+#     "kernel_size": 3,
+#     "p_dropout": 0.1,
+#     "resblock": "1",
+#     "resblock_kernel_sizes": [3, 7, 11],
+#     "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+#     "upsample_rates": [8, 8, 2, 2],
+#     "upsample_initial_channel": 512,
+#     "upsample_kernel_sizes": [16, 16, 4, 4],
+#     "n_layers_q": 3,
+#     "use_spectral_norm": False,
+# }
+# DATA_CONFIG = {
+#     "training_files": "filelists/ljs_audio_text_train_filelist.txt.cleaned",
+#     "validation_files": "filelists/ljs_audio_text_val_filelist.txt.cleaned",
+#     "text_cleaners": ["english_cleaners2"],
+#     "max_wav_value": 32768.0,
+#     "sampling_rate": 22050,
+#     "filter_length": 1024,
+#     "hop_length": 256,
+#     "win_length": 1024,
+#     "n_mel_channels": 80,
+#     "mel_fmin": 0.0,
+#     "mel_fmax": None,
+#     "add_blank": True,
+#     "n_speakers": 0,
+#     "cleaned_text": True,
+# }
+
+# TRAIN_CONFIG = {
+#     "log_interval": 200,
+#     "eval_interval": 1000,
+#     "seed": 1234,
+#     "epochs": 20000,
+#     "learning_rate": 2e-4,
+#     "betas": [0.8, 0.99],
+#     "eps": 1e-9,
+#     "batch_size": 64,
+#     "fp16_run": True,
+#     "lr_decay": 0.999875,
+#     "segment_size": 8192,
+#     "init_lr_ratio": 1,
+#     "warmup_epochs": 0,
+#     "c_mel": 45,
+#     "c_kl": 1.0,
+# }
+
+# config = DEFAULTS.values()
+# config["with_gsts"] = False
+config = {
+    "train_config": {
+        "output_directory": "/lj_minimal_decoder",
+        "epochs": 10000000,
+        "optim_algo": "RAdam",
+        "learning_rate": 1e-4,
+        "weight_decay": 1e-6,
+        "sigma": 1.0,
+        "iters_per_checkpoint": 2500,
+        "steps_per_sample": 200,
+        "batch_size": 16,
+        "seed": None,
+        "checkpoint_path": "",
+        "ignore_layers": [],
+        "ignore_layers_warmstart": [],
+        "finetune_layers": [],
+        "include_layers": [],
+        "vocoder_config_path": "/usr/src/app/radtts/models/hifigan_22khz_config.json",
+        "vocoder_checkpoint_path": "/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt",
+        "log_attribute_samples": False,
+        "log_decoder_samples": True,
+        "warmstart_checkpoint_path": "",
+        "use_amp": False,
+        "grad_clip_val": 1.0,
+        "loss_weights": {
+            "blank_logprob": -1,
+            "ctc_loss_weight": 0.1,
+            "binarization_loss_weight": 1.0,
+            "dur_loss_weight": 1.0,
+            "f0_loss_weight": 1.0,
+            "energy_loss_weight": 1.0,
+            "vpred_loss_weight": 1.0
+        },
+        "binarization_start_iter": 6000,
+        "kl_loss_start_iter": 18000,
+        "unfreeze_modules": "all"
+    },
+    "data_config": {
+        "training_files": {
+            "LJS": {
+                "basedir": "/",
+                "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+                "lmdbpath": ""
+            }
+        },
+        "validation_files": {
+            "LJS": {
+                "basedir": "/",
+                "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+                "lmdbpath": ""
+            }
+        },
+        "dur_min": 0.1,
+        "dur_max": 10.2,
+        "sampling_rate": 22050,
+        "filter_length": 1024,
+        "hop_length": 256,
+        "win_length": 1024,
+        "n_mel_channels": 80,
+        "mel_fmin": 0.0,
+        "mel_fmax": 8000.0,
+        "f0_min": 80.0,
+        "f0_max": 640.0,
+        "max_wav_value": 32768.0,
+        "use_f0": True,
+        "use_log_f0": 0,
+        "use_energy_avg": True,
+        "use_scaled_energy": True,
+        "symbol_set": "radtts",
+        "cleaner_names": ["radtts_cleaners"],
+        "heteronyms_path": "tts_text_processing/heteronyms",
+        "phoneme_dict_path": "tts_text_processing/cmudict-0.7b",
+        "p_phoneme": 1.0,
+        "handle_phoneme": "word",
+        "handle_phoneme_ambiguous": "ignore",
+        "include_speakers": None,
+        "n_frames": -1,
+        "betabinom_cache_path": "data_cache/",
+        "lmdb_cache_path": "", 
+        "use_attn_prior_masking": True,
+        "prepend_space_to_text": True,
+        "append_space_to_text": True,
+        "add_bos_eos_to_text": False,
+        "betabinom_scaling_factor": 1.0,
+        "distance_tx_unvoiced": False,
+        "mel_noise_scale": 0.0
+    },
+    "model_config": {
+        "n_speakers": 1,
+        "n_speaker_dim": 16,
+        "n_text": 185,
+        "n_text_dim": 512,
+        "n_flows": 8,
+        "n_conv_layers_per_step": 4,
+        "n_mel_channels": 80,
+        "n_hidden": 1024,
+        "mel_encoder_n_hidden": 512,
+        "dummy_speaker_embedding": False,
+        "n_early_size": 2,
+        "n_early_every": 2,
+        "n_group_size": 2,
+        "affine_model": "wavenet",
+        "include_modules": "decatnvpred",
+        "scaling_fn": "tanh",
+        "matrix_decomposition": "LUS",
+        "learn_alignments": True,
+        "use_speaker_emb_for_alignment": False,
+        "attn_straight_through_estimator": True,
+        "use_context_lstm": True,
+        "context_lstm_norm": "spectral",
+        "context_lstm_w_f0_and_energy": True,
+        "text_encoder_lstm_norm": "spectral",
+        "n_f0_dims": 1,
+        "n_energy_avg_dims": 1,
+        "use_first_order_features": False,
+        "unvoiced_bias_activation": "relu",
+        "decoder_use_partial_padding": True,
+        "decoder_use_unvoiced_bias": True,
+        "ap_pred_log_f0": True,
+        "ap_use_unvoiced_bias": True,
+        "ap_use_voiced_embeddings": True,
+        "dur_model_config": None,
+        "f0_model_config": None,
+        "energy_model_config": None,
+        "v_model_config": {
+            "name": "dap",
+            "hparams": {
+                "n_speaker_dim": 16,
+                "take_log_of_input": False,
+                "bottleneck_hparams": {
+                    "in_dim": 512,
+                    "reduction_factor": 16,
+                    "norm": "weightnorm",
+                    "non_linearity": "relu"
+                },
+                "arch_hparams": {
+                    "out_dim": 1,
+                    "n_layers": 2,
+                    "n_channels": 256,
+                    "kernel_size": 3,
+                    "p_dropout": 0.5,
+                    "lstm_type": "",
+                    "use_linear": 1
+                }
+            }
+        }
+    }
 }
 
-TRAIN_CONFIG = {
-    "log_interval": 200,
-    "eval_interval": 1000,
-    "seed": 1234,
-    "epochs": 20000,
-    "learning_rate": 2e-4,
-    "betas": [0.8, 0.99],
-    "eps": 1e-9,
-    "batch_size": 64,
-    "fp16_run": True,
-    "lr_decay": 0.999875,
-    "segment_size": 8192,
-    "init_lr_ratio": 1,
-    "warmup_epochs": 0,
-    "c_mel": 45,
-    "c_kl": 1.0,
-}
-
-config = DEFAULTS.values()
-config["with_gsts"] = False
-
+train_config = config['train_config']
+model_config = config['model_config']
+data_config = config['data_config']
 
 @torch.no_grad()
 def sample_inference(model):
@@ -230,12 +383,11 @@ class DataCollate():
 def ray_df_to_batch_radtts(df):
     transcripts = df.transcript.tolist()
     audio_bytes_list = df.audio_bytes.tolist()
-    pitch_bytes_list = df.bitch_bytes.tolist()
     speaker_ids = df.speaker_id.tolist()
     collate_fn = DataCollate()
     collate_input = []
-    for transcript, audio_bytes, pitch_bytes in zip(
-        transcripts, audio_bytes_list, pitch_bytes_list
+    for transcript, audio_bytes, speaker_id in zip(
+        transcripts, audio_bytes_list, speaker_ids
     ):
         # Audio
         bio = BytesIO(audio_bytes)
@@ -256,13 +408,10 @@ def ray_df_to_batch_radtts(df):
             )
         )
         # Spectrogram
-        spec = spectrogram_torch(audio_norm)
-        spec = torch.squeeze(spec, 0)
-        # Pitch
-        bio = BytesIO(pitch_bytes)
-        pitch = torch.load(bio)
+        mel = spectrogram_torch(audio_norm)
+        mel = torch.squeeze(spec, 0)
 
-        collate_input.append((text_sequence, spec, audio_norm, speaker_ids, pitch))
+        collate_input.append({'text_sequence': text_sequence, 'mel':mel, 'speaker_id': speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg))
     return collate_fn(collate_input)
 
 
@@ -308,10 +457,10 @@ def get_ray_dataset():
     output_dataset = output_dataset.map_batches(
         lambda table: table.rename(
             columns={
-                "value_1": "transcript",
-                "value_2": "audio_bytes",
-                "value_3": "path",
-                "value_4": "speaker_id"
+                "value": "transcript",
+                "value_1": "audio_bytes",
+                "value_2": "path",
+                "value_3": "speaker_id"
             }
         )
     )
@@ -349,8 +498,11 @@ def _train_step(
     kl_loss_start_iter,
     binarization_start_iter
 ):
+
     if iteration >= binarization_start_iter:
         binarize = True
+    else:
+        binarize = False
 
     optim.zero_grad()
     # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
@@ -409,26 +561,20 @@ def _train_step(
 
 
 def train_func(config: dict):
-    setup_wandb(config, project="vits-ray", rank_zero_only=False)
+    setup_wandb(config, project="radtts-ray", rank_zero_only=False)
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
-    is_cuda = torch.cuda.is_available()
     epochs = config["epochs"]
     batch_size = config["batch_size"]
-    steps_per_sample = config["batch_size"]
-    gin_channels = config["gin_channels"]
+    steps_per_sample = config["steps_per_sample"]
+    # gin_channels = config["gin_channels"]
     sigma = config['sigma']
     kl_loss_start_iter = config['kl_loss_start_iter']
     binarization_start_iter = config['binarization_start_iter']
 
-    is_cuda = torch.cuda.is_available()
     model = RADTTS(
-        n_vocab=len(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS]),
-        spec_channels=DATA_CONFIG["filter_length"] // 2 + 1,
-        segment_size=TRAIN_CONFIG["segment_size"] // DATA_CONFIG["hop_length"],
-        **MODEL_CONFIG,
-        gin_channels=gin_channels,
+        **model_config,
     )
-    generator = train.torch.prepare_model(model)
+    model = train.torch.prepare_model(model)
     # discriminator = MultiPeriodDiscriminator(MODEL_CONFIG["use_spectral_norm"])
     # discriminator = train.torch.prepare_model(discriminator)
 
@@ -450,15 +596,15 @@ def train_func(config: dict):
             model.load_state_dict(model_sd, strict=False)
         del checkpoint_dict
 
-    optim = torch.optim.AdamW(
-        generator.parameters(),
-        TRAIN_CONFIG["learning_rate"],
-        betas=TRAIN_CONFIG["betas"],
-        eps=TRAIN_CONFIG["eps"],
+    # NOTE (Sam): replace with RAdam
+    optim = torch.optim.Adam(
+        model.parameters(),
+        lr = config["learning_rate"],
+        weight_decay = config["weight_decay"]
     )
     scheduler = ExponentialLR(
         optim,
-        TRAIN_CONFIG["learning_rate_decay"],
+        config["weight_decay"],
         last_epoch=-1,
     )
     dataset_shard = session.get_dataset_shard("train")
@@ -527,8 +673,8 @@ if __name__ == "__main__":
     print("Loading dataset")
     ray_dataset = get_ray_dataset()
     # checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-02-17_17-49-00/TorchTrainer_6a5ed_00000_0_2023-02-17_17-52-52/checkpoint_000598/"
-    checkpoint_uri = None # from scratch
-    checkpoint = TorchCheckpointFixed.from_uri(checkpoint_uri)
+    # checkpoint_uri = None # from scratch
+    # checkpoint = TorchCheckpointFixed.from_uri(checkpoint_uri)
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={

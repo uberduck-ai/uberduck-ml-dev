@@ -36,10 +36,11 @@ from torch.nn import init
 from torch.cuda import amp
 from librosa.filters import mel as librosa_mel
 from librosa.util import pad_center, tiny
+from typing import Tuple
 
 from ..utils.utils import *
 from .transforms import piecewise_rational_quadratic_transform
-
+from .components.partialconv1d import PartialConv1d as pconv1d
 
 class Conv1d(nn.Module):
     def __init__(
@@ -773,6 +774,71 @@ class WN(torch.nn.Module):
             remove_weight_norm(l)
 
 
+
+class WN_RADTTS(torch.nn.Module):
+    """
+    Adapted from WN() module in WaveGlow with modififcations to variable names
+    """
+    def __init__(self, n_in_channels, n_context_dim, n_layers, n_channels,
+                 kernel_size=5, affine_activation='softplus',
+                 use_partial_padding=True):
+        super(WN_RADTTS, self).__init__()
+        assert(kernel_size % 2 == 1)
+        assert(n_channels % 2 == 0)
+        self.n_layers = n_layers
+        self.n_channels = n_channels
+        self.in_layers = torch.nn.ModuleList()
+        self.res_skip_layers = torch.nn.ModuleList()
+        start = torch.nn.Conv1d(n_in_channels+n_context_dim, n_channels, 1)
+        start = torch.nn.utils.weight_norm(start, name='weight')
+        self.start = start
+        self.softplus = torch.nn.Softplus()
+        self.affine_activation = affine_activation
+        self.use_partial_padding = use_partial_padding
+        # Initializing last layer to 0 makes the affine coupling layers
+        # do nothing at first.  This helps with training stability
+        end = torch.nn.Conv1d(n_channels, 2*n_in_channels, 1)
+        end.weight.data.zero_()
+        end.bias.data.zero_()
+        self.end = end
+
+        for i in range(n_layers):
+            dilation = 2 ** i
+            padding = int((kernel_size*dilation - dilation)/2)
+            in_layer = ConvNorm(n_channels, n_channels, kernel_size=kernel_size,
+                                dilation=dilation, padding=padding,
+                                use_partial_padding=use_partial_padding,
+                                use_weight_norm=True)
+            # in_layer = nn.Conv1d(n_channels, n_channels, kernel_size,
+            #                      dilation=dilation, padding=padding)
+            # in_layer = nn.utils.weight_norm(in_layer)
+            self.in_layers.append(in_layer)
+            res_skip_layer = nn.Conv1d(n_channels, n_channels, 1)
+            res_skip_layer = nn.utils.weight_norm(res_skip_layer)
+            self.res_skip_layers.append(res_skip_layer)
+
+    def forward(self, forward_input: Tuple[torch.Tensor, torch.Tensor], seq_lens: torch.Tensor = None):
+        z, context = forward_input
+        z = torch.cat((z, context), 1)  # append context to z as well
+        z = self.start(z)
+        output = torch.zeros_like(z)
+        mask = None
+        if seq_lens is not None:
+            mask = get_mask_from_lengths(seq_lens).unsqueeze(1).float()
+        non_linearity = torch.relu
+        if self.affine_activation == 'softplus':
+            non_linearity = self.softplus
+
+        for i in range(self.n_layers):
+            z = non_linearity(self.in_layers[i](z, mask))
+            res_skip_acts = non_linearity(self.res_skip_layers[i](z))
+            output = output + res_skip_acts
+
+        output = self.end(output)  # [B, dim, seq_len]
+        return output
+
+
+
 # Cell
 class ResidualCouplingLayer(nn.Module):
     def __init__(
@@ -1204,7 +1270,7 @@ class AffineTransformationLayer(torch.nn.Module):
         self.affine_model = affine_model
         self.scaling_fn = scaling_fn
         if affine_model == 'wavenet':
-            self.affine_param_predictor = WN(
+            self.affine_param_predictor = WN_RADTTS(
                 int(n_mel_channels/2), n_context_dim, n_layers=n_layers,
                 n_channels=n_channels, affine_activation=affine_activation,
                 use_partial_padding=use_partial_padding)
