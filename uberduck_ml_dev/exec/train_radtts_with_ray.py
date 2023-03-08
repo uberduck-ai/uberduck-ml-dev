@@ -1,11 +1,9 @@
 import tempfile
-import csv
 from io import BytesIO
 
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 from scipy.io import wavfile
 import wandb
 from torch.cuda.amp import autocast, GradScaler
@@ -18,20 +16,16 @@ from ray.air.integrations.wandb import  setup_wandb
 import ray.data
 # from ray.data.datasource import FastFileMetadataProvider
 import ray.train as train
-from ray.train.torch import TorchTrainer, TorchCheckpoint
+from ray.train.torch import TorchTrainer
 from ray.tune import SyncConfig
 
 
 # from uberduck_ml_dev.models import vits
 # from uberduck_ml_dev.models.vits import *
 from uberduck_ml_dev.models.radtts import RADTTS
-from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS, SYMBOL_SETS
-from uberduck_ml_dev.models.tacotron2 import DEFAULTS
 from uberduck_ml_dev.text.utils import text_to_sequence
 from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS
-from uberduck_ml_dev.models.common import (
-    spectrogram_torch,
-)
+
 from uberduck_ml_dev.losses import RADTTSLoss, AttentionBinarizationLoss
 
 from uberduck_ml_dev.utils.utils import (
@@ -39,18 +33,6 @@ from uberduck_ml_dev.utils.utils import (
     to_gpu,
     clip_grad_value_,
 )
-
-def _fix_state_dict(sd):
-    return {k[7:]: v for k, v in sd.items()}
-
-
-def _load_checkpoint_dict():
-    checkpoint = session.get_checkpoint()
-    if checkpoint is None:
-        return
-    checkpoint_dict = checkpoint.to_dict()
-    return checkpoint_dict
-
 
 # MODEL_CONFIG = {
 #     "inter_channels": 192,
@@ -613,7 +595,7 @@ def _train_step(
         binarize = False
 
     optim.zero_grad()
-    # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
+
     with autocast(enabled= False):
         batch_dict = ray_df_to_batch_radtts(batch)
         mel = to_gpu(batch_dict['mel'])
@@ -635,11 +617,14 @@ def _train_step(
 
         loss_outputs = criterion(outputs, in_lens, out_lens)
 
+        print_list = []
         loss = None
         for k, (v, w) in loss_outputs.items():
             if w > 0:
                 loss = v * w if loss is None else loss + v * w
+            print_list.append('  |  {}: {:.3f}'.format(k, v))
 
+        
         w_bin = criterion.loss_weights.get('binarization_loss_weight', 1.0)
         if binarize and iteration >= kl_loss_start_iter:
             binarization_loss = attention_kl_loss(
@@ -649,7 +634,7 @@ def _train_step(
             binarization_loss = torch.zeros_like(loss)
         loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
 
- 
+    print(print_list)
     optim.zero_grad()
     scaler.scale(loss).backward()
     scaler.unscale_(optim)
@@ -671,7 +656,6 @@ def train_func(config: dict):
     epochs = config["epochs"]
     batch_size = config["batch_size"]
     steps_per_sample = config["steps_per_sample"]
-    # gin_channels = config["gin_channels"]
     sigma = config['sigma']
     kl_loss_start_iter = config['kl_loss_start_iter']
     binarization_start_iter = config['binarization_start_iter']
@@ -681,20 +665,10 @@ def train_func(config: dict):
     )
     model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
 
-    checkpoint_dict = _load_checkpoint_dict()
-    if checkpoint_dict is None:
-        global_step = 0
-        start_epoch = 0
-    else:
-        global_step = checkpoint_dict["global_step"]
-        start_epoch = checkpoint_dict["epoch"]
-        if session.get_world_size() > 1:
-            model_sd = checkpoint_dict["model"]
-            model.load_state_dict(model_sd)
-        else:
-            model_sd = _fix_state_dict(checkpoint_dict["model"])
-            model.load_state_dict(model_sd)
-        del checkpoint_dict
+
+    global_step = 0
+    start_epoch = 0
+
 
     # NOTE (Sam): replace with RAdam
     optim = torch.optim.Adam(
