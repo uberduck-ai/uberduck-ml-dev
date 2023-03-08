@@ -577,8 +577,8 @@ def get_ray_dataset():
 
 @torch.no_grad()
 def log(metrics, gen_audio=None, gt_audio=None, sample_audio=None):
-    pass
-    # wandb_metrics = dict(metrics)
+    # pass
+    wandb_metrics = dict(metrics)
     # if gen_audio is not None:
     #     wandb_metrics.update({"gen/audio": wandb.Audio(gen_audio, sample_rate=22050)})
     # if gt_audio is not None:
@@ -588,8 +588,8 @@ def log(metrics, gen_audio=None, gt_audio=None, sample_audio=None):
     #         {"sample_inference": wandb.Audio(sample_audio, sample_rate=22050)}
     #     )
     # session.report(metrics)
-    # if session.get_world_rank() == 0:
-    #     wandb.log(wandb_metrics)
+    if session.get_world_rank() == 0:
+        wandb.log(wandb_metrics)
 
 
 def _train_step(
@@ -658,26 +658,15 @@ def _train_step(
     scaler.update()
     scheduler.step()
 
-
-    # metrics = loss_outputs.items() # add loss
-    # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
-    #     gen_audio = None#y_hat[0][0][: y_lengths[0]].data.cpu().numpy().astype("float32")
-    #     gt_audio = None#y[0][0][: y_lengths[0]].data.cpu().numpy().astype("float32")
-    #     model.eval()
-    #     sample_audio = sample_inference(
-    #         model
-    #     )
-    #     model.train()
-
-    #     # log(metrics, gen_audio, gt_audio, sample_audio)
-    # else:
-    #     # log(metrics)
-    #     pass
+    metrics = {
+        "loss": loss.item()
+    }
+    log(metrics)
     print(f"Loss: {loss.item()}")
-
+    
 
 def train_func(config: dict):
-    setup_wandb(config, project="radtts-ray", rank_zero_only=False)
+    setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
     epochs = config["epochs"]
     batch_size = config["batch_size"]
