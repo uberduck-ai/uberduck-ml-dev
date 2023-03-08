@@ -742,7 +742,24 @@ def train_func(config: dict):
                 binarization_start_iter,
             )
             global_step += 1
-
+            
+        checkpoint = Checkpoint.from_dict(
+            dict(
+                epoch=epoch,
+                global_step=global_step,
+                model=model.state_dict(),
+            )
+        )
+        session.report({}, checkpoint=checkpoint)
+        if session.get_world_rank() == 0:
+            artifact = wandb.Artifact(
+                f"artifact_epoch{epoch}_step{global_step}", "model"
+            )
+            with tempfile.TemporaryDirectory() as tempdirname:
+                checkpoint.to_directory(tempdirname)
+                artifact.add_dir(tempdirname)
+                wandb.log_artifact(artifact)
+            iteration += 1
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
