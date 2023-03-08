@@ -691,8 +691,6 @@ def train_func(config: dict):
         **model_config,
     )
     model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
-    # discriminator = MultiPeriodDiscriminator(MODEL_CONFIG["use_spectral_norm"])
-    # discriminator = train.torch.prepare_model(discriminator)
 
     checkpoint_dict = _load_checkpoint_dict()
     if checkpoint_dict is None:
@@ -703,13 +701,10 @@ def train_func(config: dict):
         start_epoch = checkpoint_dict["epoch"]
         if session.get_world_size() > 1:
             model_sd = checkpoint_dict["model"]
-            # NOTE(zach): Add audio embedding state dict if it is not present.
-            # NOTE(zach): Pass strict=False due to different nuber of gin_channels
-            model.load_state_dict(model_sd, strict=False)
+            model.load_state_dict(model_sd)
         else:
             model_sd = _fix_state_dict(checkpoint_dict["model"])
-            # NOTE(zach): Pass strict=False due to different nuber of gin_channels
-            model.load_state_dict(model_sd, strict=False)
+            model.load_state_dict(model_sd)
         del checkpoint_dict
 
     # NOTE (Sam): replace with RAdam
@@ -758,33 +753,7 @@ def train_func(config: dict):
                 binarization_start_iter,
             )
             global_step += 1
-        if session.get_world_rank() == 0:
-            # TODO(zach): Also save wandb artifact here.
-            checkpoint = Checkpoint.from_dict(
-                dict(
-                    epoch=epoch,
-                    global_step=global_step,
-                    model=model.state_dict(),
-                )
-            )
-            session.report({}, checkpoint=checkpoint)
-            artifact = wandb.Artifact(
-                f"artifact_epoch{epoch}_step{global_step}", "model"
-            )
-            with tempfile.TemporaryDirectory() as tempdirname:
-                checkpoint.to_directory(tempdirname)
-                artifact.add_dir(tempdirname)
-                wandb.log_artifact(artifact)
-            iteration += 1
 
-
-
-class TorchCheckpointFixed(TorchCheckpoint):
-    def __setstate__(self, state: dict):
-        if "_data_dict" in state and state["_data_dict"]:
-            state = state.copy()
-            state["_data_dict"] = self._decode_data_dict(state["_data_dict"])
-        super(TorchCheckpoint, self).__setstate__(state)
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
