@@ -116,7 +116,7 @@ config = {
         "sigma": 1.0,
         "iters_per_checkpoint": 2500,
         "steps_per_sample": 200,
-        "batch_size": 16,
+        "batch_size": 6,
         "seed": None,
         "checkpoint_path": "",
         "ignore_layers": [],
@@ -614,7 +614,7 @@ def _train_step(
 
     optim.zero_grad()
     # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
-    with autocast():
+    with autocast(enabled= False):
         batch_dict = ray_df_to_batch_radtts(batch)
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
@@ -626,33 +626,28 @@ def _train_step(
         in_lens = to_gpu(batch_dict['input_lengths'])
         out_lens = to_gpu(batch_dict['output_lengths'])
         energy_avg = to_gpu(batch_dict['energy_avg'])
-        # (mel, speaker_ids, text, in_lens, out_lens, attn_prior,
-        #      f0, voiced_mask, p_voiced, energy_avg,
-        #      audiopaths) = [
-        #     to_gpu(el) for el in 
-        # ]
+
         outputs = model(
                     mel, speaker_ids, text, in_lens, out_lens,
                     binarize_attention=binarize, attn_prior=attn_prior,
                     f0=f0, energy_avg=energy_avg,
                     voiced_mask=voiced_mask, p_voiced=p_voiced)
 
-        with autocast(enabled=False):
-            loss_outputs = criterion(outputs, in_lens, out_lens)
+        loss_outputs = criterion(outputs, in_lens, out_lens)
 
-            loss = None
-            for k, (v, w) in loss_outputs.items():
-                if w > 0:
-                    loss = v * w if loss is None else loss + v * w
+        loss = None
+        for k, (v, w) in loss_outputs.items():
+            if w > 0:
+                loss = v * w if loss is None else loss + v * w
 
-            w_bin = criterion.loss_weights.get('binarization_loss_weight', 1.0)
-            if binarize and iteration >= kl_loss_start_iter:
-                binarization_loss = attention_kl_loss(
-                    outputs['attn'], outputs['attn_soft'])
-                loss += binarization_loss * w_bin
-            else:
-                binarization_loss = torch.zeros_like(loss)
-            loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
+        w_bin = criterion.loss_weights.get('binarization_loss_weight', 1.0)
+        if binarize and iteration >= kl_loss_start_iter:
+            binarization_loss = attention_kl_loss(
+                outputs['attn'], outputs['attn_soft'])
+            loss += binarization_loss * w_bin
+        else:
+            binarization_loss = torch.zeros_like(loss)
+        loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
 
  
     optim.zero_grad()
@@ -664,20 +659,20 @@ def _train_step(
     scheduler.step()
 
 
-    metrics = loss_outputs.items() # add loss
-    if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
-        gen_audio = None#y_hat[0][0][: y_lengths[0]].data.cpu().numpy().astype("float32")
-        gt_audio = None#y[0][0][: y_lengths[0]].data.cpu().numpy().astype("float32")
-        model.eval()
-        sample_audio = sample_inference(
-            model
-        )
-        model.train()
+    # metrics = loss_outputs.items() # add loss
+    # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
+    #     gen_audio = None#y_hat[0][0][: y_lengths[0]].data.cpu().numpy().astype("float32")
+    #     gt_audio = None#y[0][0][: y_lengths[0]].data.cpu().numpy().astype("float32")
+    #     model.eval()
+    #     sample_audio = sample_inference(
+    #         model
+    #     )
+    #     model.train()
 
-        # log(metrics, gen_audio, gt_audio, sample_audio)
-    else:
-        # log(metrics)
-        pass
+    #     # log(metrics, gen_audio, gt_audio, sample_audio)
+    # else:
+    #     # log(metrics)
+    #     pass
     print(f"Loss: {loss.item()}")
 
 
@@ -782,6 +777,8 @@ def train_func(config: dict):
                 wandb.log_artifact(artifact)
             iteration += 1
 
+
+
 class TorchCheckpointFixed(TorchCheckpoint):
     def __setstate__(self, state: dict):
         if "_data_dict" in state and state["_data_dict"]:
@@ -789,31 +786,29 @@ class TorchCheckpointFixed(TorchCheckpoint):
             state["_data_dict"] = self._decode_data_dict(state["_data_dict"])
         super(TorchCheckpoint, self).__setstate__(state)
 
+from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
+from ray.air.config import ScalingConfig, RunConfig
+from ray.tune import SyncConfig
 
 if __name__ == "__main__":
-    print("Loading dataset")
+
     ray_dataset = get_ray_dataset()
-    # checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-02-17_17-49-00/TorchTrainer_6a5ed_00000_0_2023-02-17_17-52-52/checkpoint_000598/"
-    # checkpoint_uri = None # from scratch
-    # checkpoint = TorchCheckpointFixed.from_uri(checkpoint_uri)
+    train_config['n_group_size'] = model_config['n_group_size']
+    train_config['dur_model_config'] = model_config['dur_model_config']
+    train_config['f0_model_config'] = model_config['f0_model_config']
+    train_config['energy_model_config'] = model_config['energy_model_config']
+    train_config['v_model_config']=model_config['v_model_config']
+
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
-        train_loop_config={
-            "epochs": 500,
-            # "epochs": 10,
-            "batch_size": 24,
-            "steps_per_sample": 200,
-            "gin_channels": 512,
-        },
+        train_loop_config=train_config,
         scaling_config=ScalingConfig(
-            num_workers=10, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
         ),
         run_config=RunConfig(
             sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
         ),
         datasets={"train": ray_dataset},
-        resume_from_checkpoint=checkpoint,
     )
-    print("Starting trainer")
+
     result = trainer.fit()
-    print(f"Last result: {result.metrics}")
