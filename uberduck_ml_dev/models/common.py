@@ -1160,8 +1160,12 @@ def spectrogram_torch(y, n_fft=FILTER_LENGTH, sampling_rate=SAMPLING_RATE, hop_s
 # TODO (Sam): unite the get_mel methods
 def get_mel(audio, max_wav_value, stft):
 
-    audio_norm = ((max_wav_value - 1) * audio / (np.abs(audio).max())) / max_wav_value
-    audio_norm = torch.FloatTensor(audio_norm)
+
+    # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
+    # NOTE (Sam): be carefuly of numerical issues with order of operations here.
+    audio = torch.FloatTensor(audio)
+    audio_norm = ((max_wav_value - 1) / max_wav_value ) * (audio / (np.abs(audio).max()))
+    # audio_norm = ((max_wav_value - 1) * audio / (np.abs(audio).max())) / max_wav_value
     audio_norm = audio_norm.unsqueeze(0)
     audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
     melspec = stft.mel_spectrogram(audio_norm)
