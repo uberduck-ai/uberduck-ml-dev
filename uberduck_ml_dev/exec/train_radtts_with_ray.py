@@ -160,8 +160,8 @@ config = {
         "use_scaled_energy": True,
         "symbol_set": "radtts",
         "cleaner_names": ["radtts_cleaners"],
-        "heteronyms_path": "tts_text_processing/heteronyms",
-        "phoneme_dict_path": "tts_text_processing/cmudict-0.7b",
+        "heteronyms_path": "text/heteronyms",
+        "phoneme_dict_path": "text/cmudict-0.7b",
         "p_phoneme": 1.0,
         "handle_phoneme": "word",
         "handle_phoneme_ambiguous": "ignore",
@@ -456,8 +456,38 @@ def get_speaker_id(speaker):
 
     return torch.LongTensor([speaker])
 
+from uberduck_ml_dev.text.text_processing import TextProcessing
+
+symbol_set = data_config['symbol_set']
+cleaner_names = data_config['cleaner_names']
+heteronyms_path = data_config['heteronyms_path']
+phoneme_dict_path = data_config['phoneme_dict_path']
+p_phoneme = data_config['p_phoneme']
+handle_phoneme = data_config['handle_phoneme']
+handle_phoneme_ambiguous = data_config['handle_phoneme_ambiguous']
+prepend_space_to_text = data_config['prepend_space_to_text']
+append_space_to_text = data_config['append_space_to_text']
+add_bos_eos_to_text = data_config['add_bos_eos_to_text']
+
+
+tp = TextProcessing(
+    symbol_set,
+    cleaner_names,
+    heteronyms_path,
+    phoneme_dict_path,
+    p_phoneme=p_phoneme,
+    handle_phoneme=handle_phoneme,
+    handle_phoneme_ambiguous=handle_phoneme_ambiguous,
+    prepend_space_to_text=prepend_space_to_text,
+    append_space_to_text=append_space_to_text,
+    add_bos_eos_to_text=add_bos_eos_to_text,
+)
 from uberduck_ml_dev.models.common import get_mel
 
+def get_text(text):
+    text = tp.encode_text(text)
+    text = torch.LongTensor(text)
+    return text
 
 def ray_df_to_batch_radtts(df):
     transcripts = df.transcript.tolist()
@@ -475,18 +505,19 @@ def ray_df_to_batch_radtts(df):
         audio_norm = audio / (np.abs(audio).max() * 2)
         # audio_norm = audio_norm.unsqueeze(0)
         # Text
-        text_sequence = torch.LongTensor(
-            intersperse(
-                text_to_sequence(
-                    transcript,
-                    ["english_cleaners"],
-                    1.0,
-                    symbol_set=NVIDIA_TACO2_SYMBOLS,
-                ),
-                0,
-            )
-        )
+        # text_sequence = torch.LongTensor(
+        #     intersperse(
+        #         text_to_sequence(
+        #             transcript,
+        #             ["english_cleaners"],
+        #             1.0,
+        #             symbol_set=NVIDIA_TACO2_SYMBOLS,
+        #         ),
+        #         0,
+        #     )
+        # )
         # Spectrogram
+        text_sequence = get_text(transcript)
 
         mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
         mel = torch.squeeze(mel, 0)
