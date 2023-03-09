@@ -1159,13 +1159,20 @@ def spectrogram_torch(y, n_fft=FILTER_LENGTH, sampling_rate=SAMPLING_RATE, hop_s
 
 # TODO (Sam): unite the get_mel methods
 def get_mel(audio, max_wav_value, stft):
-    audio_norm = audio / max_wav_value
+
+    audio_norm = ((max_wav_value - 1) * audio / (np.abs(audio).max())) / max_wav_value
+    audio_norm = torch.FloatTensor(audio_norm)
     audio_norm = audio_norm.unsqueeze(0)
     audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
     melspec = stft.mel_spectrogram(audio_norm)
     melspec = torch.squeeze(melspec, 0)
+    # audio_norm = audio / max_wav_value
+    # audio_norm = audio_norm.unsqueeze(0)
+    # audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
+    # melspec = stft.mel_spectrogram(audio_norm)
+    # melspec = torch.squeeze(melspec, 0)
     # if self.do_mel_scaling:
-    #     melspec = (melspec + 5.5) / 2
+    melspec = (melspec + 5.5) / 2
     # if self.mel_noise_scale > 0:
     #     melspec += torch.randn_like(melspec) * self.mel_noise_scale
     return melspec
