@@ -34,57 +34,6 @@ from uberduck_ml_dev.utils.utils import (
     clip_grad_value_,
 )
 
-# MODEL_CONFIG = {
-#     "inter_channels": 192,
-#     "hidden_channels": 192,
-#     "filter_channels": 768,
-#     "n_heads": 2,
-#     "n_layers": 6,
-#     "kernel_size": 3,
-#     "p_dropout": 0.1,
-#     "resblock": "1",
-#     "resblock_kernel_sizes": [3, 7, 11],
-#     "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-#     "upsample_rates": [8, 8, 2, 2],
-#     "upsample_initial_channel": 512,
-#     "upsample_kernel_sizes": [16, 16, 4, 4],
-#     "n_layers_q": 3,
-#     "use_spectral_norm": False,
-# }
-# DATA_CONFIG = {
-#     "training_files": "filelists/ljs_audio_text_train_filelist.txt.cleaned",
-#     "validation_files": "filelists/ljs_audio_text_val_filelist.txt.cleaned",
-#     "text_cleaners": ["english_cleaners2"],
-#     "max_wav_value": 32768.0,
-#     "sampling_rate": 22050,
-#     "filter_length": 1024,
-#     "hop_length": 256,
-#     "win_length": 1024,
-#     "n_mel_channels": 80,
-#     "mel_fmin": 0.0,
-#     "mel_fmax": None,
-#     "add_blank": True,
-#     "n_speakers": 0,
-#     "cleaned_text": True,
-# }
-
-# TRAIN_CONFIG = {
-#     "log_interval": 200,
-#     "eval_interval": 1000,
-#     "seed": 1234,
-#     "epochs": 20000,
-#     "learning_rate": 2e-4,
-#     "betas": [0.8, 0.99],
-#     "eps": 1e-9,
-#     "batch_size": 64,
-#     "fp16_run": True,
-#     "lr_decay": 0.999875,
-#     "segment_size": 8192,
-#     "init_lr_ratio": 1,
-#     "warmup_epochs": 0,
-#     "c_mel": 45,
-#     "c_kl": 1.0,
-# }
 
 # config = DEFAULTS.values()
 # config["with_gsts"] = False
@@ -126,6 +75,7 @@ config = {
         "unfreeze_modules": "all"
     },
     "data_config": {
+    # NOTE (Sam): unused since we are getting data from s3 using the ray loader now
         "training_files": {
             "LJS": {
                 "basedir": "/",
@@ -142,6 +92,7 @@ config = {
                 "lmdbpath": ""
             }
         },
+    ###
         "dur_min": 0.1,
         "dur_max": 10.2,
         "sampling_rate": 22050,
@@ -341,7 +292,8 @@ class DataCollate():
 
             output_lengths[i] = mel.size(1)
             speaker_ids[i] = batch[ids_sorted_decreasing[i]]['speaker_id']
-            audiopath = 'whocares'#batch[ids_sorted_decreasing[i]]['audiopath']
+            # audiopath = 'whocares'#batch[ids_sorted_decreasing[i]]['audiopath']
+            audiopath = batch[ids_sorted_decreasing[i]]['audiopath']
             audiopaths.append(audiopath)
             cur_attn_prior = batch[ids_sorted_decreasing[i]]['attn_prior']
             if cur_attn_prior is None:
@@ -425,7 +377,7 @@ def get_attention_prior(n_tokens, n_frames):
         attn_prior = torch.load(prior_path)
     else:
         attn_prior = beta_binomial_prior_distribution(
-            n_tokens, n_frames, scaling_factor = 0.05
+            n_tokens, n_frames, scaling_factor = 1.0 # 0.05
         )
         torch.save(attn_prior, prior_path)
     # else:
@@ -493,6 +445,7 @@ def ray_df_to_batch_radtts(df):
     transcripts = df.transcript.tolist()
     audio_bytes_list = df.audio_bytes.tolist()
     speaker_ids = df.speaker_id.tolist()
+    paths = df.path.tolist()
     collate_fn = DataCollate()
     collate_input = []
     for transcript, audio_bytes, speaker_id in zip(
@@ -530,7 +483,7 @@ def ray_df_to_batch_radtts(df):
         speaker_id =  get_speaker_id(speaker_id)
         # print(type(mel))
         # print(type(text_sequence), type (speaker_id), type(f0), type (p_voiced), type(voiced_mask), type(energy_avg), type(attn_prior))
-        collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior})
+        collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
     return collate_fn(collate_input)
 
 
