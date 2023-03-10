@@ -637,9 +637,80 @@ def _train_step(
     metrics = {
         "loss": loss.item()
     }
-    log(metrics)
+    for k, (v, w) in loss_outputs.items():
+        metrics[k] = v.item()
+
+    if 2 == 3:
+    # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
+        images, audios = get_log_audio(outputs, batch_dict['audiopaths'], train_config, model)
+        log(metrics, audios)
+    else:
+        log(metrics)
+
     print(f"Loss: {loss.item()}")
     
+
+def get_log_audio(outputs, audiopaths, train_config, model):
+    attn_used = outputs['attn']
+    attn_soft = outputs['attn_soft']
+    audioname = os.path.basename(audiopaths[0])
+    images = {}
+    audios = {}
+    if attn_used is not None:
+        images['attention_weights'] = plot_alignment_to_numpy(
+                attn_soft[0, 0].data.cpu().numpy().T, title=audioname)
+        images['attention_weights_max'] = plot_alignment_to_numpy(
+                attn_used[0, 0].data.cpu().numpy().T, title=audioname)
+        attribute_sigmas = []
+        """ NOTE: if training vanilla radtts (no attributes involved),
+        use log_attribute_samples only, as there will be no ground truth
+        features available. The infer function in this case will work with
+        f0=None, energy_avg=None, and voiced_mask=None
+        """
+        if train_config['log_decoder_samples']: # decoder with gt features
+            attribute_sigmas.append(-1)
+        if train_config['log_attribute_samples']: # attribute prediction
+            if model.is_attribute_unconditional():
+                attribute_sigmas.extend([1.0])
+            else:
+                attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
+        if len(attribute_sigmas) > 0:
+            durations = attn_used[0, 0].sum(0, keepdim=True)
+            durations = (durations + 0.5).floor().int()
+            # load vocoder to CPU to avoid taking up valuable GPU vRAM
+            vocoder_checkpoint_path = train_config['vocoder_checkpoint_path']
+            vocoder_config_path = train_config['vocoder_config_path']
+            vocoder, denoiser = load_vocoder(
+                vocoder_checkpoint_path, vocoder_config_path, to_cuda=False)
+            for attribute_sigma in attribute_sigmas:
+                try:
+                    if attribute_sigma > 0.0:
+                        model_output = model.infer(
+                            speaker_ids[0:1], text[0:1], 0.8,
+                            dur=durations, f0=None, energy_avg=None,
+                            voiced_mask=None, sigma_f0=attribute_sigma,
+                            sigma_energy=attribute_sigma)
+                    else:
+                        model_output = model.infer(
+                            speaker_ids[0:1], text[0:1], 0.8,
+                            dur=durations, f0=f0[0:1, :durations.sum()],
+                            energy_avg=energy_avg[0:1, :durations.sum()],
+                            voiced_mask=voiced_mask[0:1, :durations.sum()])
+                except:
+                    print("Instability or issue occured during inference, skipping sample generation for TB logger")
+                    continue
+                mels = model_output['mel']
+                audio = vocoder(mels.cpu()).float()[0]
+                audio_denoised = denoiser(
+                    audio, strength=0.00001)[0].float()
+                audio_denoised = audio_denoised[0].detach().cpu().numpy()
+                audio_denoised = audio_denoised / np.abs(audio_denoised).max()
+                if attribute_sigma < 0:
+                    sample_tag = "decoder_sample_gt_attributes"
+                else:
+                    sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
+                audios[sample_tag] = audio_denoised
+    return images, audios
 
 def train_func(config: dict):
     setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
