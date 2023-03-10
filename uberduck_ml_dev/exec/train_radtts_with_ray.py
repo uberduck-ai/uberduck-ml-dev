@@ -39,7 +39,7 @@ from uberduck_ml_dev.utils.utils import (
 # config["with_gsts"] = False
 config = {
     "train_config": {
-        "output_directory": "/lj_minimal_decoder",
+        "output_directory": "/home/ray/default/lj_test",
         "epochs": 10000000,
         "optim_algo": "RAdam",
         "learning_rate": 1e-4,
@@ -618,14 +618,21 @@ def _train_step(
             binarization_loss = torch.zeros_like(loss)
         loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
 
+    grad_clip_val = 1. # it is what is is ;)
     print(print_list)
-    optim.zero_grad()
     scaler.scale(loss).backward()
-    scaler.unscale_(optim)
-    clip_grad_value_(model.parameters(), 100)
+    if grad_clip_val > 0:
+        scaler.unscale_(optim)
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(), grad_clip_val)
+    # scheduler.step()
+    # scaler.scale(loss).backward()
+    # scaler.unscale_(optim)
+    # clip_grad_value_(model.parameters(), 100)
     scaler.step(optim)
     scaler.update()
-    scheduler.step()
+    # scaler.update()
+    # scheduler.step()
 
     metrics = {
         "loss": loss.item()
