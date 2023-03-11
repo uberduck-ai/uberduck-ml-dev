@@ -248,56 +248,64 @@ class ResBlock2(torch.nn.Module):
 
 
 class Generator(torch.nn.Module):
+    __constants__ = ['lrelu_slope', 'num_kernels', 'num_upsamples', 'p_blur']
     def __init__(self, h):
         super(Generator, self).__init__()
-        self.h = h
         self.num_kernels = len(h.resblock_kernel_sizes)
         self.num_upsamples = len(h.upsample_rates)
-        self.conv_pre = weight_norm(
-            Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3)
-        )
-        resblock = ResBlock1 if h.resblock == "1" else ResBlock2
+        self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
+        self.p_blur = h.gaussian_blur['p_blurring']
+        self.gaussian_blur_fn = None
+        if self.p_blur > 0.0:
+            self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
+        else:
+            self.gaussian_blur_fn = nn.Identity()
+        self.lrelu_slope = LRELU_SLOPE
+
+        resblock = ResBlock1 if h.resblock == '1' else ResBlock2
 
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
-            self.ups.append(
-                weight_norm(
-                    ConvTranspose1d(
-                        h.upsample_initial_channel // (2**i),
-                        h.upsample_initial_channel // (2 ** (i + 1)),
-                        k,
-                        u,
-                        padding=(k - u) // 2,
-                    )
-                )
-            )
+            self.ups.append(weight_norm(
+                ConvTranspose1d(h.upsample_initial_channel//(2**i), h.upsample_initial_channel//(2**(i+1)),
+                                k, u, padding=(k-u)//2)))
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
             resblock_list = nn.ModuleList()
-            ch = h.upsample_initial_channel // (2 ** (i + 1))
-            for j, (k, d) in enumerate(
-                zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
-            ):  
-                resblock_list.append(resblock(h,ch,k,d))
+            ch = h.upsample_initial_channel//(2**(i+1))
+            for j, (k, d) in enumerate(zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)):
+                resblock_list.append(resblock(h, ch, k, d))
             self.resblocks.append(resblock_list)
-            # self.resblocks.append(resblock(h, ch, k, d))
 
         self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
+    def load_state_dict(self, state_dict):
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            new_k = k
+            if 'resblocks' in k:
+                parts = k.split(".")
+                # only do this is the checkpoint type is older
+                if len(parts) == 5:
+                    layer = int(parts[1])
+                    new_layer = f"{layer//3}.{layer%3}"
+                    new_k = f"resblocks.{new_layer}.{'.'.join(parts[2:])}"
+            new_state_dict[new_k] = v
+        super().load_state_dict(new_state_dict)
+
     def forward(self, x):
+        if self.p_blur > 0.0:
+            x = self.gaussian_blur_fn(x)
         x = self.conv_pre(x)
-        for i in range(self.num_upsamples):
-            x = F.leaky_relu(x, LRELU_SLOPE)
-            x = self.ups[i](x)
-            xs = None
-            for j in range(self.num_kernels):
-                if xs is None:
-                    xs = self.resblocks[i * self.num_kernels + j](x)
-                else:
-                    xs += self.resblocks[i * self.num_kernels + j](x)
+        for upsample_layer, resblock_group in zip(self.ups, self.resblocks):
+            x = F.leaky_relu(x, self.lrelu_slope)
+            x = upsample_layer(x)
+            xs = torch.zeros(x.shape, dtype=x.dtype, device=x.device)
+            for resblock in resblock_group:
+                xs += resblock(x)
             x = xs / self.num_kernels
         x = F.leaky_relu(x)
         x = self.conv_post(x)
@@ -306,12 +314,15 @@ class Generator(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
+        print('Removing weight norm...')
         for l in self.ups:
             remove_weight_norm(l)
-        for l in self.resblocks:
-            l.remove_weight_norm()
+        for group in self.resblocks:
+            for block in group:
+                block.remove_weight_norm()
         remove_weight_norm(self.conv_pre)
         remove_weight_norm(self.conv_post)
+
 
 
 class DiscriminatorP(torch.nn.Module):

@@ -45,8 +45,8 @@ config = {
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
         "sigma": 1.0,
-        "iters_per_checkpoint": 2500,
-        "steps_per_sample": 200,
+        "iters_per_checkpoint": 20,
+        "steps_per_sample": 6,
         "batch_size": 6,
         "seed": None,
         "checkpoint_path": "",
@@ -542,10 +542,12 @@ def get_ray_dataset():
 
 
 @torch.no_grad()
-def log(metrics, audios):
+def log(metrics, audios = {}):
     # pass
     wandb_metrics = dict(metrics)
-    for k,v in audios.iteritems():
+    
+    for k,v in audios.items():
+        print('v \n\n\n\n\n', v)
         wandb_metrics[k] = wandb.Audio(v, sample_rate=22050)
     # if gen_audio is not None:
     #     wandb_metrics.update({"gen/audio": wandb.Audio(gen_audio, sample_rate=22050)})
@@ -566,14 +568,15 @@ from uberduck_ml_dev.utils.plot import plot_alignment_to_numpy
 def get_log_audio(outputs, audiopaths, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask):
     attn_used = outputs['attn']
     attn_soft = outputs['attn_soft']
-    audioname = os.path.basename(audiopaths[0])
+    # audioname = os.path.basename(audiopaths[0])
     images = {}
     audios = {}
     if attn_used is not None:
+        print('herehere')
         images['attention_weights'] = plot_alignment_to_numpy(
-                attn_soft[0, 0].data.cpu().numpy().T, title=audioname)
+                attn_soft[0, 0].data.cpu().numpy().T, title="audioname")
         images['attention_weights_max'] = plot_alignment_to_numpy(
-                attn_used[0, 0].data.cpu().numpy().T, title=audioname)
+                attn_used[0, 0].data.cpu().numpy().T, title="audioname")
         attribute_sigmas = []
         """ NOTE: if training vanilla radtts (no attributes involved),
         use log_attribute_samples only, as there will be no ground truth
@@ -588,29 +591,51 @@ def get_log_audio(outputs, audiopaths, train_config, model, speaker_ids, text, f
             else:
                 attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
         if len(attribute_sigmas) > 0:
+            print('entering inference \n\n\n\n')
+            print(text.shape, voiced_mask.shape)
             durations = attn_used[0, 0].sum(0, keepdim=True)
             durations = (durations + 0.5).floor().int()
             # load vocoder to CPU to avoid taking up valuable GPU vRAM
-            vocoder = get_vocoder()
+            # vocoder = get_vocoder()
             for attribute_sigma in attribute_sigmas:
-                try:
-                    if attribute_sigma > 0.0:
+                # try:
+                if attribute_sigma > 0.0:
+                    if hasattr(model, "infer"):
                         model_output = model.infer(
                             speaker_ids[0:1], text[0:1], 0.8,
                             dur=durations, f0=None, energy_avg=None,
                             voiced_mask=None, sigma_f0=attribute_sigma,
                             sigma_energy=attribute_sigma)
                     else:
+                        model_output = model.module.infer(
+                            speaker_ids[0:1], text[0:1], 0.8,
+                            dur=durations, f0=None, energy_avg=None,
+                            voiced_mask=None, sigma_f0=attribute_sigma,
+                            sigma_energy=attribute_sigma)         
+                else:
+                    if hasattr(model, "infer"):
                         model_output = model.infer(
                             speaker_ids[0:1], text[0:1], 0.8,
                             dur=durations, f0=f0[0:1, :durations.sum()],
                             energy_avg=energy_avg[0:1, :durations.sum()],
                             voiced_mask=voiced_mask[0:1, :durations.sum()])
-                except:
-                    print("Instability or issue occured during inference, skipping sample generation for TB logger")
-                    continue
+                    else:
+                        model_output = model.module.infer(
+                            speaker_ids[0:1], text[0:1], 0.8,
+                            dur=durations, f0=f0[0:1, :durations.sum()],
+                            energy_avg=energy_avg[0:1, :durations.sum()],
+                            voiced_mask=voiced_mask[0:1, :durations.sum()])                      
+                # except:
+                #     print("Instability or issue occured during inference, skipping sample generation for TB logger")
+                #     continue
                 mels = model_output['mel']
-                audio = vocoder(mels.cpu()).float()[0]
+                print('through here asdfasdfasdf \n\n\n\n\n')
+                if hasattr(vocoder, 'forward'):
+                    print('come on')
+                    audio = vocoder(mels.cpu()).float()[0]
+                # else:
+                #     print('i died')
+                #     audio = vocoder.module.forward(mels.cpu()).float()[0]
                 audio = audio[0].detach().cpu().numpy()
                 audio = audio / np.abs(audio).max()
                 if attribute_sigma < 0:
@@ -618,6 +643,8 @@ def get_log_audio(outputs, audiopaths, train_config, model, speaker_ids, text, f
                 else:
                     sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
                 audios[sample_tag] = audio
+
+    print('in audios \n\n\n\n\n\n',attribute_sigmas,audios)
     return images, audios
 
 
@@ -703,10 +730,14 @@ def _train_step(
     for k, (v, w) in loss_outputs.items():
         metrics[k] = v.item()
 
-    if 2 == 3:
+    # if 2 == 3:
     # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
+    if session.get_world_rank() == 0:
+
+        model.eval()
         images, audios = get_log_audio(outputs, batch_dict['audiopaths'], train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
         log(metrics, audios)
+        model.train()
     else:
         log(metrics)
 
@@ -848,8 +879,14 @@ def get_vocoder():
     print("Getting model config...")
     response = requests.get(HIFI_GAN_CONFIG_URL)
     hifigan_config = response.json()
+    h = AttrDict(hifigan_config)
+    if 'gaussian_blur' in hifigan_config:
+        hifigan_config['gaussian_blur']['p_blurring'] = 0.0
+    else:
+        hifigan_config['gaussian_blur'] = {'p_blurring': 0.0}
+        h['gaussian_blur'] = {'p_blurring': 0.0}
     # model_params = hifigan_config["model_params"]
-    model = Generator(AttrDict(hifigan_config))
+    model = Generator(h)
     print("Loading pretrained model...")
     load_pretrained(model)
     print("Got pretrained model...")
@@ -865,7 +902,7 @@ if __name__ == "__main__":
     train_config['f0_model_config'] = model_config['f0_model_config']
     train_config['energy_model_config'] = model_config['energy_model_config']
     train_config['v_model_config']=model_config['v_model_config']
-
+    vocoder = get_vocoder()
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config=train_config,
