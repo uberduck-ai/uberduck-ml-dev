@@ -735,7 +735,7 @@ def _train_step(
     if session.get_world_rank() == 0:
 
         model.eval()
-        images, audios = get_log_audio(outputs, batch_dict['audiopaths'], train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
+        images, audios = get_log_audio(mel, batch_dict['audiopaths'], train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
         log(metrics, audios)
         model.train()
     else:
