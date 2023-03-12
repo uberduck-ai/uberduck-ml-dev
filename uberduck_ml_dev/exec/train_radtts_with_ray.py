@@ -275,7 +275,6 @@ class DataCollate():
             mel_padded[i, :, :mel.size(1)] = mel
             if batch[ids_sorted_decreasing[i]]['f0'] is not None:
                 f0 = batch[ids_sorted_decreasing[i]]['f0']
-                # print(f0.shape, f0_padded.shape)
                 f0_padded[i, :len(f0)] = f0
 
             if batch[ids_sorted_decreasing[i]]['voiced_mask'] is not None:
@@ -481,8 +480,6 @@ def ray_df_to_batch_radtts(df):
         attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
 
         speaker_id =  get_speaker_id(speaker_id)
-        # print(type(mel))
-        # print(type(text_sequence), type (speaker_id), type(f0), type (p_voiced), type(voiced_mask), type(energy_avg), type(attn_prior))
         collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
     return collate_fn(collate_input)
 
@@ -547,7 +544,6 @@ def log(metrics, audios = {}):
     wandb_metrics = dict(metrics)
     
     for k,v in audios.items():
-        print('v \n\n\n\n\n', v)
         wandb_metrics[k] = wandb.Audio(v, sample_rate=22050)
     # if gen_audio is not None:
     #     wandb_metrics.update({"gen/audio": wandb.Audio(gen_audio, sample_rate=22050)})
@@ -587,13 +583,11 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
             p_voiced=p_voiced)
     
     attn_used = outputs['attn']
-    print(attn_used, '\n\n\n\n\n\n\n snackeries')
     attn_soft = outputs['attn_soft']
     # audioname = os.path.basename(audiopaths[0])
     images = {}
     audios = {}
     if attn_used is not None:
-        print('herehere')
         images['attention_weights'] = plot_alignment_to_numpy(
                 attn_soft[0, 0].data.cpu().numpy().T, title="audioname")
         images['attention_weights_max'] = plot_alignment_to_numpy(
@@ -612,18 +606,11 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
             else:
                 attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
         if len(attribute_sigmas) > 0:
-            print('entering inference \n\n\n\n')
-            print(text.shape, voiced_mask.shape, energy_avg.shape, attn_used.shape, f0.shape, attn_used[0, 0].sum())
             durations = attn_used[0, 0].sum(0, keepdim=True)
-            print(durations.sum())
-            print(durations)
-            # NOTE (Sam): this is causing problems when durations are > x.5.
+            # NOTE (Sam): this is causing problems when durations are > x.5 and binarize_attention is false.
             #  In that case, durations + 0.5 . floor > durations
             # this causes issues to the length_regulator, which expects floor < durations
-            # How could this not have been a problem before?  
             durations = (durations + 0.5).floor().int()
-            # durations = durations.floor().int()
-            print(durations.sum(), 'durations \n\n\n\n\n')
             # load vocoder to CPU to avoid taking up valuable GPU vRAM
             # vocoder = get_vocoder()
             for attribute_sigma in attribute_sigmas:
@@ -658,13 +645,8 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
                 #     print("Instability or issue occured during inference, skipping sample generation for TB logger")
                 #     continue
                 mels = model_output['mel']
-                print('through here asdfasdfasdf \n\n\n\n\n')
                 if hasattr(vocoder, 'forward'):
-                    print('come on')
                     audio = vocoder(mels.cpu()).float()[0]
-                # else:
-                #     print('i died')
-                #     audio = vocoder.module.forward(mels.cpu()).float()[0]
                 audio = audio[0].detach().cpu().numpy()
                 audio = audio / np.abs(audio).max()
                 if attribute_sigma < 0:
@@ -673,7 +655,6 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
                     sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
                 audios[sample_tag] = audio
 
-    print('in audios \n\n\n\n\n\n',attribute_sigmas,audios)
     return images, audios
 
 
