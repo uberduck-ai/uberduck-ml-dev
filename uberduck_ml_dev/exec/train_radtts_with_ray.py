@@ -45,8 +45,8 @@ config = {
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
         "sigma": 1.0,
-        "iters_per_checkpoint": 20,
-        "steps_per_sample": 2,
+        "iters_per_checkpoint": 50000,
+        "steps_per_sample": 4000,
         "batch_size": 6,
         "seed": None,
         "checkpoint_path": "",
@@ -194,28 +194,7 @@ train_config = config['train_config']
 model_config = config['model_config']
 data_config = config['data_config']
 
-@torch.no_grad()
-def sample_inference(model):
-    # sample_text = random_utterance()
-    # text_sequence = torch.LongTensor(
-    #     intersperse(
-    #         text_to_sequence(
-    #             sample_text,
-    #             ["english_cleaners"],
-    #             1.0,
-    #             symbol_set=NVIDIA_TACO2_SYMBOLS,
-    #         ),
-    #         0,
-    #     )
-    # ).unsqueeze(0)
 
-    # audio, *_ = model.infer(
-    #     text_sequence, text_lengths
-    # )
-    # audio = audio.data.squeeze().cpu().numpy()
-    # return audio
-
-    return None
 
 class DataCollate():
     """ Zero-pads model inputs and targets given number of steps """
@@ -291,7 +270,6 @@ class DataCollate():
 
             output_lengths[i] = mel.size(1)
             speaker_ids[i] = batch[ids_sorted_decreasing[i]]['speaker_id']
-            # audiopath = 'whocares'#batch[ids_sorted_decreasing[i]]['audiopath']
             audiopath = batch[ids_sorted_decreasing[i]]['audiopath']
             audiopaths.append(audiopath)
             cur_attn_prior = batch[ids_sorted_decreasing[i]]['attn_prior']
@@ -343,7 +321,6 @@ def get_energy_average(mel):
     return energy_avg
 
 import os
-import pickle as pkl
 from scipy.stats import betabinom
 
 def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.05):
@@ -455,20 +432,7 @@ def ray_df_to_batch_radtts(df):
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / (np.abs(audio).max() * 2)
-        # audio_norm = audio_norm.unsqueeze(0)
-        # Text
-        # text_sequence = torch.LongTensor(
-        #     intersperse(
-        #         text_to_sequence(
-        #             transcript,
-        #             ["english_cleaners"],
-        #             1.0,
-        #             symbol_set=NVIDIA_TACO2_SYMBOLS,
-        #         ),
-        #         0,
-        #     )
-        # )
-        # Spectrogram
+
         text_sequence = get_text(transcript)
 
         mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
@@ -487,7 +451,8 @@ def ray_df_to_batch_radtts(df):
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
-        "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
+        "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
         sep="|",
         header=None,
         quoting=3,
