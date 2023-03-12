@@ -352,6 +352,7 @@ class RADTTS(torch.nn.Module):
         text_enc: b x C x N
         voiced_mask: b x N
         """
+        print('far in heah', text_enc.shape, voiced_mask.shape)
         voiced_mask = voiced_mask.unsqueeze(1)
         voiced_embedding_s = self.v_embeddings.weight[0:1, :, None]
         unvoiced_embedding_s = self.v_embeddings.weight[1:2, :, None]
@@ -366,7 +367,7 @@ class RADTTS(torch.nn.Module):
                 f0=None, energy_avg=None, voiced_mask=None, p_voiced=None):
         speaker_vecs = self.encode_speaker(speaker_ids)
         text_enc, text_embeddings = self.encode_text(text, in_lens)
-
+        
         log_s_list, log_det_W_list, z_mel = [], [], []
         attn = None
         attn_soft = None
@@ -473,7 +474,7 @@ class RADTTS(torch.nn.Module):
                     text_enc, attn_hard.squeeze(1).transpose(1, 2))
 
             if self.use_vpred_module:
-                # unvoiced bias requires  voiced mask prediction
+                # unvoiced bias requires voiced mask prediction
                 vpred_model_outputs = self.v_pred_module(
                     torch.detach(text_enc_time_expanded),
                     torch.detach(speaker_vecs),
@@ -552,7 +553,7 @@ class RADTTS(torch.nn.Module):
             spk_vec_attributes = self.encode_speaker(speaker_id_attributes)
 
         txt_enc, txt_emb = self.encode_text(text, None)
-
+        print(txt_enc.shape, 'not so far')
         if dur is None:
             # get token durations
             z_dur = torch.cuda.FloatTensor(batch_size, 1, n_tokens)
@@ -573,10 +574,11 @@ class RADTTS(torch.nn.Module):
 
         out_lens = torch.LongTensor(out_lens).to(txt_enc.device)
 
-        # get attributes f0, energy, vpred, etc)
+        # NOTE (Sam): this length regulator 
+        print(dur.sum())
         txt_enc_time_expanded = self.length_regulator(
             txt_enc.transpose(1, 2), dur).transpose(1, 2)
-
+        print(txt_enc_time_expanded.shape, 'is pro regulation \n\n\n\n\n\n')
         if not self.is_attribute_unconditional():
             # if explicitly modeling attributes
             if voiced_mask is None:

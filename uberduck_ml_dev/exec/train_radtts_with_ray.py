@@ -40,13 +40,13 @@ from uberduck_ml_dev.utils.utils import (
 config = {
     "train_config": {
         "output_directory": "/home/ray/default/lj_test",
-        "epochs": 10000000,
+        "epochs": 100,
         "optim_algo": "RAdam",
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
         "sigma": 1.0,
         "iters_per_checkpoint": 20,
-        "steps_per_sample": 6,
+        "steps_per_sample": 2,
         "batch_size": 6,
         "seed": None,
         "checkpoint_path": "",
@@ -118,7 +118,7 @@ config = {
         "handle_phoneme_ambiguous": "ignore",
         "include_speakers": None,
         "n_frames": -1,
-        "betabinom_cache_path": "data_cache/",
+        "betabinom_cache_path": "data_cache_2/",
         "lmdb_cache_path": "", 
         "use_attn_prior_masking": True,
         "prepend_space_to_text": True,
@@ -565,8 +565,29 @@ def log(metrics, audios = {}):
 
 from uberduck_ml_dev.utils.plot import plot_alignment_to_numpy
 
-def get_log_audio(outputs, audiopaths, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask):
+@torch.no_grad()
+def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask):
+
+    mel = to_gpu(batch_dict['mel'])
+    speaker_ids = to_gpu(batch_dict['speaker_ids'])
+    attn_prior = to_gpu(batch_dict['attn_prior'])
+    f0 = to_gpu(batch_dict['f0'])
+    voiced_mask = to_gpu(batch_dict['voiced_mask'])
+    p_voiced = to_gpu(batch_dict['p_voiced'])
+    text = to_gpu(batch_dict['text'])
+    in_lens = to_gpu(batch_dict['input_lengths'])
+    out_lens = to_gpu(batch_dict['output_lengths'])
+    energy_avg = to_gpu(batch_dict['energy_avg'])
+
+    # NOTE (Sam): I don't think we can reuse the previous outputs since binarize_attention must be true
+    outputs = model(
+                mel, speaker_ids, text, in_lens, out_lens,
+            binarize_attention=True, attn_prior=attn_prior, f0=f0,
+            energy_avg=energy_avg, voiced_mask=voiced_mask,
+            p_voiced=p_voiced)
+    
     attn_used = outputs['attn']
+    print(attn_used, '\n\n\n\n\n\n\n snackeries')
     attn_soft = outputs['attn_soft']
     # audioname = os.path.basename(audiopaths[0])
     images = {}
@@ -592,9 +613,17 @@ def get_log_audio(outputs, audiopaths, train_config, model, speaker_ids, text, f
                 attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
         if len(attribute_sigmas) > 0:
             print('entering inference \n\n\n\n')
-            print(text.shape, voiced_mask.shape)
+            print(text.shape, voiced_mask.shape, energy_avg.shape, attn_used.shape, f0.shape, attn_used[0, 0].sum())
             durations = attn_used[0, 0].sum(0, keepdim=True)
+            print(durations.sum())
+            print(durations)
+            # NOTE (Sam): this is causing problems when durations are > x.5.
+            #  In that case, durations + 0.5 . floor > durations
+            # this causes issues to the length_regulator, which expects floor < durations
+            # How could this not have been a problem before?  
             durations = (durations + 0.5).floor().int()
+            # durations = durations.floor().int()
+            print(durations.sum(), 'durations \n\n\n\n\n')
             # load vocoder to CPU to avoid taking up valuable GPU vRAM
             # vocoder = get_vocoder()
             for attribute_sigma in attribute_sigmas:
@@ -732,10 +761,11 @@ def _train_step(
 
     # if 2 == 3:
     # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
-    if session.get_world_rank() == 0:
+    if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
 
         model.eval()
-        images, audios = get_log_audio(mel, batch_dict['audiopaths'], train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
+        # TODO (Sam): adding tf output logging and out of distribution inference
+        images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
         log(metrics, audios)
         model.train()
     else:
