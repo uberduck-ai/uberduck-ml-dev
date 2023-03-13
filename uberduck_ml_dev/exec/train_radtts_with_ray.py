@@ -17,6 +17,7 @@ import ray.data
 # from ray.data.datasource import FastFileMetadataProvider
 import ray.train as train
 from ray.train.torch import TorchTrainer
+from ray.air.util.check_ingest import DummyTrainer
 from ray.tune import SyncConfig
 
 
@@ -39,7 +40,7 @@ from uberduck_ml_dev.utils.utils import (
 # config["with_gsts"] = False
 config = {
     "train_config": {
-        "output_directory": "/home/ray/default/lj_test",
+        "output_directory": "/home/ray/default/lj_test_dontemptycache",
         "epochs": 10000,
         "optim_algo": "RAdam",
         "learning_rate": 1e-4,
@@ -47,7 +48,7 @@ config = {
         "sigma": 1.0,
         "iters_per_checkpoint": 50000,
         "steps_per_sample": 4000,
-        "batch_size": 6,
+        "batch_size": 16,
         "seed": None,
         "checkpoint_path": "",
         "ignore_layers": [],
@@ -504,6 +505,35 @@ def get_ray_dataset():
 
 
 
+def get_ray_dataset_minimal():
+    lj_df = pd.read_csv(
+        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
+        sep="|",
+        header=None,
+        quoting=3,
+        names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
+    )
+
+    parallelism_length = 400
+    speaker_ids = lj_df.speaker_id.tolist()
+    speaker_ids_ds = ray.data.from_items(speaker_ids, parallelism=parallelism_length)
+    speaker_ids_ds = speaker_ids_ds.map_batches(
+        lambda x: x, batch_format="pyarrow", batch_size=None
+    )
+    output_dataset = speaker_ids_ds
+    output_dataset = output_dataset.map_batches(
+        lambda table: table.rename(
+            columns={
+                "value": "transcript",
+            }
+        )
+    )
+    return output_dataset
+
+
+
 @torch.no_grad()
 def log(metrics, audios = {}):
     # pass
@@ -628,13 +658,12 @@ def _train_step(
     batch,
     model,
     optim,
-    global_step,
+    iteration,
     steps_per_sample,
     scaler,
     scheduler,
     criterion,
     attention_kl_loss,
-    iteration,
     kl_loss_start_iter,
     binarization_start_iter
 ):
@@ -708,7 +737,7 @@ def _train_step(
 
     # if 2 == 3:
     # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
-    if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
+    if iteration % steps_per_sample == 0 and session.get_world_rank() == 0:
 
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
@@ -720,6 +749,43 @@ def _train_step(
 
     print(f"Loss: {loss.item()}")
     
+def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    for batch_idx, ray_batch_df in enumerate(
+        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=4)
+    ):
+        # torch.cuda.empty_cache()
+        _train_step(
+            ray_batch_df,
+            model,
+            optim,
+            iteration,
+            steps_per_sample,
+            scaler,
+            scheduler,
+            criterion,
+            attention_kl_loss,
+            kl_loss_start_iter,
+            binarization_start_iter,
+        )
+        iteration += 1
+        
+    checkpoint = Checkpoint.from_dict(
+        dict(
+            epoch=epoch,
+            global_step=iteration,
+            model=model.state_dict(),
+        )
+    )
+    session.report({}, checkpoint=checkpoint)
+    if session.get_world_rank() == 0:
+        artifact = wandb.Artifact(
+            f"artifact_epoch{epoch}_step{iteration}", "model"
+        )
+        with tempfile.TemporaryDirectory() as tempdirname:
+            checkpoint.to_directory(tempdirname)
+            artifact.add_dir(tempdirname)
+            wandb.log_artifact(artifact)
+        
 
 def train_func(config: dict):
     setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
@@ -734,12 +800,13 @@ def train_func(config: dict):
     model = RADTTS(
         **model_config,
     )
-    model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
+    # model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
+    model = train.torch.prepare_model(model)
+    # model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict())
 
-
-    global_step = 0
     start_epoch = 0
-
+    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 16)
+    # train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     # NOTE (Sam): replace with RAdam
     optim = torch.optim.Adam(
@@ -753,7 +820,6 @@ def train_func(config: dict):
         last_epoch=-1,
     )
     dataset_shard = session.get_dataset_shard("train")
-    global_step = 0
     scaler = GradScaler()
 
     criterion = RADTTSLoss(
@@ -768,43 +834,8 @@ def train_func(config: dict):
     attention_kl_loss = AttentionBinarizationLoss()
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
-        for batch_idx, ray_batch_df in enumerate(
-            dataset_shard.iter_batches(batch_size=batch_size)
-        ):
-            torch.cuda.empty_cache()
-            _train_step(
-                ray_batch_df,
-                model,
-                optim,
-                global_step,
-                steps_per_sample,
-                scaler,
-                scheduler,
-                criterion,
-                attention_kl_loss,
-                iteration,
-                kl_loss_start_iter,
-                binarization_start_iter,
-            )
-            global_step += 1
-            
-        checkpoint = Checkpoint.from_dict(
-            dict(
-                epoch=epoch,
-                global_step=global_step,
-                model=model.state_dict(),
-            )
-        )
-        session.report({}, checkpoint=checkpoint)
-        if session.get_world_rank() == 0:
-            artifact = wandb.Artifact(
-                f"artifact_epoch{epoch}_step{global_step}", "model"
-            )
-            with tempfile.TemporaryDirectory() as tempdirname:
-                checkpoint.to_directory(tempdirname)
-                artifact.add_dir(tempdirname)
-                wandb.log_artifact(artifact)
-            iteration += 1
+        train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration += 1
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
@@ -879,10 +910,376 @@ def get_vocoder():
     model.eval()
     return model
 
+# ### pytorch dataloader for debug
+# from scipy.io.wavfile import read
+# import lmdb
+# import pickle as pkl
+# from scipy.ndimage import distance_transform_edt as distance_transform
+# def load_wav_to_torch(full_path):
+#     """ Loads wavdata into torch array """
+#     sampling_rate, data = read(full_path)
+#     return torch.from_numpy(np.array(data)).float(), sampling_rate
+
+# class Data(torch.utils.data.Dataset):
+#     def __init__(self, datasets, filter_length, hop_length, win_length,
+#                  sampling_rate, n_mel_channels, mel_fmin, mel_fmax, f0_min,
+#                  f0_max, max_wav_value, use_f0, use_energy_avg, use_log_f0,
+#                  use_scaled_energy, symbol_set, cleaner_names, heteronyms_path,
+#                  phoneme_dict_path, p_phoneme, handle_phoneme='word',
+#                  handle_phoneme_ambiguous='ignore', speaker_ids=None,
+#                  include_speakers=None, n_frames=-1,
+#                  use_attn_prior_masking=True, prepend_space_to_text=True,
+#                  append_space_to_text=True, add_bos_eos_to_text=False,
+#                  betabinom_cache_path="", betabinom_scaling_factor=0.05,
+#                  lmdb_cache_path="", dur_min=None, dur_max=None,
+#                  combine_speaker_and_emotion=False, **kwargs):
+
+#         self.combine_speaker_and_emotion = combine_speaker_and_emotion
+#         self.max_wav_value = max_wav_value
+#         self.audio_lmdb_dict = {}  # dictionary of lmdbs for audio data
+#         self.data = self.load_data(datasets)
+#         self.distance_tx_unvoiced = False
+#         if 'distance_tx_unvoiced' in kwargs.keys():
+#             self.distance_tx_unvoiced = kwargs['distance_tx_unvoiced']
+#         self.stft = TacotronSTFT(filter_length=filter_length,
+#                                  hop_length=hop_length,
+#                                  win_length=win_length,
+#                                  sampling_rate=sampling_rate,
+#                                  n_mel_channels=n_mel_channels,
+#                                  mel_fmin=mel_fmin, mel_fmax=mel_fmax)
+
+#         self.do_mel_scaling = kwargs.get('do_mel_scaling', True)
+#         self.mel_noise_scale = kwargs.get('mel_noise_scale', 0.0)
+#         self.filter_length = filter_length
+#         self.hop_length = hop_length
+#         self.win_length = win_length
+#         self.mel_fmin = mel_fmin
+#         self.mel_fmax = mel_fmax
+#         self.f0_min = f0_min
+#         self.f0_max = f0_max
+#         self.use_f0 = use_f0
+#         self.use_log_f0 = use_log_f0
+#         self.use_energy_avg = use_energy_avg
+#         self.use_scaled_energy = use_scaled_energy
+#         self.sampling_rate = sampling_rate
+#         self.tp = TextProcessing(
+#             symbol_set, cleaner_names, heteronyms_path, phoneme_dict_path,
+#             p_phoneme=p_phoneme, handle_phoneme=handle_phoneme,
+#             handle_phoneme_ambiguous=handle_phoneme_ambiguous,
+#             prepend_space_to_text=prepend_space_to_text,
+#             append_space_to_text=append_space_to_text,
+#             add_bos_eos_to_text=add_bos_eos_to_text)
+
+#         self.dur_min = dur_min
+#         self.dur_max = dur_max
+#         if speaker_ids is None or speaker_ids == '':
+#             self.speaker_ids = self.create_speaker_lookup_table(self.data)
+#         else:
+#             self.speaker_ids = speaker_ids
+
+#         print("Number of files", len(self.data))
+#         if include_speakers is not None:
+#             for (speaker_set, include) in include_speakers:
+#                 self.filter_by_speakers_(speaker_set, include)
+#             print("Number of files after speaker filtering", len(self.data))
+
+#         if dur_min is not None and dur_max is not None:
+#             self.filter_by_duration_(dur_min, dur_max)
+#             print("Number of files after duration filtering", len(self.data))
+
+#         self.use_attn_prior_masking = bool(use_attn_prior_masking)
+#         self.prepend_space_to_text = bool(prepend_space_to_text)
+#         self.append_space_to_text = bool(append_space_to_text)
+#         self.betabinom_cache_path = betabinom_cache_path
+#         self.betabinom_scaling_factor = betabinom_scaling_factor
+#         self.lmdb_cache_path = lmdb_cache_path
+#         if self.lmdb_cache_path != "":
+#             self.cache_data_lmdb = lmdb.open(
+#                 self.lmdb_cache_path, readonly=True, max_readers=1024,
+#                 lock=False).begin()
+
+#         # make sure caching path exists
+#         if not os.path.exists(self.betabinom_cache_path):
+#             os.makedirs(self.betabinom_cache_path)
+
+#         print("Dataloader initialized with no augmentations")
+#         self.speaker_map = None
+#         if 'speaker_map' in kwargs:
+#             self.speaker_map = kwargs['speaker_map']
+
+#     def load_data(self, datasets, split='|'):
+#         dataset = []
+#         for dset_name, dset_dict in datasets.items():
+#             folder_path = dset_dict['basedir']
+#             audiodir = dset_dict['audiodir']
+#             filename = dset_dict['filelist']
+#             audio_lmdb_key = None
+#             if 'lmdbpath' in dset_dict.keys() and len(dset_dict['lmdbpath']) > 0:
+#                 self.audio_lmdb_dict[dset_name] = lmdb.open(
+#                     dset_dict['lmdbpath'], readonly=True, max_readers=256,
+#                     lock=False).begin()
+#                 audio_lmdb_key = dset_name
+
+#             wav_folder_prefix = os.path.join(folder_path, audiodir)
+#             filelist_path = os.path.join(folder_path, filename)
+#             with open(filelist_path, encoding='utf-8') as f:
+#                 data = [line.strip().split(split) for line in f]
+
+#             for d in data:
+#                 emotion = 'other' if len(d) == 3 else d[3]
+#                 duration = -1 if len(d) == 3 else d[4]
+#                 dataset.append(
+#                     {'audiopath': os.path.join(wav_folder_prefix, d[0]),
+#                      'text': d[1],
+#                      'speaker': d[2] + '-' + emotion if self.combine_speaker_and_emotion else d[2],
+#                      'emotion': emotion,
+#                      'duration': float(duration),
+#                      'lmdb_key': audio_lmdb_key
+#                      })
+#         return dataset
+
+#     def filter_by_speakers_(self, speakers, include=True):
+#         print("Include spaker {}: {}".format(speakers, include))
+#         if include:
+#             self.data = [x for x in self.data if x['speaker'] in speakers]
+#         else:
+#             self.data = [x for x in self.data if x['speaker'] not in speakers]
+
+#     def filter_by_duration_(self, dur_min, dur_max):
+#         self.data = [
+#             x for x in self.data
+#             if x['duration'] == -1 or (
+#                 x['duration'] >= dur_min and x['duration'] <= dur_max)]
+
+#     def create_speaker_lookup_table(self, data):
+#         speaker_ids = np.sort(np.unique([x['speaker'] for x in data]))
+#         d = {speaker_ids[i]: i for i in range(len(speaker_ids))}
+#         print("Number of speakers:", len(d))
+#         print("Speaker IDS", d)
+#         return d
+
+#     def f0_normalize(self, x):
+#         if self.use_log_f0:
+#             mask = x >= self.f0_min
+#             x[mask] = torch.log(x[mask])
+#             x[~mask] = 0.0
+
+#         return x
+
+#     def f0_denormalize(self, x):
+#         if self.use_log_f0:
+#             log_f0_min = np.log(self.f0_min)
+#             mask = x >= log_f0_min
+#             x[mask] = torch.exp(x[mask])
+#             x[~mask] = 0.0
+#         x[x <= 0.0] = 0.0
+
+#         return x
+
+#     def energy_avg_normalize(self, x):
+#         if self.use_scaled_energy:
+#             x = (x + 20.0) / 20.0
+#         return x
+
+#     def energy_avg_denormalize(self, x):
+#         if self.use_scaled_energy:
+#             x = x * 20.0 - 20.0
+#         return x
+
+#     def get_f0_pvoiced(self, audio, sampling_rate=22050, frame_length=1024,
+#                        hop_length=256, f0_min=100, f0_max=300):
+
+#         audio_norm = audio / self.max_wav_value
+#         f0, voiced_mask, p_voiced = pyin(
+#             audio_norm, f0_min, f0_max, sampling_rate,
+#             frame_length=frame_length, win_length=frame_length // 2,
+#             hop_length=hop_length)
+#         f0[~voiced_mask] = 0.0
+#         f0 = torch.FloatTensor(f0)
+#         p_voiced = torch.FloatTensor(p_voiced)
+#         voiced_mask = torch.FloatTensor(voiced_mask)
+#         return f0, voiced_mask, p_voiced
+
+#     def get_energy_average(self, mel):
+#         energy_avg = mel.mean(0)
+#         energy_avg = self.energy_avg_normalize(energy_avg)
+#         return energy_avg
+
+#     def get_mel(self, audio):
+#         audio_norm = audio / self.max_wav_value
+#         audio_norm = audio_norm.unsqueeze(0)
+#         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
+#         melspec = self.stft.mel_spectrogram(audio_norm)
+#         melspec = torch.squeeze(melspec, 0)
+#         if self.do_mel_scaling:
+#             melspec = (melspec + 5.5) / 2
+#         if self.mel_noise_scale > 0:
+#             melspec += torch.randn_like(melspec) * self.mel_noise_scale
+#         return melspec
+
+#     def get_speaker_id(self, speaker):
+#         if self.speaker_map is not None and speaker in self.speaker_map:
+#             speaker = self.speaker_map[speaker]
+
+#         return torch.LongTensor([self.speaker_ids[speaker]])
+
+#     def get_text(self, text):
+#         text = self.tp.encode_text(text)
+#         text = torch.LongTensor(text)
+#         return text
+
+#     def get_attention_prior(self, n_tokens, n_frames):
+#         # cache the entire attn_prior by filename
+#         if self.use_attn_prior_masking:
+#             filename = "{}_{}".format(n_tokens, n_frames)
+#             prior_path = os.path.join(self.betabinom_cache_path, filename)
+#             prior_path += "_prior.pth"
+#             if self.lmdb_cache_path != "":
+#                 attn_prior = pkl.loads(
+#                     self.cache_data_lmdb.get(prior_path.encode('ascii')))
+#             elif os.path.exists(prior_path):
+#                 attn_prior = torch.load(prior_path)
+#             else:
+#                 attn_prior = beta_binomial_prior_distribution(
+#                     n_tokens, n_frames, self.betabinom_scaling_factor)
+#                 torch.save(attn_prior, prior_path)
+#         else:
+#             attn_prior = torch.ones(n_frames, n_tokens)  # all ones baseline
+
+#         return attn_prior
+
+#     def __getitem__(self, index):
+#         data = self.data[index]
+#         audiopath, text = data['audiopath'], data['text']
+#         speaker_id = data['speaker']
+
+#         if data['lmdb_key'] is not None:
+#             data_dict = pkl.loads(
+#                 self.audio_lmdb_dict[data['lmdb_key']].get(
+#                     audiopath.encode('ascii')))
+#             audio = data_dict['audio']
+#             sampling_rate = data_dict['sampling_rate']
+#         else:
+#             audio, sampling_rate = load_wav_to_torch(audiopath)
+
+#         if sampling_rate != self.sampling_rate:
+#             raise ValueError("{} SR doesn't match target {} SR".format(
+#                 sampling_rate, self.sampling_rate))
+
+#         mel = self.get_mel(audio)
+#         f0 = None
+#         p_voiced = None
+#         voiced_mask = None
+#         if self.use_f0:
+#             filename = '_'.join(audiopath.split('/')[-3:])
+#             f0_path = os.path.join(self.betabinom_cache_path, filename)
+#             f0_path += "_f0_sr{}_fl{}_hl{}_f0min{}_f0max{}_log{}.pt".format(
+#                 self.sampling_rate, self.filter_length, self.hop_length,
+#                 self.f0_min, self.f0_max, self.use_log_f0)
+
+#             dikt = None
+#             if len(self.lmdb_cache_path) > 0:
+#                 dikt = pkl.loads(
+#                     self.cache_data_lmdb.get(f0_path.encode('ascii')))
+#                 f0 = dikt['f0']
+#                 p_voiced = dikt['p_voiced']
+#                 voiced_mask = dikt['voiced_mask']
+#             elif os.path.exists(f0_path):
+#                 try:
+#                     dikt = torch.load(f0_path)
+#                 except:
+#                     print(f"f0 loading from {f0_path} is broken, recomputing.")
+
+#             if dikt is not None:
+#                 f0 = dikt['f0']
+#                 p_voiced = dikt['p_voiced']
+#                 voiced_mask = dikt['voiced_mask']
+#             else:
+#                 f0, voiced_mask, p_voiced = self.get_f0_pvoiced(
+#                     audio.cpu().numpy(), self.sampling_rate,
+#                     self.filter_length, self.hop_length, self.f0_min,
+#                     self.f0_max)
+#                 print("saving f0 to {}".format(f0_path))
+#                 torch.save({'f0': f0,
+#                             'voiced_mask': voiced_mask,
+#                             'p_voiced': p_voiced}, f0_path)
+#             if f0 is None:
+#                 raise Exception("STOP, BROKEN F0 {}".format(audiopath))
+
+#             f0 = self.f0_normalize(f0)
+#             if self.distance_tx_unvoiced:
+#                 mask = f0 <= 0.0
+#                 distance_map = np.log(distance_transform(mask))
+#                 distance_map[distance_map <= 0] = 0.0
+#                 f0 = f0 - distance_map
+
+#         energy_avg = None
+#         if self.use_energy_avg:
+#             energy_avg = self.get_energy_average(mel)
+#             if self.use_scaled_energy and energy_avg.min() < 0.0:
+#                 print(audiopath, "has scaled energy avg smaller than 0")
+
+#         speaker_id = self.get_speaker_id(speaker_id)
+#         text_encoded = self.get_text(text)
+
+#         attn_prior = self.get_attention_prior(
+#                 text_encoded.shape[0], mel.shape[1])
+
+#         if not self.use_attn_prior_masking:
+#             attn_prior = None
+
+#         return {'mel': mel,
+#                 'speaker_id': speaker_id,
+#                 'text_encoded': text_encoded,
+#                 'audiopath': audiopath,
+#                 'attn_prior': attn_prior,
+#                 'f0': f0,
+#                 'p_voiced': p_voiced,
+#                 'voiced_mask': voiced_mask,
+#                 'energy_avg': energy_avg,
+#                 }
+
+#     def __len__(self):
+#         return len(self.data)
+
+# from torch.utils.data.distributed import DistributedSampler
+# from torch.utils.data import DataLoader
+
+# def prepare_dataloaders(data_config, n_gpus, batch_size):
+#     # Get data, data loaders and collate function ready
+#     ignore_keys = ['training_files', 'validation_files']
+#     print("initializing training dataloader")
+#     trainset = Data(data_config['training_files'],
+#                     **dict((k, v) for k, v in data_config.items()
+#                     if k not in ignore_keys))
+
+#     print("initializing validation dataloader")
+#     data_config_val = data_config.copy()
+#     data_config_val['aug_probabilities'] = None  # no aug in val set
+#     valset = Data(data_config['validation_files'],
+#                   **dict((k, v) for k, v in data_config_val.items()
+#                   if k not in ignore_keys), speaker_ids=trainset.speaker_ids)
+
+#     collate_fn = DataCollate()
+
+#     train_sampler, shuffle = None, True
+#     if n_gpus > 1:
+#         train_sampler, shuffle = DistributedSampler(trainset), False
+
+#     train_loader = DataLoader(trainset, num_workers=8, shuffle=shuffle,
+#                               sampler=train_sampler, batch_size=batch_size,
+#                               pin_memory=False, drop_last=True,
+#                               collate_fn=collate_fn)
+
+#     return train_loader, valset, collate_fn
+
 
 if __name__ == "__main__":
 
+ 
+    # print('asdfghk \n\n\n\n\n')
     ray_dataset = get_ray_dataset()
+    # ray_dataset_minimal = get_ray_dataset_minimal()
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -893,12 +1290,21 @@ if __name__ == "__main__":
         train_loop_per_worker=train_func,
         train_loop_config=train_config,
         scaling_config=ScalingConfig(
-            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
+            num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
         ),
         run_config=RunConfig(
-            sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
+            # sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
+            sync_config=SyncConfig()
         ),
         datasets={"train": ray_dataset},
     )
-
+    # trainer = DummyTrainer(
+    #     scaling_config=ScalingConfig(
+    #         num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
+    #     ),
+    #     run_config=RunConfig(
+    #         sync_config=SyncConfig()
+    #     ),
+    #     datasets={"train": ray_dataset_minimal},
+    # )
     result = trainer.fit()
