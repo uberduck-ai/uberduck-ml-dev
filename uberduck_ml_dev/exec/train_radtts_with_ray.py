@@ -40,7 +40,7 @@ from uberduck_ml_dev.utils.utils import (
 config = {
     "train_config": {
         "output_directory": "/home/ray/default/lj_test",
-        "epochs": 100,
+        "epochs": 10000,
         "optim_algo": "RAdam",
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
@@ -451,7 +451,8 @@ def ray_df_to_batch_radtts(df):
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
-        "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
+        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
         sep="|",
         header=None,
@@ -845,16 +846,25 @@ import requests
 HIFI_GAN_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_22khz_config.json"
 HIFI_GAN_GENERATOR_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_libritts100360_generator0p5.pt"
 
+
+
+hifi_gan_config_path = '/usr/src/app/radtts/models/hifigan_22khz_config.json'
+hifi_gan_generator_path = '/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt'
+
 def load_pretrained(model):
-    response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
-    bio = BytesIO(response.content)
-    loaded = torch.load(bio)
+    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
+    # bio = BytesIO(response.content)
+    loaded = torch.load(hifi_gan_generator_path)
     model.load_state_dict(loaded['generator'])
+
 
 def get_vocoder():
     print("Getting model config...")
-    response = requests.get(HIFI_GAN_CONFIG_URL)
-    hifigan_config = response.json()
+    # response = requests.get(HIFI_GAN_CONFIG_URL)
+
+    with open(hifi_gan_config_path) as f:
+        hifigan_config = json.load(f)
+
     h = AttrDict(hifigan_config)
     if 'gaussian_blur' in hifigan_config:
         hifigan_config['gaussian_blur']['p_blurring'] = 0.0
@@ -883,7 +893,7 @@ if __name__ == "__main__":
         train_loop_per_worker=train_func,
         train_loop_config=train_config,
         scaling_config=ScalingConfig(
-            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
         ),
         run_config=RunConfig(
             sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
