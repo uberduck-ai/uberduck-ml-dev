@@ -432,19 +432,19 @@ def ray_df_to_batch_radtts(df):
     for transcript, audio_bytes, speaker_id, f0_path in zip(
         transcripts, audio_bytes_list, speaker_ids, f0_paths
     ):
-        print(datetime.now(), 'start')
+        # print(datetime.now(), 'start')
         # Audio
-        print(datetime.now(), 'pre wav read and norm')
+        # print(datetime.now(), 'pre wav read and norm')
         bio = BytesIO(audio_bytes)
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / (np.abs(audio).max() * 2)
-        print(datetime.now(), 'pre text embed')
+        # print(datetime.now(), 'pre text embed')
         text_sequence = get_text(transcript)
-        print(datetime.now(), 'pre mel compute')
+        # print(datetime.now(), 'pre mel compute')
         mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
         mel = torch.squeeze(mel, 0)
-        print(datetime.now(), 'pre f0 load')
+        # print(datetime.now(), 'pre f0 load')
         dikt = torch.load(f0_path)
         f0 = dikt['f0']
         p_voiced = dikt['p_voiced']
@@ -452,9 +452,9 @@ def ray_df_to_batch_radtts(df):
         # f0, voiced_mask, p_voiced = get_f0_pvoiced(
         #     audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)   
         f0 = f0_normalize(f0, f0_min = data_config['f0_min'])
-        print(datetime.now(), 'pre energy compute')
+        # print(datetime.now(), 'pre energy compute')
         energy_avg = get_energy_average(mel)
-        print(datetime.now(), 'pre prior load')
+        # print(datetime.now(), 'pre prior load')
         prior_path = "{}_{}".format(text_sequence.shape[0], mel.shape[1])
         prior_path = os.path.join('/usr/src/app/radtts/data_cache', prior_path)
         prior_path += "_prior.pth"
@@ -462,7 +462,7 @@ def ray_df_to_batch_radtts(df):
         # attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
         speaker_id =  get_speaker_id(speaker_id)
         collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
-        print(datetime.now(), 'end')
+        # print(datetime.now(), 'end')
     return collate_fn(collate_input)
 
 
