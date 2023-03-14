@@ -46,7 +46,7 @@ config = {
         "sigma": 1.0,
         "iters_per_checkpoint": 10000,
         "steps_per_sample": 2000,
-        "batch_size": 16,
+        "batch_size": 32,
         "seed": None,
         "checkpoint_path": "",
         "ignore_layers": [],
@@ -673,8 +673,9 @@ def _train_step(
 
     with autocast(enabled= False):
 
-
-        batch_dict = collate_fn(batch)
+        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+        batch_dict = batch
+        # batch_dict = collate_fn(batch)
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
         attn_prior = to_gpu(batch_dict['attn_prior'])
@@ -746,16 +747,18 @@ def _train_step(
     print(f"Loss: {loss.item()}")
 
 
-  
-# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-    for batch_idx, ray_batch_df in enumerate(
-        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
-    ):
-    # for batch in train_dataloader:
+# NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+# def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    # for batch_idx, ray_batch_df in enumerate(
+    #     dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
+    # ):
+    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+    for batch in train_dataloader:
         _train_step(
-            ray_batch_df,
-            # batch,
+            # ray_batch_df,
+            # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+            batch,
             model,
             optim,
             iteration,
@@ -807,8 +810,10 @@ def train_func(config: dict):
 
 
     start_epoch = 0
-    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    # train_dataloader = train.torch.prepare_data_loader(train_loader)
+
+    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     # NOTE (Sam): replace with RAdam
     optim = torch.optim.Adam(
@@ -836,8 +841,9 @@ def train_func(config: dict):
     attention_kl_loss = AttentionBinarizationLoss()
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
-        # train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+        train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        # train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
         iteration += 1
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
