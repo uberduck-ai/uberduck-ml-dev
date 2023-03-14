@@ -14,15 +14,14 @@ from ray.air import session, Checkpoint
 from ray.air.config import ScalingConfig, RunConfig
 from ray.air.integrations.wandb import  setup_wandb
 import ray.data
-# from ray.data.datasource import FastFileMetadataProvider
+
 import ray.train as train
 from ray.train.torch import TorchTrainer
 from ray.air.util.check_ingest import DummyTrainer
 from ray.tune import SyncConfig
 
 
-# from uberduck_ml_dev.models import vits
-# from uberduck_ml_dev.models.vits import *
+
 from uberduck_ml_dev.models.radtts import RADTTS
 from uberduck_ml_dev.text.utils import text_to_sequence
 from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS
@@ -36,8 +35,7 @@ from uberduck_ml_dev.utils.utils import (
 )
 
 
-# config = DEFAULTS.values()
-# config["with_gsts"] = False
+
 config = {
     "train_config": {
         "output_directory": "",
@@ -365,6 +363,7 @@ def get_attention_prior(n_tokens, n_frames):
 
     return attn_prior
 
+# NOTE (Sam): looks like this was not used in successful training runs
 def f0_normalize( x, f0_min):
     # if self.use_log_f0:
     # mask = x >= f0_min
@@ -421,49 +420,7 @@ def get_text(text):
     text = torch.LongTensor(text)
     return text
 from datetime import datetime
-def ray_df_to_batch_radtts(df):
-    transcripts = df.transcript.tolist()
-    audio_bytes_list = df.audio_bytes.tolist()
-    speaker_ids = df.speaker_id.tolist()
-    paths = df.path.tolist()
-    f0_paths = df.f0_path.tolist()
-    collate_fn = DataCollate()
-    collate_input = []
-    for transcript, audio_bytes, speaker_id, f0_path in zip(
-        transcripts, audio_bytes_list, speaker_ids, f0_paths
-    ):
-        # print(datetime.now(), 'start')
-        # Audio
-        # print(datetime.now(), 'pre wav read and norm')
-        bio = BytesIO(audio_bytes)
-        sr, wav_data = wavfile.read(bio)
-        audio = torch.FloatTensor(wav_data)
-        audio_norm = audio / (np.abs(audio).max() * 2)
-        # print(datetime.now(), 'pre text embed')
-        text_sequence = get_text(transcript)
-        # print(datetime.now(), 'pre mel compute')
-        mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
-        mel = torch.squeeze(mel, 0)
-        # print(datetime.now(), 'pre f0 load')
-        dikt = torch.load(f0_path)
-        f0 = dikt['f0']
-        p_voiced = dikt['p_voiced']
-        voiced_mask = dikt['voiced_mask']
-        # f0, voiced_mask, p_voiced = get_f0_pvoiced(
-        #     audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)   
-        f0 = f0_normalize(f0, f0_min = data_config['f0_min'])
-        # print(datetime.now(), 'pre energy compute')
-        energy_avg = get_energy_average(mel)
-        # print(datetime.now(), 'pre prior load')
-        prior_path = "{}_{}".format(text_sequence.shape[0], mel.shape[1])
-        prior_path = os.path.join('/usr/src/app/radtts/data_cache', prior_path)
-        prior_path += "_prior.pth"
-        attn_prior = torch.load(prior_path)
-        # attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
-        speaker_id =  get_speaker_id(speaker_id)
-        collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
-        # print(datetime.now(), 'end')
-    return collate_fn(collate_input)
+
 
 def ray_df_preprocessing(df):
     transcripts = df.transcript.tolist()
@@ -471,7 +428,7 @@ def ray_df_preprocessing(df):
     speaker_ids = df.speaker_id.tolist()
     paths = df.path.tolist()
     f0_paths = df.f0_path.tolist()
-    # collate_fn = DataCollate()
+
     collate_input = []
     for transcript, audio_bytes, speaker_id, f0_path in zip(
         transcripts, audio_bytes_list, speaker_ids, f0_paths
@@ -508,7 +465,7 @@ def ray_df_preprocessing(df):
         # NOTE (Sam): might be faster to return dictionary arrays of batched inputs instead of list
         collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
         # print(datetime.now(), 'end')
-    # return collate_fn(collate_input)
+
     return collate_input
 
 def get_ray_dataset():
@@ -535,24 +492,13 @@ def get_ray_dataset():
     audio_ds = ray.data.read_binary_files(
         paths,
         parallelism=parallelism_length,
-        # meta_provider=FastFileMetadataProvider(),
         ray_remote_args={"num_cpus": 0.2},
     )
     audio_ds = audio_ds.map_batches(
         lambda x: x, batch_format="pyarrow", batch_size=None
     )
 
-    
 
-        # bio = BytesIO(audio_bytes)
-        # sr, wav_data = wavfile.read(bio)
-        # audio = torch.FloatTensor(wav_data)
-        # audio_norm = audio / (np.abs(audio).max() * 2)
-        # # print(datetime.now(), 'pre text embed')
-        # text_sequence = get_text(transcript)
-        # # print(datetime.now(), 'pre mel compute')
-        # mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
-        # mel = torch.squeeze(mel, 0)
     paths = ray.data.from_items(paths, parallelism=parallelism_length)
     paths_ds = paths.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
 
@@ -587,36 +533,6 @@ def get_ray_dataset():
 
     processed_dataset = output_dataset.map_batches(ray_df_preprocessing)
     return processed_dataset
-    # return output_dataset
-
-
-
-# def get_ray_dataset_minimal():
-#     lj_df = pd.read_csv(
-#         '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
-#         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
-#         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
-#         sep="|",
-#         header=None,
-#         quoting=3,
-#         names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
-#     )
-
-#     parallelism_length = 400
-#     speaker_ids = lj_df.speaker_id.tolist()
-#     speaker_ids_ds = ray.data.from_items(speaker_ids, parallelism=parallelism_length)
-#     speaker_ids_ds = speaker_ids_ds.map_batches(
-#         lambda x: x, batch_format="pyarrow", batch_size=None
-#     )
-#     output_dataset = speaker_ids_ds
-#     output_dataset = output_dataset.map_batches(
-#         lambda table: table.rename(
-#             columns={
-#                 "value": "transcript",
-#             }
-#         )
-#     )
-#     return output_dataset
 
 
 
@@ -627,15 +543,8 @@ def log(metrics, audios = {}):
     
     for k,v in audios.items():
         wandb_metrics[k] = wandb.Audio(v, sample_rate=22050)
-    # if gen_audio is not None:
-    #     wandb_metrics.update({"gen/audio": wandb.Audio(gen_audio, sample_rate=22050)})
-    # if gt_audio is not None:
-    #     wandb_metrics.update({"gt/audio": wandb.Audio(gt_audio, sample_rate=22050)})
-    # if sample_audio is not None:
-    #     wandb_metrics.update(
-    #         {"sample_inference": wandb.Audio(sample_audio, sample_rate=22050)}
-    #     )
-    # session.report(metrics)
+
+    session.report(metrics)
     if session.get_world_rank() == 0:
         wandb.log(wandb_metrics)
 
@@ -666,7 +575,7 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
     
     attn_used = outputs['attn']
     attn_soft = outputs['attn_soft']
-    # audioname = os.path.basename(audiopaths[0])
+
     images = {}
     audios = {}
     if attn_used is not None:
@@ -691,10 +600,10 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
             durations = attn_used[0, 0].sum(0, keepdim=True)
             # NOTE (Sam): this is causing problems when durations are > x.5 and binarize_attention is false.
             #  In that case, durations + 0.5 . floor > durations
-            # this causes issues to the length_regulator, which expects floor < durations
+            # this causes issues to the length_regulator, which expects floor < durations.
+            # Just keep binarize_attention = True in inference and don't think about it that hard.
             durations = (durations + 0.5).floor().int()
-            # load vocoder to CPU to avoid taking up valuable GPU vRAM
-            # vocoder = get_vocoder()
+            # NOTE (Sam): should we load vocoder to CPU to avoid taking up valuable GPU vRAM?
             for attribute_sigma in attribute_sigmas:
                 # try:
                 if attribute_sigma > 0.0:
@@ -766,8 +675,6 @@ def _train_step(
 
 
         batch_dict = collate_fn(batch)
-        
-        # batch_dict = batch
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
         attn_prior = to_gpu(batch_dict['attn_prior'])
@@ -826,10 +733,8 @@ def _train_step(
     for k, (v, w) in loss_outputs.items():
         metrics[k] = v.item()
 
-    # if 2 == 3:
-    # if global_step % steps_per_sample == 0 and session.get_world_rank() == 0:
-    if iteration % steps_per_sample == 0 and session.get_world_rank() == 0:
 
+    if iteration % steps_per_sample == 0 and session.get_world_rank() == 0:
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
         images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
@@ -848,7 +753,6 @@ def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scale
         dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
     ):
     # for batch in train_dataloader:
-        # torch.cuda.empty_cache()
         _train_step(
             ray_batch_df,
             # batch,
@@ -872,7 +776,7 @@ def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scale
             model=model.state_dict(),
         )
     )
-    session.report({}, checkpoint=checkpoint)
+    # session.report({}, checkpoint=checkpoint)
     if session.get_world_rank() == 0:
         artifact = wandb.Artifact(
             f"artifact_epoch{epoch}_step{iteration}", "model"
@@ -896,9 +800,7 @@ def train_func(config: dict):
     model = RADTTS(
         **model_config,
     )
-    # model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
     model = train.torch.prepare_model(model)
-    # model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict())
 
     start_epoch = 0
     # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
@@ -942,13 +844,10 @@ from ray.tune import SyncConfig
 # For sample inference
 import json
 from uberduck_ml_dev.vocoders.hifigan import AttrDict, Generator
-# , Denoiser
+# NOTE (Sam): denoiser not used here in contrast with radtts repo
 
-# def load_vocoder(vocoder_path, config_path, to_cuda=True):
 def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda = True):
-    # with open(config_path) as f:
-    #     data_vocoder = f.read()
-    # config_vocoder = json.loads(data_vocoder)
+
     h = AttrDict(vocoder_config)
     if 'gaussian_blur' in vocoder_config:
         vocoder_config['gaussian_blur']['p_blurring'] = 0.0
@@ -956,21 +855,16 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda = True):
         vocoder_config['gaussian_blur'] = {'p_blurring': 0.0}
         h['gaussian_blur'] = {'p_blurring': 0.0}
 
-    # state_dict_g = torch.load(vocoder_path, map_location='cpu')['generator']
-
-    # load hifigan
     vocoder = Generator(h)
     vocoder.load_state_dict(vocoder_state_dict)
-    # denoiser = Denoiser(vocoder)
     if to_cuda:
         vocoder.cuda()
-        # denoiser.cuda()
+
     vocoder.eval()
-    # denoiser.eval()
 
-    return vocoder #, denoiser
+    return vocoder 
 
-import requests
+
 HIFI_GAN_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_22khz_config.json"
 HIFI_GAN_GENERATOR_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_libritts100360_generator0p5.pt"
 
@@ -980,6 +874,7 @@ hifi_gan_config_path = '/usr/src/app/radtts/models/hifigan_22khz_config.json'
 hifi_gan_generator_path = '/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt'
 
 def load_pretrained(model):
+    # NOTE (Sam): uncomment for download on anyscale
     # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
     # bio = BytesIO(response.content)
     loaded = torch.load(hifi_gan_generator_path)
@@ -987,7 +882,8 @@ def load_pretrained(model):
 
 
 def get_vocoder():
-    print("Getting model config...")
+    print("Getting vocoder")
+    # NOTE (Sam): uncomment for download on anyscale
     # response = requests.get(HIFI_GAN_CONFIG_URL)
 
     with open(hifi_gan_config_path) as f:
@@ -1374,9 +1270,7 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
 if __name__ == "__main__":
 
  
-    # print('asdfghk \n\n\n\n\n')
     ray_dataset = get_ray_dataset()
-    # ray_dataset_minimal = get_ray_dataset()
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -1390,18 +1284,11 @@ if __name__ == "__main__":
             num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
         ),
         run_config=RunConfig(
+        # NOTE (Sam): uncomment for saving on anyscale
             # sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
             sync_config=SyncConfig()
         ),
         datasets={"train": ray_dataset},
     )
-    # trainer = DummyTrainer(
-    #     scaling_config=ScalingConfig(
-    #         num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
-    #     ),
-    #     run_config=RunConfig(
-    #         sync_config=SyncConfig()
-    #     ),
-    #     datasets={"train": ray_dataset_minimal},
-    # )
+
     result = trainer.fit()
