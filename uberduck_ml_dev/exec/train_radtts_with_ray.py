@@ -800,7 +800,11 @@ def train_func(config: dict):
     model = RADTTS(
         **model_config,
     )
-    model = train.torch.prepare_model(model)
+
+    # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
+    # model = train.torch.prepare_model(model)
+    model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
+
 
     start_epoch = 0
     # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
@@ -1281,7 +1285,7 @@ if __name__ == "__main__":
         train_loop_per_worker=train_func,
         train_loop_config=train_config,
         scaling_config=ScalingConfig(
-            num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
+            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
         ),
         run_config=RunConfig(
         # NOTE (Sam): uncomment for saving on anyscale
