@@ -81,7 +81,7 @@ config = {
             "LJS": {
                 "basedir": "/",
                 "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_100.txt",
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
                 "lmdbpath": ""
             }
         },
@@ -89,7 +89,7 @@ config = {
             "LJS": {
                 "basedir": "/",
                 "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_100.txt",
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
                 "lmdbpath": ""
             }
         },
@@ -469,8 +469,8 @@ def ray_df_to_batch_radtts(df):
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
-        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
-        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
         sep="|",
