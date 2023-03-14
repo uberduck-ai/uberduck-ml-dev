@@ -469,8 +469,8 @@ def ray_df_to_batch_radtts(df):
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
-        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
-        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
         sep="|",
@@ -703,8 +703,8 @@ def _train_step(
     optim.zero_grad()
 
     with autocast(enabled= False):
-        # batch_dict = ray_df_to_batch_radtts(batch)
-        batch_dict = batch
+        batch_dict = ray_df_to_batch_radtts(batch)
+        # batch_dict = batch
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
         attn_prior = to_gpu(batch_dict['attn_prior'])
@@ -779,16 +779,16 @@ def _train_step(
 
 
   
-def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-# def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-    # for batch_idx, ray_batch_df in enumerate(
-    #     dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=4)
-    # ):
-    for batch in train_dataloader:
+# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    for batch_idx, ray_batch_df in enumerate(
+        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=4)
+    ):
+    # for batch in train_dataloader:
         # torch.cuda.empty_cache()
         _train_step(
-            # ray_batch_df,
-            batch,
+            ray_batch_df,
+            # batch,
             model,
             optim,
             iteration,
@@ -838,8 +838,8 @@ def train_func(config: dict):
     # model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict())
 
     start_epoch = 0
-    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    train_dataloader = train.torch.prepare_data_loader(train_loader)
+    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    # train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     # NOTE (Sam): replace with RAdam
     optim = torch.optim.Adam(
@@ -867,8 +867,8 @@ def train_func(config: dict):
     attention_kl_loss = AttentionBinarizationLoss()
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
-        train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        # train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        # train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
         iteration += 1
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
