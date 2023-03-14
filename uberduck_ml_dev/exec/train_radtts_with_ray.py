@@ -296,6 +296,7 @@ class DataCollate():
 
 max_wav_value = 32768
 from librosa import pyin
+
 def get_f0_pvoiced(audio, sampling_rate=22050, frame_length=1024,
                     hop_length=256, f0_min=100, f0_max=300):
 
@@ -419,53 +420,71 @@ def get_text(text):
     text = tp.encode_text(text)
     text = torch.LongTensor(text)
     return text
-
+from datetime import datetime
 def ray_df_to_batch_radtts(df):
     transcripts = df.transcript.tolist()
     audio_bytes_list = df.audio_bytes.tolist()
     speaker_ids = df.speaker_id.tolist()
     paths = df.path.tolist()
+    f0_paths = df.f0_path.tolist()
     collate_fn = DataCollate()
     collate_input = []
-    for transcript, audio_bytes, speaker_id in zip(
-        transcripts, audio_bytes_list, speaker_ids
+    for transcript, audio_bytes, speaker_id, f0_path in zip(
+        transcripts, audio_bytes_list, speaker_ids, f0_paths
     ):
+        print(datetime.now(), 'start')
         # Audio
+        print(datetime.now(), 'pre wav read and norm')
         bio = BytesIO(audio_bytes)
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
         audio_norm = audio / (np.abs(audio).max() * 2)
-
+        print(datetime.now(), 'pre text embed')
         text_sequence = get_text(transcript)
-
+        print(datetime.now(), 'pre mel compute')
         mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
         mel = torch.squeeze(mel, 0)
-        f0, voiced_mask, p_voiced = get_f0_pvoiced(
-            audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)   
+        print(datetime.now(), 'pre f0 load')
+        dikt = torch.load(f0_path)
+        f0 = dikt['f0']
+        p_voiced = dikt['p_voiced']
+        voiced_mask = dikt['voiced_mask']
+        # f0, voiced_mask, p_voiced = get_f0_pvoiced(
+        #     audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)   
         f0 = f0_normalize(f0, f0_min = data_config['f0_min'])
+        print(datetime.now(), 'pre energy compute')
         energy_avg = get_energy_average(mel)
-        attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
-
+        print(datetime.now(), 'pre prior load')
+        prior_path = "{}_{}".format(text_sequence.shape[0], mel.shape[1])
+        prior_path = os.path.join('/usr/src/app/radtts/data_cache', prior_path)
+        prior_path += "_prior.pth"
+        attn_prior = torch.load(prior_path)
+        # attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
         speaker_id =  get_speaker_id(speaker_id)
         collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
+        print(datetime.now(), 'end')
     return collate_fn(collate_input)
 
 
 
 def get_ray_dataset():
     lj_df = pd.read_csv(
-        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt',
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
         sep="|",
         header=None,
         quoting=3,
-        names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
+        # names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
+        names = ['path', 'transcript', 'speaker_id', 'f0_path']
     )
 
     paths = lj_df.path.tolist()
     transcripts = lj_df.transcript.tolist()
     speaker_ids = lj_df.speaker_id.tolist()
+
+    pitches = lj_df.f0_path.tolist()
 
     parallelism_length = 400
     audio_ds = ray.data.read_binary_files(
@@ -488,10 +507,15 @@ def get_ray_dataset():
     speaker_ids_ds = speaker_ids_ds.map_batches(
         lambda x: x, batch_format="pyarrow", batch_size=None
     )
+    pitches_ds = ray.data.from_items(pitches, parallelism=parallelism_length)
+    pitches_ds = pitches_ds.map_batches(
+        lambda x: x, batch_format="pyarrow", batch_size=None
+    )
     output_dataset = (
         transcripts_ds.zip(audio_ds)
         .zip(paths_ds)
         .zip(speaker_ids_ds)
+        .zip(pitches_ds)
     )
     output_dataset = output_dataset.map_batches(
         lambda table: table.rename(
@@ -499,7 +523,8 @@ def get_ray_dataset():
                 "value": "transcript",
                 "value_1": "audio_bytes",
                 "value_2": "path",
-                "value_3": "speaker_id"
+                "value_3": "speaker_id",
+                "value_4": "f0_path",
             }
         )
     )
