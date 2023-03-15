@@ -435,6 +435,24 @@ def get_text(text):
     return text
 from datetime import datetime
 
+RESNET_SE_MODEL_PATH = '/usr/src/app/radtts/resnet_se.pth.tar'
+RESNET_SE_CONFIG_PATH = '/usr/src/app/radtts/resnet_se_config.json'
+
+# import json
+# with open(resnet_se_config) as f:
+#     resnet_config =json.load(f)
+    
+# state_dict = torch.load(resnet_se_model)['model']
+# audio_config = dict(resnet_config["audio"])
+# model_params = resnet_config["model_params"]
+# if "model_name" in model_params:
+#     del model_params["model_name"]
+
+# audio_config["sample_rate"] = 22050
+from TTS.encoder.models.resnet import ResNetSpeakerEncoder
+# audio_encoder = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
+# audio_encoder.eval()
+# audio_encoder.cuda()
 
 def ray_df_preprocessing(df):
     transcripts = df.transcript.tolist()
@@ -442,10 +460,11 @@ def ray_df_preprocessing(df):
     speaker_ids = df.speaker_id.tolist()
     paths = df.path.tolist()
     f0_paths = df.f0_path.tolist()
+    embeddings = df.embedding.tolist()
 
     collate_input = []
-    for transcript, audio_bytes, speaker_id, f0_path in zip(
-        transcripts, audio_bytes_list, speaker_ids, f0_paths
+    for transcript, audio_bytes, speaker_id, f0_path, embedding in zip(
+        transcripts, audio_bytes_list, speaker_ids, f0_paths, embeddings
     ):
         # print(datetime.now(), 'start')
         # Audio
@@ -477,16 +496,57 @@ def ray_df_preprocessing(df):
         attn_prior = torch.load(prior_path)
         # attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
         speaker_id =  get_speaker_id(speaker_id)
+        # datum = torch.FloatTensor(audio_norm).unsqueeze(-1).t().cuda()
+        # audio_embedding = torch.load(emb_path)
+        audio_embedding = embedding
+        # audio_embeddings = audio_encoder(datum)
+        # audio_embeddings = None
         # NOTE (Sam): might be faster to return dictionary arrays of batched inputs instead of list
-        collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': paths})
+        collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': None, 'audio_embedding': audio_embedding})
         # print(datetime.now(), 'end')
 
     return collate_input
 
+
+class ResNetSpeakerEncoderCallable:
+    def __init__(self):
+        print('initializing resnet speaker encoder')
+        with open(RESNET_SE_CONFIG_PATH) as f:
+            resnet_config =json.load(f)
+            
+        state_dict = torch.load(RESNET_SE_MODEL_PATH)['model']
+        audio_config = dict(resnet_config["audio"])
+        model_params = resnet_config["model_params"]
+        if "model_name" in model_params:
+            del model_params["model_name"]
+
+        self.device = "cuda"
+        self.model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
+        self.model.eval()
+        self.model.cuda()
+
+    # NOTE (Sam): might have to accept bytes input for anyscale distributed data loading?
+    def __call__(self, audiopaths):
+
+        print('calling resnet speaker encoder')
+        for audiopath in audiopaths:
+            audio_data = read(audiopath)[1]
+            datum = torch.FloatTensor(audio_data).unsqueeze(-1).t().cuda()
+            emb = self.model(datum)
+            emb = emb.cpu().detach().numpy()
+            yield {
+                    "embedding": emb
+                }
+            
+
 def get_ray_dataset():
+
+    # ctx = ray.data.context.DatasetContext.get_current()
+    # ctx.use_streaming_executor = True
     lj_df = pd.read_csv(
         # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
-        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt',
+        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_emb.txt',
         # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
@@ -494,7 +554,8 @@ def get_ray_dataset():
         header=None,
         quoting=3,
         # names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
-        names = ['path', 'transcript', 'speaker_id', 'f0_path']
+        # names = ['path', 'transcript', 'speaker_id', 'f0_path']
+        names = ['path', 'transcript', 'speaker_id', 'f0_path', 'emb_path']
     )
 
     paths = lj_df.path.tolist()
@@ -502,20 +563,22 @@ def get_ray_dataset():
     speaker_ids = lj_df.speaker_id.tolist()
 
     pitches = lj_df.f0_path.tolist()
+    emb_paths = lj_df.emb_path.tolist()
 
     parallelism_length = 400
     audio_ds = ray.data.read_binary_files(
         paths,
         parallelism=parallelism_length,
-        ray_remote_args={"num_cpus": 0.2},
+        # ray_remote_args={"num_cpus": 0.2},
+        ray_remote_args={"num_cpus": 1.},
     )
     audio_ds = audio_ds.map_batches(
         lambda x: x, batch_format="pyarrow", batch_size=None
     )
 
 
-    paths = ray.data.from_items(paths, parallelism=parallelism_length)
-    paths_ds = paths.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
+    paths_ds = ray.data.from_items(paths, parallelism=parallelism_length)
+    paths_ds = paths_ds.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
 
     transcripts = ray.data.from_items(transcripts, parallelism=parallelism_length)
     transcripts_ds = transcripts.map_batches(lambda x: x, batch_format="pyarrow", batch_size=None)
@@ -528,11 +591,25 @@ def get_ray_dataset():
     pitches_ds = pitches_ds.map_batches(
         lambda x: x, batch_format="pyarrow", batch_size=None
     )
+
+    # embs_ds = ray.data.from_items(emb_paths, parallelism=parallelism_length)
+    # embs_ds = embs_ds.map_batches(
+    #     lambda x: x, batch_format="pyarrow", batch_size=None
+    # )
+
+    embs_ds = ray.data.from_items(paths, parallelism=parallelism_length)
+    embs_ds = embs_ds.map_batches(
+        ResNetSpeakerEncoderCallable,
+        num_gpus=.2,
+        compute="actors",
+    )
+
     output_dataset = (
         transcripts_ds.zip(audio_ds)
         .zip(paths_ds)
         .zip(speaker_ids_ds)
         .zip(pitches_ds)
+        .zip(embs_ds)
     )
     output_dataset = output_dataset.map_batches(
         lambda table: table.rename(
@@ -542,14 +619,14 @@ def get_ray_dataset():
                 "value_2": "path",
                 "value_3": "speaker_id",
                 "value_4": "f0_path",
+                "value_5": "emb_path",
             }
         )
     )
 
     processed_dataset = output_dataset.map_batches(ray_df_preprocessing)
-    return processed_dataset
-
-
+    return processed_dataset.fully_executed()
+    # return processed_dataset
 
 @torch.no_grad()
 def log(metrics, audios = {}):
@@ -1361,6 +1438,7 @@ if __name__ == "__main__":
         train_loop_config=train_config,
         scaling_config=ScalingConfig(
             num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
+            # num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=.8)
         ),
         run_config=RunConfig(
         # NOTE (Sam): uncomment for saving on anyscale
