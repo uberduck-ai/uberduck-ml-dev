@@ -45,7 +45,7 @@ config = {
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
         "sigma": 1.0,
-        "iters_per_checkpoint": 10000,
+        # "iters_per_checkpoint": 10000,
         # "steps_per_sample": 2000,
         # NOTE (Sam): for testing
         "steps_per_sample": 100,
@@ -88,7 +88,8 @@ config = {
                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
                 "audiodir": "",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+                "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
                 "lmdbpath": ""
             }
         },
@@ -98,7 +99,8 @@ config = {
                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
                 "audiodir": "",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+                "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
                 "lmdbpath": ""
             }
         },
@@ -668,7 +670,9 @@ def _train_step(
     model,
     optim,
     iteration,
+    epoch,
     steps_per_sample,
+    # iters_per_checkpoint,
     scaler,
     scheduler,
     criterion,
@@ -676,7 +680,7 @@ def _train_step(
     kl_loss_start_iter,
     binarization_start_iter
 ):
-    print(datetime.now(), 'entering train step')
+    print(datetime.now(), 'entering train step:', iteration)
     if iteration >= binarization_start_iter:
         binarize = True
     else:
@@ -724,7 +728,7 @@ def _train_step(
         else:
             binarization_loss = torch.zeros_like(loss)
         loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
-
+    print(datetime.now(), 'middle train step:', iteration)
     grad_clip_val = 1. # it is what is is ;)
     print(print_list)
     scaler.scale(loss).backward()
@@ -743,7 +747,27 @@ def _train_step(
         metrics[k] = v.item()
 
     print('iteration: ', iteration)
-    if iteration % steps_per_sample == 0 and session.get_world_rank() == 0:
+    log_sample = iteration % steps_per_sample == 0
+    # log_checkpoint = iteration % iters_per_checkpoint == 0
+    # if log_checkpoint and session.get_world_rank() == 0:
+
+    #     checkpoint = Checkpoint.from_dict(
+    #         dict(
+    #             epoch = epoch,
+    #             global_step=iteration,
+    #             model=model.state_dict(),
+    #         )
+    #     )
+
+    #     artifact = wandb.Artifact(
+    #         f"artifact_epoch{epoch}_step{iteration}", "model"
+    #     )
+    #     with tempfile.TemporaryDirectory() as tempdirname:
+    #         checkpoint.to_directory(tempdirname)
+    #         artifact.add_dir(tempdirname)
+    #         wandb.log_artifact(artifact)
+
+    if log_sample and session.get_world_rank() == 0:
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
         images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
@@ -752,6 +776,8 @@ def _train_step(
     else:
         log(metrics)
 
+    # 
+    # iteration += 1
     print(f"Loss: {loss.item()}")
 
 
@@ -770,7 +796,9 @@ def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps
             model,
             optim,
             iteration,
+            epoch,
             steps_per_sample,
+            # iters_per_checkpoint,
             scaler,
             scheduler,
             criterion,
@@ -780,22 +808,22 @@ def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps
         )
         iteration += 1
         
-    checkpoint = Checkpoint.from_dict(
-        dict(
-            epoch=epoch,
-            global_step=iteration,
-            model=model.state_dict(),
-        )
-    )
-    # session.report({}, checkpoint=checkpoint)
-    if session.get_world_rank() == 0:
-        artifact = wandb.Artifact(
-            f"artifact_epoch{epoch}_step{iteration}", "model"
-        )
-        with tempfile.TemporaryDirectory() as tempdirname:
-            checkpoint.to_directory(tempdirname)
-            artifact.add_dir(tempdirname)
-            wandb.log_artifact(artifact)
+    # checkpoint = Checkpoint.from_dict(
+    #     dict(
+    #         epoch = epoch,
+    #         global_step=iteration,
+    #         model=model.state_dict(),
+    #     )
+    # )
+
+    # artifact = wandb.Artifact(
+    #     f"artifact_epoch{epoch}_step{iteration}", "model"
+    # )
+    # with tempfile.TemporaryDirectory() as tempdirname:
+    #     checkpoint.to_directory(tempdirname)
+    #     artifact.add_dir(tempdirname)
+    #     wandb.log_artifact(artifact)       
+
         
 from uberduck_ml_dev.optimizers.radam import RAdam
 
@@ -808,7 +836,7 @@ def train_func(config: dict):
     sigma = config['sigma']
     kl_loss_start_iter = config['kl_loss_start_iter']
     binarization_start_iter = config['binarization_start_iter']
-
+    # iters_per_checkpoint = config['iters_per_checkpoint']
     model = RADTTS(
         **model_config,
     )
@@ -817,7 +845,6 @@ def train_func(config: dict):
     # model = train.torch.prepare_model(model)
     model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
 
-
     start_epoch = 0
 
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
@@ -825,13 +852,13 @@ def train_func(config: dict):
     train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     # NOTE (Sam): replace with RAdam
-    optim = torch.optim.Adam(
-        model.parameters(),
-        lr = config["learning_rate"],
-        weight_decay = config["weight_decay"]
-    )
-    # optimizer = RAdam(model.parameters(), config["learning_rate"],
-    #                     weight_decay=config["weight_decay"])
+    # optim = torch.optim.Adam(
+    #     model.parameters(),
+    #     lr = config["learning_rate"],
+    #     weight_decay = config["weight_decay"]
+    # )
+    optim = RAdam(model.parameters(), config["learning_rate"],
+                        weight_decay=config["weight_decay"])
     scheduler = ExponentialLR(
         optim,
         config["weight_decay"],
@@ -855,7 +882,6 @@ def train_func(config: dict):
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
         train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
         # train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        iteration += 1
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
@@ -933,8 +959,16 @@ MAX_WAV_VALUE = data_config['max_wav_value']
 def load_wav_to_torch(full_path):
     """ Loads wavdata into torch array """
     sampling_rate, data = read(full_path)
-    data = np.asarray(((MAX_WAV_VALUE - 1) / MAX_WAV_VALUE) * (data / np.abs(data).max()), dtype = np.int16)
-    return torch.from_numpy(np.array(data)).float(), sampling_rate
+    # print(data.max(), 'dataraw')
+    data_float =  (data / np.abs(data).max())
+    # print(data_float.max(), 'dataraw')
+    data_int = (MAX_WAV_VALUE - 1)  * data_float
+    # print(data_int.max(), 'di')
+    output = torch.from_numpy(np.array(data_int)).float()
+    # print(output.max(), 'do')
+    # data = np.asarray(, dtype = np.int16)
+    # print(data.max(), 'datanorm')
+    return output, sampling_rate
 
 class Data(torch.utils.data.Dataset):
     def __init__(self, datasets, filter_length, hop_length, win_length,
@@ -1216,7 +1250,7 @@ class Data(torch.utils.data.Dataset):
                     audio.cpu().numpy(), self.sampling_rate,
                     self.filter_length, self.hop_length, self.f0_min,
                     self.f0_max)
-                print("saving f0 to {}".format(f0_path))
+                print(audio.cpu().numpy().max(), f0.max(), "saving f0 to {}".format(f0_path))
                 torch.save({'f0': f0,
                             'voiced_mask': voiced_mask,
                             'p_voiced': p_voiced}, f0_path)
