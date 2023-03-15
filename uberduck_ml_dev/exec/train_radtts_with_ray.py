@@ -700,8 +700,8 @@ def _train_step(
     with autocast(enabled= False):
 
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        batch_dict = batch
-        # batch_dict = collate_fn(batch)
+        # batch_dict = batch
+        batch_dict = collate_fn(batch)
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
         attn_prior = to_gpu(batch_dict['attn_prior'])
@@ -801,17 +801,17 @@ def _train_step(
 
 
 # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-# def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-    # for batch_idx, ray_batch_df in enumerate(
-    #     dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
-    # ):
+# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    for batch_idx, ray_batch_df in enumerate(
+        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
+    ):
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    for batch in train_dataloader:
+    # for batch in train_dataloader:
         _train_step(
-            # ray_batch_df,
+            ray_batch_df,
             # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-            batch,
+            # batch,
             model,
             optim,
             iteration,
@@ -868,8 +868,8 @@ def train_func(config: dict):
     start_epoch = 0
 
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    train_dataloader = train.torch.prepare_data_loader(train_loader)
+    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    # train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     # NOTE (Sam): replace with RAdam
     # optim = torch.optim.Adam(
@@ -900,9 +900,9 @@ def train_func(config: dict):
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        iteration += 1
-        # train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        # iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
@@ -1349,7 +1349,7 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
 if __name__ == "__main__":
 
     # NOTE (Sam): uncomment for ray dataset training
-    # ray_dataset = get_ray_dataset()
+    ray_dataset = get_ray_dataset()
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -1368,7 +1368,7 @@ if __name__ == "__main__":
             sync_config=SyncConfig()
         ),
         # NOTE (Sam): uncomment for ray dataset training
-        # datasets={"train": ray_dataset},
+        datasets={"train": ray_dataset},
     )
 
     result = trainer.fit()
