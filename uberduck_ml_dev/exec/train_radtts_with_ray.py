@@ -48,7 +48,7 @@ config = {
         # "iters_per_checkpoint": 10000,
         # "steps_per_sample": 2000,
         # NOTE (Sam): for testing
-        "steps_per_sample": 100,
+        "steps_per_sample": 2000,
         "batch_size": 32,
         "seed": None,
         "checkpoint_path": "",
@@ -88,8 +88,8 @@ config = {
                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
                 "audiodir": "",
-                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
-                "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+                # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
                 "lmdbpath": ""
             }
         },
@@ -99,8 +99,8 @@ config = {
                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
                 "audiodir": "",
-                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
-                "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+                # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
                 "lmdbpath": ""
             }
         },
