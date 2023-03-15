@@ -34,7 +34,8 @@ from uberduck_ml_dev.utils.utils import (
     clip_grad_value_,
 )
 
-
+# NOTE (Sam): we can use ray trainer with ray datasets or torch dataloader.  torch dataloader is a little faster for now.
+# See comments for optionality
 
 config = {
     "train_config": {
@@ -45,7 +46,9 @@ config = {
         "weight_decay": 1e-6,
         "sigma": 1.0,
         "iters_per_checkpoint": 10000,
-        "steps_per_sample": 2000,
+        # "steps_per_sample": 2000,
+        # NOTE (Sam): for testing
+        "steps_per_sample": 100,
         "batch_size": 32,
         "seed": None,
         "checkpoint_path": "",
@@ -69,8 +72,11 @@ config = {
             "energy_loss_weight": 1.0,
             "vpred_loss_weight": 1.0
         },
-        "binarization_start_iter": 6000,
-        "kl_loss_start_iter": 18000,
+        # "binarization_start_iter": 6000,
+        # "kl_loss_start_iter": 18000,
+        # NOTE (Sam): for bs 32 rather than 16
+        "binarization_start_iter": 4000,
+        "kl_loss_start_iter": 12000,
         "unfreeze_modules": "all"
     },
     "data_config": {
@@ -78,16 +84,21 @@ config = {
         "training_files": {
             "LJS": {
                 "basedir": "/",
-                "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+                # NOTE (Sam): these are used in the torch DataLoader based loading
+                # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
+                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+                "audiodir": "",
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
                 "lmdbpath": ""
             }
         },
         "validation_files": {
             "LJS": {
                 "basedir": "/",
-                "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+                # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
+                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+                "audiodir": "",
+                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
                 "lmdbpath": ""
             }
         },
@@ -119,7 +130,7 @@ config = {
         "handle_phoneme_ambiguous": "ignore",
         "include_speakers": None,
         "n_frames": -1,
-        "betabinom_cache_path": "data_cache_2/",
+        "betabinom_cache_path": "/usr/src/app/radtts/data_cache/",
         "lmdb_cache_path": "", 
         "use_attn_prior_masking": True,
         "prepend_space_to_text": True,
@@ -298,6 +309,7 @@ from librosa import pyin
 def get_f0_pvoiced(audio, sampling_rate=22050, frame_length=1024,
                     hop_length=256, f0_min=100, f0_max=300):
 
+    # NOTE (Sam): is this normalization kosher?
     audio_norm = audio / max_wav_value
     f0, voiced_mask, p_voiced = pyin(
         y = audio_norm, fmin = f0_min, fmax = f0_max, sr = sampling_rate,
@@ -439,6 +451,7 @@ def ray_df_preprocessing(df):
         bio = BytesIO(audio_bytes)
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
+        # TODO (Sam): fix this for anyscale training
         audio_norm = audio / (np.abs(audio).max() * 2)
         # print(datetime.now(), 'pre text embed')
         text_sequence = get_text(transcript)
@@ -719,14 +732,9 @@ def _train_step(
         scaler.unscale_(optim)
         torch.nn.utils.clip_grad_norm_(
             model.parameters(), grad_clip_val)
-    # scheduler.step()
-    # scaler.scale(loss).backward()
-    # scaler.unscale_(optim)
-    # clip_grad_value_(model.parameters(), 100)
+
     scaler.step(optim)
     scaler.update()
-    # scaler.update()
-    # scheduler.step()
 
     metrics = {
         "loss": loss.item()
@@ -734,7 +742,7 @@ def _train_step(
     for k, (v, w) in loss_outputs.items():
         metrics[k] = v.item()
 
-
+    print('iteration: ', iteration)
     if iteration % steps_per_sample == 0 and session.get_world_rank() == 0:
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
@@ -789,6 +797,7 @@ def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps
             artifact.add_dir(tempdirname)
             wandb.log_artifact(artifact)
         
+from uberduck_ml_dev.optimizers.radam import RAdam
 
 def train_func(config: dict):
     setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
@@ -821,6 +830,8 @@ def train_func(config: dict):
         lr = config["learning_rate"],
         weight_decay = config["weight_decay"]
     )
+    # optimizer = RAdam(model.parameters(), config["learning_rate"],
+    #                     weight_decay=config["weight_decay"])
     scheduler = ExponentialLR(
         optim,
         config["weight_decay"],
@@ -918,9 +929,11 @@ from scipy.io.wavfile import read
 import lmdb
 import pickle as pkl
 from scipy.ndimage import distance_transform_edt as distance_transform
+MAX_WAV_VALUE = data_config['max_wav_value']
 def load_wav_to_torch(full_path):
     """ Loads wavdata into torch array """
     sampling_rate, data = read(full_path)
+    data = np.asarray(((MAX_WAV_VALUE - 1) / MAX_WAV_VALUE) * (data / np.abs(data).max()), dtype = np.int16)
     return torch.from_numpy(np.array(data)).float(), sampling_rate
 
 class Data(torch.utils.data.Dataset):
@@ -1030,7 +1043,8 @@ class Data(torch.utils.data.Dataset):
 
             for d in data:
                 emotion = 'other' if len(d) == 3 else d[3]
-                duration = -1 if len(d) == 3 else d[4]
+                # NOTE (Sam): temporary change due to pitch being in filelist (not durations).
+                duration = -1 # if len(d) == 3 else d[4]
                 dataset.append(
                     {'audiopath': os.path.join(wav_folder_prefix, d[0]),
                      'text': d[1],
@@ -1174,7 +1188,7 @@ class Data(torch.utils.data.Dataset):
         p_voiced = None
         voiced_mask = None
         if self.use_f0:
-            filename = '_'.join(audiopath.split('/')[-3:])
+            filename = '_'.join(audiopath.split('/')[-4:])
             f0_path = os.path.join(self.betabinom_cache_path, filename)
             f0_path += "_f0_sr{}_fl{}_hl{}_f0min{}_f0max{}_log{}.pt".format(
                 self.sampling_rate, self.filter_length, self.hop_length,
@@ -1279,8 +1293,8 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
 
 if __name__ == "__main__":
 
- 
-    ray_dataset = get_ray_dataset()
+    # NOTE (Sam): uncomment for ray dataset training
+    # ray_dataset = get_ray_dataset()
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -1298,7 +1312,8 @@ if __name__ == "__main__":
             # sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
             sync_config=SyncConfig()
         ),
-        datasets={"train": ray_dataset},
+        # NOTE (Sam): uncomment for ray dataset training
+        # datasets={"train": ray_dataset},
     )
 
     result = trainer.fit()
