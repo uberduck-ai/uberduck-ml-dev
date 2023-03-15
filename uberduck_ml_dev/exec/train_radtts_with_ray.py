@@ -45,7 +45,7 @@ config = {
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
         "sigma": 1.0,
-        # "iters_per_checkpoint": 10000,
+        "iters_per_checkpoint": 20000,
         # "steps_per_sample": 2000,
         # NOTE (Sam): for testing
         "steps_per_sample": 2000,
@@ -559,7 +559,7 @@ def log(metrics, audios = {}):
     for k,v in audios.items():
         wandb_metrics[k] = wandb.Audio(v, sample_rate=22050)
 
-    session.report(metrics)
+    # session.report(metrics)
     if session.get_world_rank() == 0:
         wandb.log(wandb_metrics)
 
@@ -665,6 +665,15 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
 
 collate_fn = DataCollate()
 
+def save_checkpoint(model, optimizer, iteration, filepath):
+    print("Saving model and optimizer state at iteration {} to {}".format(
+          iteration, filepath))
+
+    # NOTE (Sam): learning rate not accessible here
+    torch.save({'state_dict': model.state_dict(),
+                'iteration': iteration,
+                'optimizer': optimizer.state_dict()}, filepath)
+
 def _train_step(
     batch,
     model,
@@ -748,25 +757,8 @@ def _train_step(
 
     print('iteration: ', iteration)
     log_sample = iteration % steps_per_sample == 0
-    # log_checkpoint = iteration % iters_per_checkpoint == 0
-    # if log_checkpoint and session.get_world_rank() == 0:
-
-    #     checkpoint = Checkpoint.from_dict(
-    #         dict(
-    #             epoch = epoch,
-    #             global_step=iteration,
-    #             model=model.state_dict(),
-    #         )
-    #     )
-
-    #     artifact = wandb.Artifact(
-    #         f"artifact_epoch{epoch}_step{iteration}", "model"
-    #     )
-    #     with tempfile.TemporaryDirectory() as tempdirname:
-    #         checkpoint.to_directory(tempdirname)
-    #         artifact.add_dir(tempdirname)
-    #         wandb.log_artifact(artifact)
-
+    log_checkpoint = iteration % train_config['iters_per_checkpoint'] == 0
+ 
     if log_sample and session.get_world_rank() == 0:
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
@@ -776,6 +768,33 @@ def _train_step(
     else:
         log(metrics)
 
+
+    session.report(metrics)
+    if log_checkpoint and session.get_world_rank() == 0:
+
+        checkpoint_path = f'/usr/src/app/radtts/outputs/lj_test_checkpoint_{iteration}.pt'
+        save_checkpoint(model, optim, iteration,
+                                    checkpoint_path)
+        # checkpoint = Checkpoint.from_dict(
+        #     dict(
+        #         epoch = epoch,
+        #         global_step=iteration,
+        #         model=model.state_dict(),
+        #     )
+        # )
+        
+        # artifact = wandb.Artifact(
+        #     f"artifact_epoch{epoch}_step{iteration}", "model"
+        # )
+        # with tempfile.TemporaryDirectory() as tempdirname:
+            # checkpoint.to_directory(tempdirname)
+            # artifact.add_dir(tempdirname)
+            # wandb.log_artifact(artifact)
+        # session.report({}, checkpoint=checkpoint)
+    # else:
+    #     session.report(metrics)
+
+    
     # 
     # iteration += 1
     print(f"Loss: {loss.item()}")
@@ -815,7 +834,8 @@ def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps
     #         model=model.state_dict(),
     #     )
     # )
-
+    # session.report({}, checkpoint=checkpoint)
+    return iteration
     # artifact = wandb.Artifact(
     #     f"artifact_epoch{epoch}_step{iteration}", "model"
     # )
@@ -880,7 +900,8 @@ def train_func(config: dict):
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration += 1
         # train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
 
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
