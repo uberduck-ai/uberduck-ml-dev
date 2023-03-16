@@ -468,6 +468,17 @@ from TTS.encoder.models.resnet import ResNetSpeakerEncoder
 # audio_encoder.eval()
 # audio_encoder.cuda()
 
+def get_shuffle_indices(levels):
+    levels = np.asarray(levels)
+    levels_unique = np.unique(levels)
+    output_indices = np.zeros(len(levels), dtype = int)
+    for level in levels_unique:
+        indices = np.where(levels == level)[0]
+        new_indices = np.random.permutation(indices)
+        output_indices[indices] = new_indices
+    return(output_indices)
+
+
 def ray_df_preprocessing(df):
     transcripts = df.transcript.tolist()
     audio_bytes_list = df.audio_bytes.tolist()
@@ -475,7 +486,9 @@ def ray_df_preprocessing(df):
     paths = df.path.tolist()
     f0_paths = df.f0_path.tolist()
     audio_embeddings = df.audio_embedding.tolist()
-
+    shuffle_indices = get_shuffle_indices(speaker_ids)
+    np.save('/usr/src/app/radtts/30shuffle_indices.pt', shuffle_indices)
+    audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
     collate_input = []
     for transcript, audio_bytes, speaker_id, f0_path, audio_embedding in zip(
         transcripts, audio_bytes_list, speaker_ids, f0_paths, audio_embeddings
@@ -720,26 +733,26 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
                             speaker_ids[0:1], text[0:1], 0.8,
                             dur=durations, f0=None, energy_avg=None,
                             voiced_mask=None, sigma_f0=attribute_sigma,
-                            sigma_energy=attribute_sigma)
+                            sigma_energy=attribute_sigma, audio_embedding = audio_embedding[0:1])
                     else:
                         model_output = model.module.infer(
                             speaker_ids[0:1], text[0:1], 0.8,
                             dur=durations, f0=None, energy_avg=None,
                             voiced_mask=None, sigma_f0=attribute_sigma,
-                            sigma_energy=attribute_sigma)         
+                            sigma_energy=attribute_sigma, audio_embedding = audio_embedding[0:1])         
                 else:
                     if hasattr(model, "infer"):
                         model_output = model.infer(
                             speaker_ids[0:1], text[0:1], 0.8,
                             dur=durations, f0=f0[0:1, :durations.sum()],
                             energy_avg=energy_avg[0:1, :durations.sum()],
-                            voiced_mask=voiced_mask[0:1, :durations.sum()])
+                            voiced_mask=voiced_mask[0:1, :durations.sum()], audio_embedding = audio_embedding[0:1])
                     else:
                         model_output = model.module.infer(
                             speaker_ids[0:1], text[0:1], 0.8,
                             dur=durations, f0=f0[0:1, :durations.sum()],
                             energy_avg=energy_avg[0:1, :durations.sum()],
-                            voiced_mask=voiced_mask[0:1, :durations.sum()])                      
+                            voiced_mask=voiced_mask[0:1, :durations.sum()], audio_embedding = audio_embedding[0:1])                      
                 # except:
                 #     print("Instability or issue occured during inference, skipping sample generation for TB logger")
                 #     continue
@@ -866,7 +879,8 @@ def _train_step(
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
 
-        checkpoint_path = f'/usr/src/app/radtts/outputs/lj_test_checkpoint_{iteration}.pt'
+        # checkpoint_path = f'/usr/src/app/radtts/outputs/lj_test_checkpoint_{iteration}.pt'
+        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_test_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration,
                                     checkpoint_path)
         # checkpoint = Checkpoint.from_dict(

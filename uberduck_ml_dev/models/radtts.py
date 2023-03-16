@@ -334,7 +334,9 @@ class RADTTS(torch.nn.Module):
             for ind in range(b_size):
                 hard_attn = mas(attn_cpu[ind, 0, :out_lens[ind], :in_lens[ind]])
                 attn_out[ind, 0, :out_lens[ind], :in_lens[ind]] = torch.tensor(
-                    hard_attn, device=attn.get_device())
+                    # NOTE (Sam): for cpu compability.
+                    # hard_attn, device=attn.get_device())
+                    hard_attn, device=attn.device)
         return attn_out
 
     def get_first_order_features(self, feats, out_lens, dilation=1):
@@ -382,9 +384,10 @@ class RADTTS(torch.nn.Module):
         if audio_embedding is not None:
             speaker_vecs = audio_embedding
 
-
+        # print(text.type())
         text_enc, text_embeddings = self.encode_text(text, in_lens)
-        
+        # print(text_enc.type(), text_enc)
+        # text_enc = text_enc.double() # NOTE (Sam): this was necessary for inference without dataloader - no clue why.
         log_s_list, log_det_W_list, z_mel = [], [], []
         attn = None
         attn_soft = None
@@ -413,6 +416,7 @@ class RADTTS(torch.nn.Module):
             else:
                 attn = attn_soft
 
+            # print(text_enc.type(),attn.type(), 'report card')
             context = torch.bmm(text_enc, attn.squeeze(1).transpose(1, 2))
 
         f0_bias = 0
@@ -673,9 +677,14 @@ class RADTTS(torch.nn.Module):
                 txt_enc_time_expanded, spk_vec, out_lens, None,
                 None)
 
-        residual = torch.cuda.FloatTensor(
-            batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
-
+        # NOTE (Sam): hacky to get to work on cpu
+        if torch.cuda.is_available():
+            residual = torch.cuda.FloatTensor(
+                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        else:
+            residual = torch.FloatTensor(
+                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+            
         residual = residual.normal_() * sigma
 
         # map from z sample to data

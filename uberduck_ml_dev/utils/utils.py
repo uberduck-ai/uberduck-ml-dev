@@ -167,7 +167,12 @@ def get_mask_from_lengths_radtts(lengths):
         mask (torch.tensor): num_sequences x max_length x 1 binary tensor
     """
     max_len = torch.max(lengths).item()
-    ids = torch.arange(0, max_len, out=torch.cuda.LongTensor(max_len))
+    # NOTE (Sam): we needed this for flexibility to run on cpu (peeps be bogarting GPUs).
+    # TODO (Sam): parameterize cuda availability.
+    if torch.cuda.is_available():
+        ids = torch.arange(0, max_len, out=torch.cuda.LongTensor(max_len))
+    else:
+        ids = torch.arange(0, max_len, out=torch.LongTensor(max_len))
     mask = (ids < lengths.unsqueeze(1)).bool()
     return mask
 
