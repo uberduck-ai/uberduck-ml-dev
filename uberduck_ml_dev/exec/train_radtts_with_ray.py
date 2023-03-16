@@ -144,7 +144,9 @@ config = {
     },
     "model_config": {
         "n_speakers": 1,
-        "n_speaker_dim": 16,
+        # NOTE (Sam): can reduce for audio embedding using PCA
+        # "n_speaker_dim": 16,
+        "n_speaker_dim": 512,
         "n_text": 185,
         "n_text_dim": 512,
         "n_flows": 8,
@@ -257,6 +259,11 @@ class DataCollate():
             energy_avg_padded = torch.FloatTensor(len(batch), max_target_len)
             energy_avg_padded.zero_()
 
+        if batch[0]['audio_embedding'] is not None:
+            audio_embedding_padded = torch.FloatTensor(len(batch), 512) # emb size - TODO (Sam): try to reduce this via PCA
+            audio_embedding_padded.zero_()
+
+
         attn_prior_padded = torch.FloatTensor(len(batch), max_target_len, max_input_len)
         attn_prior_padded.zero_()
 
@@ -266,6 +273,10 @@ class DataCollate():
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]]['mel']
             mel_padded[i, :, :mel.size(1)] = mel
+
+            if batch[ids_sorted_decreasing[i]]['audio_embedding'] is not None:
+                audio_embedding_padded[i, :] = batch[ids_sorted_decreasing[i]]['audio_embedding']
+
             if batch[ids_sorted_decreasing[i]]['f0'] is not None:
                 f0 = batch[ids_sorted_decreasing[i]]['f0']
                 f0_padded[i, :len(f0)] = f0
@@ -302,7 +313,8 @@ class DataCollate():
                 'f0': f0_padded,
                 'p_voiced': p_voiced_padded,
                 'voiced_mask': voiced_mask_padded,
-                'energy_avg': energy_avg_padded
+                'energy_avg': energy_avg_padded,
+                'audio_embedding': audio_embedding_padded
                 }
 
 max_wav_value = 32768
@@ -460,11 +472,11 @@ def ray_df_preprocessing(df):
     speaker_ids = df.speaker_id.tolist()
     paths = df.path.tolist()
     f0_paths = df.f0_path.tolist()
-    embeddings = df.embedding.tolist()
+    audio_embeddings = df.audio_embedding.tolist()
 
     collate_input = []
-    for transcript, audio_bytes, speaker_id, f0_path, embedding in zip(
-        transcripts, audio_bytes_list, speaker_ids, f0_paths, embeddings
+    for transcript, audio_bytes, speaker_id, f0_path, audio_embedding in zip(
+        transcripts, audio_bytes_list, speaker_ids, f0_paths, audio_embeddings
     ):
         # print(datetime.now(), 'start')
         # Audio
@@ -498,7 +510,7 @@ def ray_df_preprocessing(df):
         speaker_id =  get_speaker_id(speaker_id)
         # datum = torch.FloatTensor(audio_norm).unsqueeze(-1).t().cuda()
         # audio_embedding = torch.load(emb_path)
-        audio_embedding = embedding
+        audio_embedding = torch.FloatTensor(audio_embedding)
         # audio_embeddings = audio_encoder(datum)
         # audio_embeddings = None
         # NOTE (Sam): might be faster to return dictionary arrays of batched inputs instead of list
@@ -535,7 +547,7 @@ class ResNetSpeakerEncoderCallable:
             emb = self.model(datum)
             emb = emb.cpu().detach().numpy()
             yield {
-                    "embedding": emb
+                    "audio_embedding": emb
                 }
             
 
@@ -657,13 +669,14 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
     in_lens = to_gpu(batch_dict['input_lengths'])
     out_lens = to_gpu(batch_dict['output_lengths'])
     energy_avg = to_gpu(batch_dict['energy_avg'])
+    audio_embedding = to_gpu(batch_dict['audio_embedding'])
 
     # NOTE (Sam): I don't think we can reuse the previous outputs since binarize_attention must be true
     outputs = model(
                 mel, speaker_ids, text, in_lens, out_lens,
             binarize_attention=True, attn_prior=attn_prior, f0=f0,
             energy_avg=energy_avg, voiced_mask=voiced_mask,
-            p_voiced=p_voiced)
+            p_voiced=p_voiced, audio_embedding = audio_embedding)
     
     attn_used = outputs['attn']
     attn_soft = outputs['attn_soft']
@@ -789,12 +802,13 @@ def _train_step(
         in_lens = to_gpu(batch_dict['input_lengths'])
         out_lens = to_gpu(batch_dict['output_lengths'])
         energy_avg = to_gpu(batch_dict['energy_avg'])
+        audio_embedding = to_gpu(batch_dict['audio_embedding'])
 
         outputs = model(
                     mel, speaker_ids, text, in_lens, out_lens,
                     binarize_attention=binarize, attn_prior=attn_prior,
                     f0=f0, energy_avg=energy_avg,
-                    voiced_mask=voiced_mask, p_voiced=p_voiced)
+                    voiced_mask=voiced_mask, p_voiced=p_voiced, audio_embedding = audio_embedding)
 
         loss_outputs = criterion(outputs, in_lens, out_lens)
 

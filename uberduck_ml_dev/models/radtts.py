@@ -57,7 +57,7 @@ class FlowStep(nn.Module):
             z, log_s = self.affine_tfn(z, context, seq_lens=seq_lens)
             return z, log_det_W, log_s
 
-
+from typing import Optional
 class RADTTS(torch.nn.Module):
     def __init__(self, n_speakers, n_speaker_dim, n_text, n_text_dim, n_flows,
                  n_conv_layers_per_step, n_mel_channels, n_hidden,
@@ -242,7 +242,12 @@ class RADTTS(torch.nn.Module):
         """
         return self.n_f0_dims == 0 and self.n_energy_avg_dims == 0
 
-    def encode_speaker(self, spk_ids):
+    # NOTE (Sam): make this more refined
+    def encode_speaker(self, spk_ids: Optional[str], audio_encodings: Optional[torch.Tensor] = None):
+
+        assert not (spk_ids and audio_encodings), "Only one of spk_ids and audio_encodings can be provided"
+        if audio_encodings is not None:
+            return audio_encodings
         spk_ids = spk_ids * 0 if self.dummy_speaker_embedding else spk_ids
         spk_vecs = self.speaker_embedding(spk_ids)
         return spk_vecs
@@ -364,8 +369,20 @@ class RADTTS(torch.nn.Module):
 
     def forward(self, mel, speaker_ids, text, in_lens, out_lens,
                 binarize_attention=False, attn_prior=None,
-                f0=None, energy_avg=None, voiced_mask=None, p_voiced=None):
-        speaker_vecs = self.encode_speaker(speaker_ids)
+                f0=None, energy_avg=None, voiced_mask=None, p_voiced=None, audio_embedding = None):
+        
+        # NOTE (Sam): hacky solution until check speaker_ids isn't being used as a positional argument.
+        # encode_speaker can also perform this nullification
+        if audio_embedding is not None:
+            speaker_ids = None
+
+        if speaker_ids is not None:
+            speaker_vecs = self.encode_speaker(speaker_ids)
+
+        if audio_embedding is not None:
+            speaker_vecs = audio_embedding
+
+
         text_enc, text_embeddings = self.encode_text(text, in_lens)
         
         log_s_list, log_det_W_list, z_mel = [], [], []
@@ -542,15 +559,25 @@ class RADTTS(torch.nn.Module):
               sigma_energy=0.8, token_dur_scaling=1.0, token_duration_max=100,
               speaker_id_text=None, speaker_id_attributes=None, dur=None,
               f0=None, energy_avg=None, voiced_mask=None, f0_mean=0.0,
-              f0_std=0.0, energy_mean=0.0, energy_std=0.0):
+              f0_std=0.0, energy_mean=0.0, energy_std=0.0, audio_embedding=None):
         batch_size = text.shape[0]
         n_tokens = text.shape[1]
-        spk_vec = self.encode_speaker(speaker_id)
+        if audio_embedding is not None:
+            spk_vec = audio_embedding
+        else:
+            spk_vec = self.encode_speaker(speaker_id)
         spk_vec_text, spk_vec_attributes = spk_vec, spk_vec
+        # TODO (Sam): spk_vec_text used in duration, spk_vec_attributes in pitch and "v_pred"
         if speaker_id_text is not None:
-            spk_vec_text = self.encode_speaker(speaker_id_text)
+            if audio_embedding is not None:
+                spk_vec_text = audio_embedding
+            else:
+                spk_vec_text = self.encode_speaker(speaker_id_text)
         if speaker_id_attributes is not None:
-            spk_vec_attributes = self.encode_speaker(speaker_id_attributes)
+            if audio_embedding is not None:
+                spk_vec_attributes = audio_embedding
+            else:
+                spk_vec_attributes = self.encode_speaker(speaker_id_attributes)
 
         txt_enc, txt_emb = self.encode_text(text, None)
         if dur is None:
