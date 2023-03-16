@@ -143,7 +143,9 @@ config = {
         "mel_noise_scale": 0.0
     },
     "model_config": {
-        "n_speakers": 1,
+        # NOTE (Sam): uncomment for LJ
+        "n_speakers": 30,
+        # "n_speakers": 1,
         # NOTE (Sam): can reduce for audio embedding using PCA
         # "n_speaker_dim": 16,
         "n_speaker_dim": 512,
@@ -558,7 +560,8 @@ def get_ray_dataset():
     lj_df = pd.read_csv(
         # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
         # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt',
-        '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_emb.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_emb.txt',
+        '/usr/src/app/radtts/data/30_decoder_pitch.txt',
         # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
         # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
