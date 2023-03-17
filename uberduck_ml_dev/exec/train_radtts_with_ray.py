@@ -8,6 +8,9 @@ from scipy.io import wavfile
 import wandb
 from torch.cuda.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import ExponentialLR
+import argparse
+import sys
+
 
 import ray
 from ray.air import session, Checkpoint
@@ -19,7 +22,7 @@ import ray.train as train
 from ray.train.torch import TorchTrainer
 from ray.air.util.check_ingest import DummyTrainer
 from ray.tune import SyncConfig
-
+import configparser
 
 
 from uberduck_ml_dev.models.radtts import RADTTS
@@ -34,183 +37,206 @@ from uberduck_ml_dev.utils.utils import (
     clip_grad_value_,
 )
 
+def parse_args(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", help="Path to config")
+    args = parser.parse_args(args)
+    return args
+
+args = parse_args(sys.argv[1:])
+# config = configparser.ConfigParser()
+# config.read(args.config)
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location("exp_config", args.config)
+foo = importlib.util.module_from_spec(spec)
+sys.modules["exp_config"] = foo
+spec.loader.exec_module(foo)
+from exp_config import config
+# print(args.config)
+# configuration_module = __import__(args.config, globals(), locals(  ))
+# from args.config import config
+
+print(config, 'asdf')
+data_config = config['data_config']
+train_config = config['train_config']
+model_config = config['model_config']
 # NOTE (Sam): we can use ray trainer with ray datasets or torch dataloader.  torch dataloader is a little faster for now.
 # See comments for optionality
 
-config = {
-    "train_config": {
-        "output_directory": "",
-        "epochs": 10000,
-        "optim_algo": "RAdam",
-        "learning_rate": 1e-4,
-        "weight_decay": 1e-6,
-        "sigma": 1.0,
-        "iters_per_checkpoint": 20000,
-        # "steps_per_sample": 2000,
-        # NOTE (Sam): for testing
-        "steps_per_sample": 2000,
-        "batch_size": 32,
-        "seed": None,
-        "checkpoint_path": "",
-        "ignore_layers": [],
-        "ignore_layers_warmstart": [],
-        "finetune_layers": [],
-        "include_layers": [],
-        "vocoder_config_path": "/usr/src/app/radtts/models/hifigan_22khz_config.json",
-        "vocoder_checkpoint_path": "/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt",
-        "log_attribute_samples": False,
-        "log_decoder_samples": True,
-        "warmstart_checkpoint_path": "",
-        "use_amp": False,
-        "grad_clip_val": 1.0,
-        "loss_weights": {
-            "blank_logprob": -1,
-            "ctc_loss_weight": 0.1,
-            "binarization_loss_weight": 1.0,
-            "dur_loss_weight": 1.0,
-            "f0_loss_weight": 1.0,
-            "energy_loss_weight": 1.0,
-            "vpred_loss_weight": 1.0
-        },
-        # "binarization_start_iter": 6000,
-        # "kl_loss_start_iter": 18000,
-        # NOTE (Sam): for bs 32 rather than 16
-        "binarization_start_iter": 4000,
-        "kl_loss_start_iter": 12000,
-        "unfreeze_modules": "all"
-    },
-    "data_config": {
-    # NOTE (Sam): unused since we are getting data from s3 using the ray loader now
-        "training_files": {
-            "LJS": {
-                "basedir": "/",
-                # NOTE (Sam): these are used in the torch DataLoader based loading
-                # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
-                "audiodir": "",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
-                # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
-                "lmdbpath": ""
-            }
-        },
-        "validation_files": {
-            "LJS": {
-                "basedir": "/",
-                # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-                # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
-                "audiodir": "",
-                "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
-                # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
-                "lmdbpath": ""
-            }
-        },
-    ###
-        "dur_min": 0.1,
-        "dur_max": 10.2,
-        "sampling_rate": 22050,
-        "filter_length": 1024,
-        "hop_length": 256,
-        "win_length": 1024,
-        "n_mel_channels": 80,
-        "mel_fmin": 0.0,
-        "mel_fmax": 8000.0,
-        "f0_min": 80.0,
-        "f0_max": 640.0,
-        "max_wav_value": 32768.0,
-        "use_f0": True,
-        "use_log_f0": 0,
-        "use_energy_avg": True,
-        "use_scaled_energy": True,
-        "symbol_set": "radtts",
-        "cleaner_names": ["radtts_cleaners"],
-        "heteronyms_path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/heteronyms",
-        "phoneme_dict_path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/cmudict-0.7b",
-        # "heteronyms_path": "uberduck_ml_dev/text/heteronyms",
-        # "phoneme_dict_path": "uberduck_ml_dev/text/cmudict-0.7b",
-        "p_phoneme": 1.0,
-        "handle_phoneme": "word",
-        "handle_phoneme_ambiguous": "ignore",
-        "include_speakers": None,
-        "n_frames": -1,
-        "betabinom_cache_path": "/usr/src/app/radtts/data_cache/",
-        "lmdb_cache_path": "", 
-        "use_attn_prior_masking": True,
-        "prepend_space_to_text": True,
-        "append_space_to_text": True,
-        "add_bos_eos_to_text": False,
-        "betabinom_scaling_factor": 1.0,
-        "distance_tx_unvoiced": False,
-        "mel_noise_scale": 0.0
-    },
-    "model_config": {
-        # NOTE (Sam): uncomment for LJ
-        "n_speakers": 30,
-        # "n_speakers": 1,
-        # NOTE (Sam): can reduce for audio embedding using PCA
-        # "n_speaker_dim": 16,
-        "n_speaker_dim": 512,
-        "n_text": 185,
-        "n_text_dim": 512,
-        "n_flows": 8,
-        "n_conv_layers_per_step": 4,
-        "n_mel_channels": 80,
-        "n_hidden": 1024,
-        "mel_encoder_n_hidden": 512,
-        "dummy_speaker_embedding": False,
-        "n_early_size": 2,
-        "n_early_every": 2,
-        "n_group_size": 2,
-        "affine_model": "wavenet",
-        "include_modules": "decatnvpred",
-        "scaling_fn": "tanh",
-        "matrix_decomposition": "LUS",
-        "learn_alignments": True,
-        "use_speaker_emb_for_alignment": False,
-        "attn_straight_through_estimator": True,
-        "use_context_lstm": True,
-        "context_lstm_norm": "spectral",
-        "context_lstm_w_f0_and_energy": True,
-        "text_encoder_lstm_norm": "spectral",
-        "n_f0_dims": 1,
-        "n_energy_avg_dims": 1,
-        "use_first_order_features": False,
-        "unvoiced_bias_activation": "relu",
-        "decoder_use_partial_padding": True,
-        "decoder_use_unvoiced_bias": True,
-        "ap_pred_log_f0": True,
-        "ap_use_unvoiced_bias": True,
-        "ap_use_voiced_embeddings": True,
-        "dur_model_config": None,
-        "f0_model_config": None,
-        "energy_model_config": None,
-        "v_model_config": {
-            "name": "dap",
-            "hparams": {
-                "n_speaker_dim": 16,
-                "take_log_of_input": False,
-                "bottleneck_hparams": {
-                    "in_dim": 512,
-                    "reduction_factor": 16,
-                    "norm": "weightnorm",
-                    "non_linearity": "relu"
-                },
-                "arch_hparams": {
-                    "out_dim": 1,
-                    "n_layers": 2,
-                    "n_channels": 256,
-                    "kernel_size": 3,
-                    "p_dropout": 0.5,
-                    "lstm_type": "",
-                    "use_linear": 1
-                }
-            }
-        }
-    }
-}
+# config = {
+#     "train_config": {
+#         "output_directory": "",
+#         "epochs": 10000,
+#         "optim_algo": "RAdam",
+#         "learning_rate": 1e-4,
+#         "weight_decay": 1e-6,
+#         "sigma": 1.0,
+#         "iters_per_checkpoint": 20000,
+#         # "steps_per_sample": 2000,
+#         # NOTE (Sam): for testing
+#         "steps_per_sample": 2000,
+#         "batch_size": 32,
+#         "seed": None,
+#         "checkpoint_path": "",
+#         "ignore_layers": [],
+#         "ignore_layers_warmstart": [],
+#         "finetune_layers": [],
+#         "include_layers": [],
+#         "vocoder_config_path": "/usr/src/app/radtts/models/hifigan_22khz_config.json",
+#         "vocoder_checkpoint_path": "/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt",
+#         "log_attribute_samples": False,
+#         "log_decoder_samples": True,
+#         "warmstart_checkpoint_path": "",
+#         "use_amp": False,
+#         "grad_clip_val": 1.0,
+#         "loss_weights": {
+#             "blank_logprob": -1,
+#             "ctc_loss_weight": 0.1,
+#             "binarization_loss_weight": 1.0,
+#             "dur_loss_weight": 1.0,
+#             "f0_loss_weight": 1.0,
+#             "energy_loss_weight": 1.0,
+#             "vpred_loss_weight": 1.0
+#         },
+#         # "binarization_start_iter": 6000,
+#         # "kl_loss_start_iter": 18000,
+#         # NOTE (Sam): for bs 32 rather than 16
+#         "binarization_start_iter": 4000,
+#         "kl_loss_start_iter": 12000,
+#         "unfreeze_modules": "all"
+#     },
+#     "data_config": {
+#     # NOTE (Sam): unused since we are getting data from s3 using the ray loader now
+#         "training_files": {
+#             "LJS": {
+#                 "basedir": "/",
+#                 # NOTE (Sam): these are used in the torch DataLoader based loading
+#                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
+#                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+#                 "audiodir": "",
+#                 "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+#                 # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+#                 "lmdbpath": ""
+#             }
+#         },
+#         "validation_files": {
+#             "LJS": {
+#                 "basedir": "/",
+#                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
+#                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
+#                 "audiodir": "",
+#                 "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
+#                 # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+#                 "lmdbpath": ""
+#             }
+#         },
+#     ###
+#         "dur_min": 0.1,
+#         "dur_max": 10.2,
+#         "sampling_rate": 22050,
+#         "filter_length": 1024,
+#         "hop_length": 256,
+#         "win_length": 1024,
+#         "n_mel_channels": 80,
+#         "mel_fmin": 0.0,
+#         "mel_fmax": 8000.0,
+#         "f0_min": 80.0,
+#         "f0_max": 640.0,
+#         "max_wav_value": 32768.0,
+#         "use_f0": True,
+#         "use_log_f0": 0,
+#         "use_energy_avg": True,
+#         "use_scaled_energy": True,
+#         "symbol_set": "radtts",
+#         "cleaner_names": ["radtts_cleaners"],
+#         "heteronyms_path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/heteronyms",
+#         "phoneme_dict_path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/cmudict-0.7b",
+#         # "heteronyms_path": "uberduck_ml_dev/text/heteronyms",
+#         # "phoneme_dict_path": "uberduck_ml_dev/text/cmudict-0.7b",
+#         "p_phoneme": 1.0,
+#         "handle_phoneme": "word",
+#         "handle_phoneme_ambiguous": "ignore",
+#         "include_speakers": None,
+#         "n_frames": -1,
+#         "betabinom_cache_path": "/usr/src/app/radtts/data_cache/",
+#         "lmdb_cache_path": "", 
+#         "use_attn_prior_masking": True,
+#         "prepend_space_to_text": True,
+#         "append_space_to_text": True,
+#         "add_bos_eos_to_text": False,
+#         "betabinom_scaling_factor": 1.0,
+#         "distance_tx_unvoiced": False,
+#         "mel_noise_scale": 0.0
+#     },
+#     "model_config": {
+#         # NOTE (Sam): uncomment for LJ
+#         "n_speakers": 30,
+#         # "n_speakers": 1,
+#         # NOTE (Sam): can reduce for audio embedding using PCA
+#         # "n_speaker_dim": 16,
+#         "n_speaker_dim": 512,
+#         "n_text": 185,
+#         "n_text_dim": 512,
+#         "n_flows": 8,
+#         "n_conv_layers_per_step": 4,
+#         "n_mel_channels": 80,
+#         "n_hidden": 1024,
+#         "mel_encoder_n_hidden": 512,
+#         "dummy_speaker_embedding": False,
+#         "n_early_size": 2,
+#         "n_early_every": 2,
+#         "n_group_size": 2,
+#         "affine_model": "wavenet",
+#         "include_modules": "decatnvpred",
+#         "scaling_fn": "tanh",
+#         "matrix_decomposition": "LUS",
+#         "learn_alignments": True,
+#         "use_speaker_emb_for_alignment": False,
+#         "attn_straight_through_estimator": True,
+#         "use_context_lstm": True,
+#         "context_lstm_norm": "spectral",
+#         "context_lstm_w_f0_and_energy": True,
+#         "text_encoder_lstm_norm": "spectral",
+#         "n_f0_dims": 1,
+#         "n_energy_avg_dims": 1,
+#         "use_first_order_features": False,
+#         "unvoiced_bias_activation": "relu",
+#         "decoder_use_partial_padding": True,
+#         "decoder_use_unvoiced_bias": True,
+#         "ap_pred_log_f0": True,
+#         "ap_use_unvoiced_bias": True,
+#         "ap_use_voiced_embeddings": True,
+#         "dur_model_config": None,
+#         "f0_model_config": None,
+#         "energy_model_config": None,
+#         "v_model_config": {
+#             "name": "dap",
+#             "hparams": {
+#                 "n_speaker_dim": 16,
+#                 "take_log_of_input": False,
+#                 "bottleneck_hparams": {
+#                     "in_dim": 512,
+#                     "reduction_factor": 16,
+#                     "norm": "weightnorm",
+#                     "non_linearity": "relu"
+#                 },
+#                 "arch_hparams": {
+#                     "out_dim": 1,
+#                     "n_layers": 2,
+#                     "n_channels": 256,
+#                     "kernel_size": 3,
+#                     "p_dropout": 0.5,
+#                     "lstm_type": "",
+#                     "use_linear": 1
+#                 }
+#             }
+#         }
+#     }
+# }
 
-train_config = config['train_config']
-model_config = config['model_config']
-data_config = config['data_config']
+
+
 
 
 
@@ -486,8 +512,10 @@ def ray_df_preprocessing(df):
     paths = df.path.tolist()
     f0_paths = df.f0_path.tolist()
     audio_embeddings = df.audio_embedding.tolist()
-    shuffle_indices = get_shuffle_indices(speaker_ids)
-    np.save('/usr/src/app/radtts/30shuffle_indices.pt', shuffle_indices)
+    # NOTE (Sam): I'm great at naming things.
+    shuffle_indices = np.load('/usr/src/app/radtts/30shuffle_sdfixed_indices.pt.npy')
+    # shuffle_indices = get_shuffle_indices(speaker_ids)
+    # np.save('/usr/src/app/radtts/asdfasdfasdfasdfasdf.pt', shuffle_indices)
     audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
     collate_input = []
     for transcript, audio_bytes, speaker_id, f0_path, audio_embedding in zip(
@@ -714,10 +742,16 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
         if train_config['log_decoder_samples']: # decoder with gt features
             attribute_sigmas.append(-1)
         if train_config['log_attribute_samples']: # attribute prediction
-            if model.is_attribute_unconditional():
-                attribute_sigmas.extend([1.0])
+            if hasattr(model, 'is_attribute_unconditional'):
+                if model.is_attribute_unconditional():
+                    attribute_sigmas.extend([1.0])
+                else:
+                    attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
             else:
-                attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
+                if model.module.is_attribute_unconditional():
+                    attribute_sigmas.extend([1.0])
+                else:
+                    attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])                
         if len(attribute_sigmas) > 0:
             durations = attn_used[0, 0].sum(0, keepdim=True)
             # NOTE (Sam): this is causing problems when durations are > x.5 and binarize_attention is false.
@@ -881,7 +915,8 @@ def _train_step(
     if log_checkpoint and session.get_world_rank() == 0:
 
         # checkpoint_path = f'/usr/src/app/radtts/outputs/lj_test_checkpoint_{iteration}.pt'
-        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_test_checkpoint_{iteration}.pt'
+        # checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_test_checkpoint_{iteration}.pt'
+        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration,
                                     checkpoint_path)
         # checkpoint = Checkpoint.from_dict(
@@ -1455,7 +1490,19 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
     return train_loader, valset, collate_fn
 
 
+
 if __name__ == "__main__":
+
+    
+    # if args.config:
+    #     with open(args.config) as f:
+    #         config = json.load(f)
+    # from args.config import config
+
+
+    train_config = config['train_config']
+    model_config = config['model_config']
+    data_config = config['data_config']
 
     # NOTE (Sam): uncomment for ray dataset training
     ray_dataset = get_ray_dataset()

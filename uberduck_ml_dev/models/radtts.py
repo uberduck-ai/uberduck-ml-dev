@@ -691,14 +691,14 @@ class RADTTS(torch.nn.Module):
                 txt_enc_time_expanded, spk_vec, out_lens, None,
                 None)
 
-        # NOTE (Sam): hacky to get to work on cpu
+        # NOTE (Sam): comment hacky to get to work on cpu
         # NOTE (Sam): not helpful when available but used.
         # if torch.cuda.is_available():
         residual = torch.cuda.FloatTensor(
             batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
         # else:
-        #     residual = torch.FloatTensor(
-        #         batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        # residual = torch.FloatTensor(
+        #     batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
             
         residual = residual.normal_() * sigma
 
