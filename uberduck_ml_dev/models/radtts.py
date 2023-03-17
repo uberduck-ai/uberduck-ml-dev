@@ -57,6 +57,20 @@ class FlowStep(nn.Module):
             z, log_s = self.affine_tfn(z, context, seq_lens=seq_lens)
             return z, log_det_W, log_s
 
+
+# # NOTE (Sam): comment this out for GPU
+# def get_mask_from_lengths(lengths):
+#     """Constructs binary mask from a 1D torch tensor of input lengths
+#     Args:
+#         lengths (torch.tensor): 1D tensor
+#     Returns:
+#         mask (torch.tensor): num_sequences x max_length x 1 binary tensor
+#     """
+#     max_len = torch.max(lengths).item()
+#     ids = torch.arange(0, max_len, out=torch.LongTensor(max_len))
+#     mask = (ids < lengths.unsqueeze(1)).bool()
+#     return mask
+
 from typing import Optional
 class RADTTS(torch.nn.Module):
     def __init__(self, n_speakers, n_speaker_dim, n_text, n_text_dim, n_flows,
@@ -678,12 +692,13 @@ class RADTTS(torch.nn.Module):
                 None)
 
         # NOTE (Sam): hacky to get to work on cpu
-        if torch.cuda.is_available():
-            residual = torch.cuda.FloatTensor(
-                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
-        else:
-            residual = torch.FloatTensor(
-                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        # NOTE (Sam): not helpful when available but used.
+        # if torch.cuda.is_available():
+        residual = torch.cuda.FloatTensor(
+            batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        # else:
+        #     residual = torch.FloatTensor(
+        #         batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
             
         residual = residual.normal_() * sigma
 

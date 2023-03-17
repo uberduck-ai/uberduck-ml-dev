@@ -549,6 +549,7 @@ class ResNetSpeakerEncoderCallable:
 
         self.device = "cuda"
         self.model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         self.model.cuda()
 
