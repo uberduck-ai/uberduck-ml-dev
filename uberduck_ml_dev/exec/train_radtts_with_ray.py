@@ -990,6 +990,40 @@ def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scale
 
         
 from uberduck_ml_dev.optimizers.radam import RAdam
+from collections import OrderedDict
+
+def warmstart(checkpoint_path, model, include_layers=[],
+              ignore_layers_warmstart=[]):
+    pretrained_dict = torch.load(checkpoint_path, map_location='cpu')
+    pretrained_dict = pretrained_dict['state_dict']
+    
+
+    # load params
+    # model.load_state_dict(new_state_dict)
+
+
+    # NOTE (Sam): this won't work with module presaved.
+    # if len(include_layers):
+    #     pretrained_dict = {k: v for k, v in pretrained_dict.items()
+    #                        if any(l in k for l in include_layers)}
+
+    # if len(ignore_layers_warmstart):
+    #     pretrained_dict = {k: v for k, v in pretrained_dict.items()
+    #                        if all(l not in k for l in ignore_layers_warmstart)}
+
+    is_module = True
+    if is_module:
+        new_state_dict = OrderedDict()
+        for k, v in pretrained_dict.items():
+            name = k[7:] # remove `module.`
+            new_state_dict[name] = v
+        pretrained_dict = new_state_dict
+
+    model_dict = model.state_dict()
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
+    print("Warm started from {}".format(checkpoint_path))
+    return model
 
 def train_func(config: dict):
     setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
@@ -1004,6 +1038,10 @@ def train_func(config: dict):
     model = RADTTS(
         **model_config,
     )
+
+    if config['warmstart_checkpoint_path']!= "":
+        warmstart(config['warmstart_checkpoint_path'], model)
+
 
     # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
     # model = train.torch.prepare_model(model)
