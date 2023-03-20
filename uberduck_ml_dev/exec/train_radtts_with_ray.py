@@ -1,6 +1,5 @@
 import tempfile
 from io import BytesIO
-
 import numpy as np
 import pandas as pd
 import torch
@@ -10,32 +9,55 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import ExponentialLR
 import argparse
 import sys
+from collections import OrderedDict
+import importlib.util
+import sys
+import lmdb
+import pickle as pkl
+import json
+from datetime import datetime
+import os
 
-
+from scipy.stats import betabinom
+from scipy.io.wavfile import read
+from scipy.ndimage import distance_transform_edt as distance_transform
 import ray
 from ray.air import session, Checkpoint
 from ray.air.config import ScalingConfig, RunConfig
 from ray.air.integrations.wandb import  setup_wandb
 import ray.data
-
 import ray.train as train
 from ray.train.torch import TorchTrainer
 from ray.air.util.check_ingest import DummyTrainer
 from ray.tune import SyncConfig
-import configparser
-
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
+from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
+from ray.air.config import ScalingConfig, RunConfig
+from TTS.encoder.models.resnet import ResNetSpeakerEncoder
+from librosa import pyin
 
 from uberduck_ml_dev.models.radtts import RADTTS
 from uberduck_ml_dev.text.utils import text_to_sequence
 from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS
-
 from uberduck_ml_dev.losses import RADTTSLoss, AttentionBinarizationLoss
-
+from uberduck_ml_dev.optimizers.radam import RAdam
 from uberduck_ml_dev.utils.utils import (
-    intersperse,
     to_gpu,
-    clip_grad_value_,
 )
+from uberduck_ml_dev.vocoders.hifigan import AttrDict, Generator
+from uberduck_ml_dev.models.common import get_mel
+from uberduck_ml_dev.data.audio_processing import TacotronSTFT
+from uberduck_ml_dev.text.text_processing import TextProcessing
+from uberduck_ml_dev.utils.plot import plot_alignment_to_numpy
+
+HIFI_GAN_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_22khz_config.json"
+HIFI_GAN_GENERATOR_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_libritts100360_generator0p5.pt"
+HIFI_GAN_CONFIG_PATH = '/usr/src/app/radtts/models/hifigan_22khz_config.json'
+HIFI_GAN_GENERATOR_PATH = '/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt'
+RESNET_SE_MODEL_PATH = '/usr/src/app/radtts/resnet_se.pth.tar'
+RESNET_SE_CONFIG_PATH = '/usr/src/app/radtts/resnet_se_config.json'
+
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
@@ -46,8 +68,7 @@ def parse_args(args):
 # args = parse_args(sys.argv[1:])
 # config = configparser.ConfigParser()
 # config.read(args.config)
-import importlib.util
-import sys
+
 # spec = importlib.util.spec_from_file_location("exp_config", args.config)
 spec = importlib.util.spec_from_file_location("exp_config", '/usr/src/app/uberduck_ml_exp/configs/radtts/30_spkr_shuffle_zero_dap.py')
 
@@ -56,192 +77,36 @@ foo = importlib.util.module_from_spec(spec)
 sys.modules["exp_config"] = foo
 spec.loader.exec_module(foo)
 from exp_config import config
-# print(args.config)
-# configuration_module = __import__(args.config, globals(), locals(  ))
-# from args.config import config
 
 print(config, 'asdf')
 data_config = config['data_config']
 train_config = config['train_config']
 model_config = config['model_config']
+MAX_WAV_VALUE = data_config['max_wav_value']
+
 # NOTE (Sam): we can use ray trainer with ray datasets or torch dataloader.  torch dataloader is a little faster for now.
 # See comments for optionality
 
-# config = {
-#     "train_config": {
-#         "output_directory": "",
-#         "epochs": 10000,
-#         "optim_algo": "RAdam",
-#         "learning_rate": 1e-4,
-#         "weight_decay": 1e-6,
-#         "sigma": 1.0,
-#         "iters_per_checkpoint": 20000,
-#         # "steps_per_sample": 2000,
-#         # NOTE (Sam): for testing
-#         "steps_per_sample": 2000,
-#         "batch_size": 32,
-#         "seed": None,
-#         "checkpoint_path": "",
-#         "ignore_layers": [],
-#         "ignore_layers_warmstart": [],
-#         "finetune_layers": [],
-#         "include_layers": [],
-#         "vocoder_config_path": "/usr/src/app/radtts/models/hifigan_22khz_config.json",
-#         "vocoder_checkpoint_path": "/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt",
-#         "log_attribute_samples": False,
-#         "log_decoder_samples": True,
-#         "warmstart_checkpoint_path": "",
-#         "use_amp": False,
-#         "grad_clip_val": 1.0,
-#         "loss_weights": {
-#             "blank_logprob": -1,
-#             "ctc_loss_weight": 0.1,
-#             "binarization_loss_weight": 1.0,
-#             "dur_loss_weight": 1.0,
-#             "f0_loss_weight": 1.0,
-#             "energy_loss_weight": 1.0,
-#             "vpred_loss_weight": 1.0
-#         },
-#         # "binarization_start_iter": 6000,
-#         # "kl_loss_start_iter": 18000,
-#         # NOTE (Sam): for bs 32 rather than 16
-#         "binarization_start_iter": 4000,
-#         "kl_loss_start_iter": 12000,
-#         "unfreeze_modules": "all"
-#     },
-#     "data_config": {
-#     # NOTE (Sam): unused since we are getting data from s3 using the ray loader now
-#         "training_files": {
-#             "LJS": {
-#                 "basedir": "/",
-#                 # NOTE (Sam): these are used in the torch DataLoader based loading
-#                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-#                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
-#                 "audiodir": "",
-#                 "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
-#                 # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
-#                 "lmdbpath": ""
-#             }
-#         },
-#         "validation_files": {
-#             "LJS": {
-#                 "basedir": "/",
-#                 # "audiodir": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/wavs",
-#                 # "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted.txt",
-#                 "audiodir": "",
-#                 "filelist": "/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt",  
-#                 # "filelist": '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
-#                 "lmdbpath": ""
-#             }
-#         },
-#     ###
-#         "dur_min": 0.1,
-#         "dur_max": 10.2,
-#         "sampling_rate": 22050,
-#         "filter_length": 1024,
-#         "hop_length": 256,
-#         "win_length": 1024,
-#         "n_mel_channels": 80,
-#         "mel_fmin": 0.0,
-#         "mel_fmax": 8000.0,
-#         "f0_min": 80.0,
-#         "f0_max": 640.0,
-#         "max_wav_value": 32768.0,
-#         "use_f0": True,
-#         "use_log_f0": 0,
-#         "use_energy_avg": True,
-#         "use_scaled_energy": True,
-#         "symbol_set": "radtts",
-#         "cleaner_names": ["radtts_cleaners"],
-#         "heteronyms_path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/heteronyms",
-#         "phoneme_dict_path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/cmudict-0.7b",
-#         # "heteronyms_path": "uberduck_ml_dev/text/heteronyms",
-#         # "phoneme_dict_path": "uberduck_ml_dev/text/cmudict-0.7b",
-#         "p_phoneme": 1.0,
-#         "handle_phoneme": "word",
-#         "handle_phoneme_ambiguous": "ignore",
-#         "include_speakers": None,
-#         "n_frames": -1,
-#         "betabinom_cache_path": "/usr/src/app/radtts/data_cache/",
-#         "lmdb_cache_path": "", 
-#         "use_attn_prior_masking": True,
-#         "prepend_space_to_text": True,
-#         "append_space_to_text": True,
-#         "add_bos_eos_to_text": False,
-#         "betabinom_scaling_factor": 1.0,
-#         "distance_tx_unvoiced": False,
-#         "mel_noise_scale": 0.0
-#     },
-#     "model_config": {
-#         # NOTE (Sam): uncomment for LJ
-#         "n_speakers": 30,
-#         # "n_speakers": 1,
-#         # NOTE (Sam): can reduce for audio embedding using PCA
-#         # "n_speaker_dim": 16,
-#         "n_speaker_dim": 512,
-#         "n_text": 185,
-#         "n_text_dim": 512,
-#         "n_flows": 8,
-#         "n_conv_layers_per_step": 4,
-#         "n_mel_channels": 80,
-#         "n_hidden": 1024,
-#         "mel_encoder_n_hidden": 512,
-#         "dummy_speaker_embedding": False,
-#         "n_early_size": 2,
-#         "n_early_every": 2,
-#         "n_group_size": 2,
-#         "affine_model": "wavenet",
-#         "include_modules": "decatnvpred",
-#         "scaling_fn": "tanh",
-#         "matrix_decomposition": "LUS",
-#         "learn_alignments": True,
-#         "use_speaker_emb_for_alignment": False,
-#         "attn_straight_through_estimator": True,
-#         "use_context_lstm": True,
-#         "context_lstm_norm": "spectral",
-#         "context_lstm_w_f0_and_energy": True,
-#         "text_encoder_lstm_norm": "spectral",
-#         "n_f0_dims": 1,
-#         "n_energy_avg_dims": 1,
-#         "use_first_order_features": False,
-#         "unvoiced_bias_activation": "relu",
-#         "decoder_use_partial_padding": True,
-#         "decoder_use_unvoiced_bias": True,
-#         "ap_pred_log_f0": True,
-#         "ap_use_unvoiced_bias": True,
-#         "ap_use_voiced_embeddings": True,
-#         "dur_model_config": None,
-#         "f0_model_config": None,
-#         "energy_model_config": None,
-#         "v_model_config": {
-#             "name": "dap",
-#             "hparams": {
-#                 "n_speaker_dim": 16,
-#                 "take_log_of_input": False,
-#                 "bottleneck_hparams": {
-#                     "in_dim": 512,
-#                     "reduction_factor": 16,
-#                     "norm": "weightnorm",
-#                     "non_linearity": "relu"
-#                 },
-#                 "arch_hparams": {
-#                     "out_dim": 1,
-#                     "n_layers": 2,
-#                     "n_channels": 256,
-#                     "kernel_size": 3,
-#                     "p_dropout": 0.5,
-#                     "lstm_type": "",
-#                     "use_linear": 1
-#                 }
-#             }
-#         }
-#     }
-# }
+symbol_set = data_config['symbol_set']
+cleaner_names = data_config['cleaner_names']
+heteronyms_path = data_config['heteronyms_path']
+phoneme_dict_path = data_config['phoneme_dict_path']
+p_phoneme = data_config['p_phoneme']
+handle_phoneme = data_config['handle_phoneme']
+handle_phoneme_ambiguous = data_config['handle_phoneme_ambiguous']
+prepend_space_to_text = data_config['prepend_space_to_text']
+append_space_to_text = data_config['append_space_to_text']
+add_bos_eos_to_text = data_config['add_bos_eos_to_text']
 
-
-
-
-
+stft = TacotronSTFT(
+    filter_length=data_config['filter_length'],
+    hop_length=data_config['hop_length'],
+    win_length=data_config['win_length'],
+    sampling_rate=22050,
+    n_mel_channels=data_config['n_mel_channels'],
+    mel_fmin=data_config['mel_fmin'],
+    mel_fmax=data_config['mel_fmax'],
+)
 
 class DataCollate():
     """ Zero-pads model inputs and targets given number of steps """
@@ -348,14 +213,12 @@ class DataCollate():
                 'audio_embedding': audio_embedding_padded
                 }
 
-max_wav_value = 32768
-from librosa import pyin
 
 def get_f0_pvoiced(audio, sampling_rate=22050, frame_length=1024,
                     hop_length=256, f0_min=100, f0_max=300):
 
     # NOTE (Sam): is this normalization kosher?
-    audio_norm = audio / max_wav_value
+    audio_norm = audio / MAX_WAV_VALUE
     f0, voiced_mask, p_voiced = pyin(
         y = audio_norm, fmin = f0_min, fmax = f0_max, sr = sampling_rate,
         frame_length=frame_length, win_length=frame_length // 2,
@@ -379,8 +242,6 @@ def get_energy_average(mel):
     energy_avg = energy_avg_normalize(energy_avg)
     return energy_avg
 
-import os
-from scipy.stats import betabinom
 
 def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.05):
     P = phoneme_count
@@ -429,33 +290,12 @@ def f0_normalize( x, f0_min):
 
     return x
     
-from uberduck_ml_dev.data.audio_processing import TacotronSTFT
-stft = TacotronSTFT(
-    filter_length=data_config['filter_length'],
-    hop_length=data_config['hop_length'],
-    win_length=data_config['win_length'],
-    sampling_rate=22050,
-    n_mel_channels=data_config['n_mel_channels'],
-    mel_fmin=data_config['mel_fmin'],
-    mel_fmax=data_config['mel_fmax'],
-)
+
+
 
 def get_speaker_id(speaker):
 
     return torch.LongTensor([speaker])
-
-from uberduck_ml_dev.text.text_processing import TextProcessing
-
-symbol_set = data_config['symbol_set']
-cleaner_names = data_config['cleaner_names']
-heteronyms_path = data_config['heteronyms_path']
-phoneme_dict_path = data_config['phoneme_dict_path']
-p_phoneme = data_config['p_phoneme']
-handle_phoneme = data_config['handle_phoneme']
-handle_phoneme_ambiguous = data_config['handle_phoneme_ambiguous']
-prepend_space_to_text = data_config['prepend_space_to_text']
-append_space_to_text = data_config['append_space_to_text']
-add_bos_eos_to_text = data_config['add_bos_eos_to_text']
 
 
 tp = TextProcessing(
@@ -470,32 +310,12 @@ tp = TextProcessing(
     append_space_to_text=append_space_to_text,
     add_bos_eos_to_text=add_bos_eos_to_text,
 )
-from uberduck_ml_dev.models.common import get_mel
 
 def get_text(text):
     text = tp.encode_text(text)
     text = torch.LongTensor(text)
     return text
-from datetime import datetime
 
-RESNET_SE_MODEL_PATH = '/usr/src/app/radtts/resnet_se.pth.tar'
-RESNET_SE_CONFIG_PATH = '/usr/src/app/radtts/resnet_se_config.json'
-
-# import json
-# with open(resnet_se_config) as f:
-#     resnet_config =json.load(f)
-    
-# state_dict = torch.load(resnet_se_model)['model']
-# audio_config = dict(resnet_config["audio"])
-# model_params = resnet_config["model_params"]
-# if "model_name" in model_params:
-#     del model_params["model_name"]
-
-# audio_config["sample_rate"] = 22050
-from TTS.encoder.models.resnet import ResNetSpeakerEncoder
-# audio_encoder = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
-# audio_encoder.eval()
-# audio_encoder.cuda()
 
 def get_shuffle_indices(levels):
     levels = np.asarray(levels)
@@ -702,7 +522,7 @@ def log(metrics, audios = {}):
 
 
 
-from uberduck_ml_dev.utils.plot import plot_alignment_to_numpy
+
 
 @torch.no_grad()
 def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask):
@@ -806,376 +626,6 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
                 audios[sample_tag] = audio
 
     return images, audios
-
-collate_fn = DataCollate()
-
-def save_checkpoint(model, optimizer, iteration, filepath):
-    print("Saving model and optimizer state at iteration {} to {}".format(
-          iteration, filepath))
-
-    # NOTE (Sam): learning rate not accessible here
-    torch.save({'state_dict': model.state_dict(),
-                'iteration': iteration,
-                'optimizer': optimizer.state_dict()}, filepath)
-
-def _train_step(
-    batch,
-    model,
-    optim,
-    iteration,
-    epoch,
-    steps_per_sample,
-    # iters_per_checkpoint,
-    scaler,
-    scheduler,
-    criterion,
-    attention_kl_loss,
-    kl_loss_start_iter,
-    binarization_start_iter
-):
-    print(datetime.now(), 'entering train step:', iteration)
-    if iteration >= binarization_start_iter:
-        binarize = True
-    else:
-        binarize = False
-
-    optim.zero_grad()
-
-    with autocast(enabled= False):
-
-        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        # batch_dict = batch
-        batch_dict = collate_fn(batch)
-        mel = to_gpu(batch_dict['mel'])
-        speaker_ids = to_gpu(batch_dict['speaker_ids'])
-        attn_prior = to_gpu(batch_dict['attn_prior'])
-        f0 = to_gpu(batch_dict['f0'])
-        voiced_mask = to_gpu(batch_dict['voiced_mask'])
-        p_voiced = to_gpu(batch_dict['p_voiced'])
-        text = to_gpu(batch_dict['text'])
-        in_lens = to_gpu(batch_dict['input_lengths'])
-        out_lens = to_gpu(batch_dict['output_lengths'])
-        energy_avg = to_gpu(batch_dict['energy_avg'])
-        audio_embedding = to_gpu(batch_dict['audio_embedding'])
-
-        outputs = model(
-                    mel, speaker_ids, text, in_lens, out_lens,
-                    binarize_attention=binarize, attn_prior=attn_prior,
-                    f0=f0, energy_avg=energy_avg,
-                    voiced_mask=voiced_mask, p_voiced=p_voiced, audio_embedding = audio_embedding)
-
-        loss_outputs = criterion(outputs, in_lens, out_lens)
-
-        print_list = []
-        loss = None
-        for k, (v, w) in loss_outputs.items():
-            if w > 0:
-                loss = v * w if loss is None else loss + v * w
-            print_list.append('  |  {}: {:.3f}'.format(k, v))
-
-        
-        w_bin = criterion.loss_weights.get('binarization_loss_weight', 1.0)
-        if binarize and iteration >= kl_loss_start_iter:
-            binarization_loss = attention_kl_loss(
-                outputs['attn'], outputs['attn_soft'])
-            loss += binarization_loss * w_bin
-        else:
-            binarization_loss = torch.zeros_like(loss)
-        loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
-    print(datetime.now(), 'middle train step:', iteration)
-    grad_clip_val = 1. # it is what is is ;)
-    print(print_list)
-    scaler.scale(loss).backward()
-    if grad_clip_val > 0:
-        scaler.unscale_(optim)
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), grad_clip_val)
-
-    scaler.step(optim)
-    scaler.update()
-
-    metrics = {
-        "loss": loss.item()
-    }
-    for k, (v, w) in loss_outputs.items():
-        metrics[k] = v.item()
-
-    print('iteration: ', iteration)
-    log_sample = iteration % steps_per_sample == 0
-    log_checkpoint = iteration % train_config['iters_per_checkpoint'] == 0
- 
-    if log_sample and session.get_world_rank() == 0:
-        model.eval()
-        # TODO (Sam): adding tf output logging and out of distribution inference
-        images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
-        log(metrics, audios)
-        model.train()
-    else:
-        log(metrics)
-
-
-    session.report(metrics)
-    if log_checkpoint and session.get_world_rank() == 0:
-
-        # checkpoint_path = f'/usr/src/app/radtts/outputs/lj_test_checkpoint_{iteration}.pt'
-        # checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_test_checkpoint_{iteration}.pt'
-        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
-        save_checkpoint(model, optim, iteration,
-                                    checkpoint_path)
-        # checkpoint = Checkpoint.from_dict(
-        #     dict(
-        #         epoch = epoch,
-        #         global_step=iteration,
-        #         model=model.state_dict(),
-        #     )
-        # )
-        
-        # artifact = wandb.Artifact(
-        #     f"artifact_epoch{epoch}_step{iteration}", "model"
-        # )
-        # with tempfile.TemporaryDirectory() as tempdirname:
-            # checkpoint.to_directory(tempdirname)
-            # artifact.add_dir(tempdirname)
-            # wandb.log_artifact(artifact)
-        # session.report({}, checkpoint=checkpoint)
-    # else:
-    #     session.report(metrics)
-
-    
-    # 
-    # iteration += 1
-    print(f"Loss: {loss.item()}")
-
-
-# NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-    for batch_idx, ray_batch_df in enumerate(
-        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
-    ):
-    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    # for batch in train_dataloader:
-        _train_step(
-            ray_batch_df,
-            # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-            # batch,
-            model,
-            optim,
-            iteration,
-            epoch,
-            steps_per_sample,
-            # iters_per_checkpoint,
-            scaler,
-            scheduler,
-            criterion,
-            attention_kl_loss,
-            kl_loss_start_iter,
-            binarization_start_iter,
-        )
-        iteration += 1
-        
-    # checkpoint = Checkpoint.from_dict(
-    #     dict(
-    #         epoch = epoch,
-    #         global_step=iteration,
-    #         model=model.state_dict(),
-    #     )
-    # )
-    # session.report({}, checkpoint=checkpoint)
-    return iteration
-    # artifact = wandb.Artifact(
-    #     f"artifact_epoch{epoch}_step{iteration}", "model"
-    # )
-    # with tempfile.TemporaryDirectory() as tempdirname:
-    #     checkpoint.to_directory(tempdirname)
-    #     artifact.add_dir(tempdirname)
-    #     wandb.log_artifact(artifact)       
-
-        
-from uberduck_ml_dev.optimizers.radam import RAdam
-from collections import OrderedDict
-
-def warmstart(checkpoint_path, model, include_layers=[],
-              ignore_layers_warmstart=[]):
-    pretrained_dict = torch.load(checkpoint_path, map_location='cpu')
-    pretrained_dict = pretrained_dict['state_dict']
-    
-
-    # load params
-    # model.load_state_dict(new_state_dict)
-
-
-    # NOTE (Sam): this won't work with module presaved.
-    # if len(include_layers):
-    #     pretrained_dict = {k: v for k, v in pretrained_dict.items()
-    #                        if any(l in k for l in include_layers)}
-
-    # if len(ignore_layers_warmstart):
-    #     pretrained_dict = {k: v for k, v in pretrained_dict.items()
-    #                        if all(l not in k for l in ignore_layers_warmstart)}
-
-    is_module = True
-    if is_module:
-        new_state_dict = OrderedDict()
-        for k, v in pretrained_dict.items():
-            name = k[7:] # remove `module.`
-            new_state_dict[name] = v
-        pretrained_dict = new_state_dict
-
-    model_dict = model.state_dict()
-    model_dict.update(pretrained_dict)
-    model.load_state_dict(model_dict)
-    print("Warm started from {}".format(checkpoint_path))
-    model.train()
-    return model
-
-def train_func(config: dict):
-    setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
-    print("CUDA AVAILABLE: ", torch.cuda.is_available())
-    epochs = config["epochs"]
-    batch_size = config["batch_size"]
-    steps_per_sample = config["steps_per_sample"]
-    sigma = config['sigma']
-    kl_loss_start_iter = config['kl_loss_start_iter']
-    binarization_start_iter = config['binarization_start_iter']
-    # iters_per_checkpoint = config['iters_per_checkpoint']
-    model = RADTTS(
-        **model_config,
-    )
-
-    if config['warmstart_checkpoint_path']!= "":
-        warmstart(config['warmstart_checkpoint_path'], model)
-
-
-    # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
-    # model = train.torch.prepare_model(model)
-    model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
-
-    start_epoch = 0
-
-    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    # train_dataloader = train.torch.prepare_data_loader(train_loader)
-
-    # NOTE (Sam): replace with RAdam
-    # optim = torch.optim.Adam(
-    #     model.parameters(),
-    #     lr = config["learning_rate"],
-    #     weight_decay = config["weight_decay"]
-    # )
-    optim = RAdam(model.parameters(), config["learning_rate"],
-                        weight_decay=config["weight_decay"])
-    scheduler = ExponentialLR(
-        optim,
-        config["weight_decay"],
-        last_epoch=-1,
-    )
-    dataset_shard = session.get_dataset_shard("train")
-    scaler = GradScaler()
-
-    criterion = RADTTSLoss(
-        sigma,
-        config['n_group_size'],
-        config['dur_model_config'],
-        config['f0_model_config'],
-        config['energy_model_config'],
-        vpred_model_config=config['v_model_config'],
-        loss_weights=config['loss_weights']
-    )
-    attention_kl_loss = AttentionBinarizationLoss()
-    iteration = 0
-    for epoch in range(start_epoch, start_epoch + epochs):
-        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        # iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        
-
-from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
-from ray.air.config import ScalingConfig, RunConfig
-from ray.tune import SyncConfig
-
-
-# For sample inference
-import json
-from uberduck_ml_dev.vocoders.hifigan import AttrDict, Generator
-# NOTE (Sam): denoiser not used here in contrast with radtts repo
-
-def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda = True):
-
-    h = AttrDict(vocoder_config)
-    if 'gaussian_blur' in vocoder_config:
-        vocoder_config['gaussian_blur']['p_blurring'] = 0.0
-    else:
-        vocoder_config['gaussian_blur'] = {'p_blurring': 0.0}
-        h['gaussian_blur'] = {'p_blurring': 0.0}
-
-    vocoder = Generator(h)
-    vocoder.load_state_dict(vocoder_state_dict)
-    if to_cuda:
-        vocoder.cuda()
-
-    vocoder.eval()
-
-    return vocoder 
-
-
-HIFI_GAN_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_22khz_config.json"
-HIFI_GAN_GENERATOR_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_libritts100360_generator0p5.pt"
-
-
-
-hifi_gan_config_path = '/usr/src/app/radtts/models/hifigan_22khz_config.json'
-hifi_gan_generator_path = '/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt'
-
-def load_pretrained(model):
-    # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
-    # bio = BytesIO(response.content)
-    loaded = torch.load(hifi_gan_generator_path)
-    model.load_state_dict(loaded['generator'])
-
-
-def get_vocoder():
-    print("Getting vocoder")
-    # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_CONFIG_URL)
-
-    with open(hifi_gan_config_path) as f:
-        hifigan_config = json.load(f)
-
-    h = AttrDict(hifigan_config)
-    if 'gaussian_blur' in hifigan_config:
-        hifigan_config['gaussian_blur']['p_blurring'] = 0.0
-    else:
-        hifigan_config['gaussian_blur'] = {'p_blurring': 0.0}
-        h['gaussian_blur'] = {'p_blurring': 0.0}
-    # model_params = hifigan_config["model_params"]
-    model = Generator(h)
-    print("Loading pretrained model...")
-    load_pretrained(model)
-    print("Got pretrained model...")
-    model.eval()
-    return model
-
-### pytorch dataloader for debug
-from scipy.io.wavfile import read
-import lmdb
-import pickle as pkl
-from scipy.ndimage import distance_transform_edt as distance_transform
-MAX_WAV_VALUE = data_config['max_wav_value']
-def load_wav_to_torch(full_path):
-    """ Loads wavdata into torch array """
-    sampling_rate, data = read(full_path)
-    # print(data.max(), 'dataraw')
-    data_float =  (data / np.abs(data).max())
-    # print(data_float.max(), 'dataraw')
-    data_int = (MAX_WAV_VALUE - 1)  * data_float
-    # print(data_int.max(), 'di')
-    output = torch.from_numpy(np.array(data_int)).float()
-    # print(output.max(), 'do')
-    # data = np.asarray(, dtype = np.int16)
-    # print(data.max(), 'datanorm')
-    return output, sampling_rate
 
 class Data(torch.utils.data.Dataset):
     def __init__(self, datasets, filter_length, hop_length, win_length,
@@ -1500,9 +950,230 @@ class Data(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)
 
-from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import DataLoader
 
+
+collate_fn = DataCollate()
+
+def save_checkpoint(model, optimizer, iteration, filepath):
+    print("Saving model and optimizer state at iteration {} to {}".format(
+          iteration, filepath))
+
+    # NOTE (Sam): learning rate not accessible here
+    torch.save({'state_dict': model.state_dict(),
+                'iteration': iteration,
+                'optimizer': optimizer.state_dict()}, filepath)
+
+def _train_step(
+    batch,
+    model,
+    optim,
+    iteration,
+    epoch,
+    steps_per_sample,
+    scaler,
+    scheduler,
+    criterion,
+    attention_kl_loss,
+    kl_loss_start_iter,
+    binarization_start_iter
+):
+    print(datetime.now(), 'entering train step:', iteration)
+    if iteration >= binarization_start_iter:
+        binarize = True
+    else:
+        binarize = False
+
+    optim.zero_grad()
+
+    with autocast(enabled= False):
+
+        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+        # batch_dict = batch
+        batch_dict = collate_fn(batch)
+        mel = to_gpu(batch_dict['mel'])
+        speaker_ids = to_gpu(batch_dict['speaker_ids'])
+        attn_prior = to_gpu(batch_dict['attn_prior'])
+        f0 = to_gpu(batch_dict['f0'])
+        voiced_mask = to_gpu(batch_dict['voiced_mask'])
+        p_voiced = to_gpu(batch_dict['p_voiced'])
+        text = to_gpu(batch_dict['text'])
+        in_lens = to_gpu(batch_dict['input_lengths'])
+        out_lens = to_gpu(batch_dict['output_lengths'])
+        energy_avg = to_gpu(batch_dict['energy_avg'])
+        audio_embedding = to_gpu(batch_dict['audio_embedding'])
+
+        outputs = model(
+                    mel, speaker_ids, text, in_lens, out_lens,
+                    binarize_attention=binarize, attn_prior=attn_prior,
+                    f0=f0, energy_avg=energy_avg,
+                    voiced_mask=voiced_mask, p_voiced=p_voiced, audio_embedding = audio_embedding)
+
+        loss_outputs = criterion(outputs, in_lens, out_lens)
+
+        print_list = []
+        loss = None
+        for k, (v, w) in loss_outputs.items():
+            if w > 0:
+                loss = v * w if loss is None else loss + v * w
+            print_list.append('  |  {}: {:.3f}'.format(k, v))
+
+        
+        w_bin = criterion.loss_weights.get('binarization_loss_weight', 1.0)
+        if binarize and iteration >= kl_loss_start_iter:
+            binarization_loss = attention_kl_loss(
+                outputs['attn'], outputs['attn_soft'])
+            loss += binarization_loss * w_bin
+        else:
+            binarization_loss = torch.zeros_like(loss)
+        loss_outputs['binarization_loss'] = (binarization_loss, w_bin)
+    print(datetime.now(), 'middle train step:', iteration)
+    grad_clip_val = 1. # it is what is is ;)
+    print(print_list)
+    scaler.scale(loss).backward()
+    if grad_clip_val > 0:
+        scaler.unscale_(optim)
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(), grad_clip_val)
+
+    scaler.step(optim)
+    scaler.update()
+
+    metrics = {
+        "loss": loss.item()
+    }
+    for k, (v, w) in loss_outputs.items():
+        metrics[k] = v.item()
+
+    print('iteration: ', iteration)
+    log_sample = iteration % steps_per_sample == 0
+    log_checkpoint = iteration % train_config['iters_per_checkpoint'] == 0
+ 
+    if log_sample and session.get_world_rank() == 0:
+        model.eval()
+        # TODO (Sam): adding tf output logging and out of distribution inference
+        images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
+        log(metrics, audios)
+        model.train()
+    else:
+        log(metrics)
+
+
+    session.report(metrics)
+    if log_checkpoint and session.get_world_rank() == 0:
+
+        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
+        save_checkpoint(model, optim, iteration,
+                                    checkpoint_path)
+    
+    print(f"Loss: {loss.item()}")
+
+
+# NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    for batch_idx, ray_batch_df in enumerate(
+        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
+    ):
+    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+    # for batch in train_dataloader:
+        _train_step(
+            ray_batch_df,
+            # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+            # batch,
+            model,
+            optim,
+            iteration,
+            epoch,
+            steps_per_sample,
+            # iters_per_checkpoint,
+            scaler,
+            scheduler,
+            criterion,
+            attention_kl_loss,
+            kl_loss_start_iter,
+            binarization_start_iter,
+        )
+        iteration += 1
+        
+
+    return iteration 
+
+        
+
+
+def warmstart(checkpoint_path, model, include_layers=[],
+              ignore_layers_warmstart=[]):
+    pretrained_dict = torch.load(checkpoint_path, map_location='cpu')
+    pretrained_dict = pretrained_dict['state_dict']
+    
+    is_module = True
+    if is_module:
+        new_state_dict = OrderedDict()
+        for k, v in pretrained_dict.items():
+            name = k[7:] # remove `module.`
+            new_state_dict[name] = v
+        pretrained_dict = new_state_dict
+
+    model_dict = model.state_dict()
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
+    print("Warm started from {}".format(checkpoint_path))
+    model.train()
+    return model
+
+def train_func(config: dict):
+    setup_wandb(config, project="radtts-ray", entity = 'uberduck-ai', rank_zero_only=False)
+    print("CUDA AVAILABLE: ", torch.cuda.is_available())
+    epochs = config["epochs"]
+    batch_size = config["batch_size"]
+    steps_per_sample = config["steps_per_sample"]
+    sigma = config['sigma']
+    kl_loss_start_iter = config['kl_loss_start_iter']
+    binarization_start_iter = config['binarization_start_iter']
+    model = RADTTS(
+        **model_config,
+    )
+
+    if config['warmstart_checkpoint_path']!= "":
+        warmstart(config['warmstart_checkpoint_path'], model)
+
+
+    # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
+    # model = train.torch.prepare_model(model)
+    model = train.torch.prepare_model(model, parallel_strategy_kwargs = dict(find_unused_parameters=True))
+
+    start_epoch = 0
+
+    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    # train_dataloader = train.torch.prepare_data_loader(train_loader)
+
+    optim = RAdam(model.parameters(), config["learning_rate"],
+                        weight_decay=config["weight_decay"])
+    scheduler = ExponentialLR(
+        optim,
+        config["weight_decay"],
+        last_epoch=-1,
+    )
+    dataset_shard = session.get_dataset_shard("train")
+    scaler = GradScaler()
+
+    criterion = RADTTSLoss(
+        sigma,
+        config['n_group_size'],
+        config['dur_model_config'],
+        config['f0_model_config'],
+        config['energy_model_config'],
+        vpred_model_config=config['v_model_config'],
+        loss_weights=config['loss_weights']
+    )
+    attention_kl_loss = AttentionBinarizationLoss()
+    iteration = 0
+    for epoch in range(start_epoch, start_epoch + epochs):
+        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
+        # iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        
 def prepare_dataloaders(data_config, n_gpus, batch_size):
     # Get data, data loaders and collate function ready
     ignore_keys = ['training_files', 'validation_files']
@@ -1532,6 +1203,63 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
     return train_loader, valset, collate_fn
 
 
+
+def load_pretrained(model):
+    # NOTE (Sam): uncomment for download on anyscale
+    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
+    # bio = BytesIO(response.content)
+    loaded = torch.load(HIFI_GAN_GENERATOR_PATH)
+    model.load_state_dict(loaded['generator'])
+
+def get_vocoder():
+    print("Getting vocoder")
+    # NOTE (Sam): uncomment for download on anyscale
+    # response = requests.get(HIFI_GAN_CONFIG_URL)
+
+    with open(HIFI_GAN_CONFIG_PATH) as f:
+        hifigan_config = json.load(f)
+
+    h = AttrDict(hifigan_config)
+    if 'gaussian_blur' in hifigan_config:
+        hifigan_config['gaussian_blur']['p_blurring'] = 0.0
+    else:
+        hifigan_config['gaussian_blur'] = {'p_blurring': 0.0}
+        h['gaussian_blur'] = {'p_blurring': 0.0}
+    # model_params = hifigan_config["model_params"]
+    model = Generator(h)
+    print("Loading pretrained model...")
+    load_pretrained(model)
+    print("Got pretrained model...")
+    model.eval()
+    return model
+
+### pytorch dataloader for debug
+def load_wav_to_torch(full_path):
+    """ Loads wavdata into torch array """
+    sampling_rate, data = read(full_path)
+    data_float =  (data / np.abs(data).max())
+    data_int = (MAX_WAV_VALUE - 1)  * data_float
+    output = torch.from_numpy(np.array(data_int)).float()
+    return output, sampling_rate
+
+# NOTE (Sam): denoiser not used here in contrast with radtts repo
+def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda = True):
+
+    h = AttrDict(vocoder_config)
+    if 'gaussian_blur' in vocoder_config:
+        vocoder_config['gaussian_blur']['p_blurring'] = 0.0
+    else:
+        vocoder_config['gaussian_blur'] = {'p_blurring': 0.0}
+        h['gaussian_blur'] = {'p_blurring': 0.0}
+
+    vocoder = Generator(h)
+    vocoder.load_state_dict(vocoder_state_dict)
+    if to_cuda:
+        vocoder.cuda()
+
+    vocoder.eval()
+
+    return vocoder 
 
 if __name__ == "__main__":
 
