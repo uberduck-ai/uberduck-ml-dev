@@ -43,12 +43,15 @@ def parse_args(args):
     args = parser.parse_args(args)
     return args
 
-args = parse_args(sys.argv[1:])
+# args = parse_args(sys.argv[1:])
 # config = configparser.ConfigParser()
 # config.read(args.config)
 import importlib.util
 import sys
-spec = importlib.util.spec_from_file_location("exp_config", args.config)
+# spec = importlib.util.spec_from_file_location("exp_config", args.config)
+spec = importlib.util.spec_from_file_location("exp_config", '/usr/src/app/uberduck_ml_exp/configs/radtts/30_spkr_shuffle_zero_dap.py')
+
+
 foo = importlib.util.module_from_spec(spec)
 sys.modules["exp_config"] = foo
 spec.loader.exec_module(foo)
@@ -1023,6 +1026,7 @@ def warmstart(checkpoint_path, model, include_layers=[],
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
     print("Warm started from {}".format(checkpoint_path))
+    model.train()
     return model
 
 def train_func(config: dict):
