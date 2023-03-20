@@ -540,8 +540,9 @@ def get_f0_pvoiced(audio, sampling_rate=22050, frame_length=1024,
 
 
     
-use_scaled_energy = True
+
 def energy_avg_normalize(x):
+    use_scaled_energy = True
     if  use_scaled_energy == True:
         x = (x + 20.0) / 20.0
     return x
