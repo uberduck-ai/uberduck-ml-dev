@@ -59,68 +59,8 @@ RESNET_SE_MODEL_PATH = '/usr/src/app/radtts/resnet_se.pth.tar'
 RESNET_SE_CONFIG_PATH = '/usr/src/app/radtts/resnet_se_config.json'
 
 
-def parse_args(args):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", help="Path to config")
-    args = parser.parse_args(args)
-    return args
-
-# args = parse_args(sys.argv[1:])
-# config = configparser.ConfigParser()
-# config.read(args.config)
-
-# spec = importlib.util.spec_from_file_location("exp_config", args.config)
-spec = importlib.util.spec_from_file_location("exp_config", '/usr/src/app/uberduck_ml_exp/configs/radtts/30_spkr_shuffle_zero_dap.py')
 
 
-foo = importlib.util.module_from_spec(spec)
-sys.modules["exp_config"] = foo
-spec.loader.exec_module(foo)
-from exp_config import config
-
-print(config, 'asdf')
-data_config = config['data_config']
-train_config = config['train_config']
-model_config = config['model_config']
-MAX_WAV_VALUE = data_config['max_wav_value']
-
-# NOTE (Sam): we can use ray trainer with ray datasets or torch dataloader.  torch dataloader is a little faster for now.
-# See comments for optionality
-
-symbol_set = data_config['symbol_set']
-cleaner_names = data_config['cleaner_names']
-heteronyms_path = data_config['heteronyms_path']
-phoneme_dict_path = data_config['phoneme_dict_path']
-p_phoneme = data_config['p_phoneme']
-handle_phoneme = data_config['handle_phoneme']
-handle_phoneme_ambiguous = data_config['handle_phoneme_ambiguous']
-prepend_space_to_text = data_config['prepend_space_to_text']
-append_space_to_text = data_config['append_space_to_text']
-add_bos_eos_to_text = data_config['add_bos_eos_to_text']
-
-stft = TacotronSTFT(
-    filter_length=data_config['filter_length'],
-    hop_length=data_config['hop_length'],
-    win_length=data_config['win_length'],
-    sampling_rate=22050,
-    n_mel_channels=data_config['n_mel_channels'],
-    mel_fmin=data_config['mel_fmin'],
-    mel_fmax=data_config['mel_fmax'],
-)
-
-
-tp = TextProcessing(
-    symbol_set,
-    cleaner_names,
-    heteronyms_path,
-    phoneme_dict_path,
-    p_phoneme=p_phoneme,
-    handle_phoneme=handle_phoneme,
-    handle_phoneme_ambiguous=handle_phoneme_ambiguous,
-    prepend_space_to_text=prepend_space_to_text,
-    append_space_to_text=append_space_to_text,
-    add_bos_eos_to_text=add_bos_eos_to_text,
-)
 
 class ResNetSpeakerEncoderCallable:
     def __init__(self):
@@ -659,14 +599,9 @@ def f0_normalize( x, f0_min):
 
     return x
     
-
-
-
 def get_speaker_id(speaker):
 
     return torch.LongTensor([speaker])
-
-
 
 def get_text(text):
     text = tp.encode_text(text)
@@ -846,9 +781,6 @@ def log(metrics, audios = {}):
     # session.report(metrics)
     if session.get_world_rank() == 0:
         wandb.log(wandb_metrics)
-
-
-
 
 
 @torch.no_grad()
@@ -1206,6 +1138,11 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
     return train_loader, valset, collate_fn
 
 
+def parse_args(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", help="Path to config")
+    args = parser.parse_args(args)
+    return args
 
 def load_pretrained(model):
     # NOTE (Sam): uncomment for download on anyscale
@@ -1266,12 +1203,52 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda = True):
 
 if __name__ == "__main__":
 
-    
-    # if args.config:
-    #     with open(args.config) as f:
-    #         config = json.load(f)
-    # from args.config import config
+    args = parse_args(sys.argv[1:])
+    if args.config:
+        with open(args.config) as f:
+            config = json.load(f)
 
+    data_config = config['data_config']
+    train_config = config['train_config']
+    model_config = config['model_config']
+    MAX_WAV_VALUE = data_config['max_wav_value']
+
+    # NOTE (Sam): we can use ray trainer with ray datasets or torch dataloader.  torch dataloader is a little faster for now.
+    # See comments for optionality
+
+    symbol_set = data_config['symbol_set']
+    cleaner_names = data_config['cleaner_names']
+    heteronyms_path = data_config['heteronyms_path']
+    phoneme_dict_path = data_config['phoneme_dict_path']
+    p_phoneme = data_config['p_phoneme']
+    handle_phoneme = data_config['handle_phoneme']
+    handle_phoneme_ambiguous = data_config['handle_phoneme_ambiguous']
+    prepend_space_to_text = data_config['prepend_space_to_text']
+    append_space_to_text = data_config['append_space_to_text']
+    add_bos_eos_to_text = data_config['add_bos_eos_to_text']
+
+    stft = TacotronSTFT(
+        filter_length=data_config['filter_length'],
+        hop_length=data_config['hop_length'],
+        win_length=data_config['win_length'],
+        sampling_rate=22050,
+        n_mel_channels=data_config['n_mel_channels'],
+        mel_fmin=data_config['mel_fmin'],
+        mel_fmax=data_config['mel_fmax'],
+    )
+
+    tp = TextProcessing(
+        symbol_set,
+        cleaner_names,
+        heteronyms_path,
+        phoneme_dict_path,
+        p_phoneme=p_phoneme,
+        handle_phoneme=handle_phoneme,
+        handle_phoneme_ambiguous=handle_phoneme_ambiguous,
+        prepend_space_to_text=prepend_space_to_text,
+        append_space_to_text=append_space_to_text,
+        add_bos_eos_to_text=add_bos_eos_to_text,
+    )
 
     train_config = config['train_config']
     model_config = config['model_config']
