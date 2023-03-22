@@ -136,6 +136,7 @@ def dynamic_range_decompression(x, C=1):
 
 def to_gpu(x):
 
+    # print(type(x), x)
     if x is not None:
         # x = x.contiguous()
 
@@ -145,6 +146,10 @@ def to_gpu(x):
 
     return x
 
+def to_gpu_radtts(batch):
+
+    output = {k: to_gpu(v) for k, v in batch}
+    return output
 
 def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     """Return a mask matrix. Unmasked entires are true."""
@@ -152,6 +157,23 @@ def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
         max_len = int(torch.max(lengths).item())
     ids = torch.arange(0, max_len, device=lengths.device, dtype=torch.long)
     mask = ids < lengths.unsqueeze(1)
+    return mask
+
+def get_mask_from_lengths_radtts(lengths):
+    """Constructs binary mask from a 1D torch tensor of input lengths
+    Args:
+        lengths (torch.tensor): 1D tensor
+    Returns:
+        mask (torch.tensor): num_sequences x max_length x 1 binary tensor
+    """
+    max_len = torch.max(lengths).item()
+    # NOTE (Sam): we needed this for flexibility to run on cpu (peeps be bogarting GPUs).
+    # TODO (Sam): parameterize cuda availability.
+    if torch.cuda.is_available():
+        ids = torch.arange(0, max_len, out=torch.cuda.LongTensor(max_len))
+    else:
+        ids = torch.arange(0, max_len, out=torch.LongTensor(max_len))
+    mask = (ids < lengths.unsqueeze(1)).bool()
     return mask
 
 
