@@ -448,6 +448,8 @@ def _train_step(
         segment_size = TRAIN_CONFIG["segment_size"]
         y_mel = slice_segments(mel, ids_slice, segment_size // hop_length)
 
+        # NOTE(zach): Why are we using mel_spectrogram? I thought we used linear
+        # spectrogram?
         y_hat_mel = mel_spectrogram_torch(y_hat)
 
         y = slice_segments(y, ids_slice * hop_length, segment_size)

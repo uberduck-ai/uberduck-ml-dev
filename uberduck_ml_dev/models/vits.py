@@ -108,6 +108,7 @@ class ResidualCouplingBlock(nn.Module):
         n_layers,
         n_flows=4,
         gin_channels=0,
+        local_conditioning_channels=0,
     ):
         super().__init__()
         self.channels = channels
@@ -117,6 +118,7 @@ class ResidualCouplingBlock(nn.Module):
         self.n_layers = n_layers
         self.n_flows = n_flows
         self.gin_channels = gin_channels
+        self.local_conditioning_channels = local_conditioning_channels
 
         self.flows = nn.ModuleList()
         for i in range(n_flows):
@@ -129,17 +131,30 @@ class ResidualCouplingBlock(nn.Module):
                     n_layers,
                     gin_channels=gin_channels,
                     mean_only=True,
+                    local_conditioning_channels=local_conditioning_channels,
                 )
             )
             self.flows.append(common.Flip())
 
-    def forward(self, x, x_mask, g=None, reverse=False):
-        if not reverse:
-            for flow in self.flows:
-                x, _ = flow(x, x_mask, g=g, reverse=reverse)
-        else:
+    def forward(self, x, x_mask, g=None, reverse=False, local_conditioning=None):
+        if reverse:
             for flow in reversed(self.flows):
-                x = flow(x, x_mask, g=g, reverse=reverse)
+                x = flow(
+                    x,
+                    x_mask,
+                    g=g,
+                    reverse=reverse,
+                    local_conditioning=local_conditioning,
+                )
+        else:
+            for flow in self.flows:
+                x, _ = flow(
+                    x,
+                    x_mask,
+                    g=g,
+                    reverse=reverse,
+                    local_conditioning=local_conditioning,
+                )
         return x
 
 
@@ -153,6 +168,7 @@ class PosteriorEncoder(nn.Module):
         dilation_rate,
         n_layers,
         gin_channels=0,
+        local_conditioning_channels=0,
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -170,13 +186,15 @@ class PosteriorEncoder(nn.Module):
             dilation_rate,
             n_layers,
             gin_channels=gin_channels,
+            local_conditioning_channels=local_conditioning_channels,
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, x, x_lengths, g=None):
+    def forward(self, x, x_lengths, g=None, local_conditioning=None):
+        # x has shape [b, c, t]
         x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(2)), 1).to(x.dtype)
         x = self.pre(x) * x_mask
-        x = self.enc(x, x_mask, g=g)
+        x = self.enc(x, x_mask, g=g, local_conditioning=local_conditioning)
         stats = self.proj(x) * x_mask
         m, logs = torch.split(stats, self.out_channels, dim=1)
         z = (m + torch.randn_like(m) * torch.exp(logs)) * x_mask
@@ -480,9 +498,17 @@ class SynthesizerTrn(nn.Module):
             1,
             16,
             gin_channels=gin_channels,
+            # NOTE(zach): pitch conditioning. Try using 1 since it's just a single f0 value?
+            local_conditioning_channels=1 if self.use_f0 else 0,
         )
         self.flow = ResidualCouplingBlock(
-            inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels
+            inter_channels,
+            hidden_channels,
+            5,
+            1,
+            4,
+            gin_channels=gin_channels,
+            local_conditioning_channels=1 if self.use_f0 else 0,
         )
 
         if use_sdp:
@@ -517,14 +543,18 @@ class SynthesizerTrn(nn.Module):
     ):
         if self.use_f0:
             assert f0 is not None
+            f0[voiced_mask.bool()] = torch.log(f0[voiced_mask.bool()])
+            f0 = f0 / 6
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.use_audio_embedding:
             g = audio_embedding.unsqueeze(-1)
         else:
             g = None
 
-        z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
-        z_p = self.flow(z, y_mask, g=g)
+        z, m_q, logs_q, y_mask = self.enc_q(
+            y, y_lengths, g=g, local_conditioning=f0.unsqueeze(1)
+        )
+        z_p = self.flow(z, y_mask, g=g, local_conditioning=f0.unsqueeze(1))
 
         attn_mask = torch.unsqueeze(x_mask, -1) * torch.unsqueeze(y_mask, 2)
         with torch.no_grad():
@@ -561,8 +591,6 @@ class SynthesizerTrn(nn.Module):
         if self.use_f0:
             x_expanded = torch.bmm(x, attn.squeeze(1))  # .transpose(1, 2))
             # NOTE(zach): Taken from RadTTS. scale to ~[0, 1] in log space.
-            f0[voiced_mask.bool()] = torch.log(f0[voiced_mask.bool()])
-            f0 = f0 / 6
             f0_model_outputs = self.f0_predictor(
                 x_expanded, g.squeeze(2), f0, y_lengths
             )
@@ -594,6 +622,7 @@ class SynthesizerTrn(nn.Module):
         durations=None,
         zero_shot_input=None,
         audio_embedding=None,
+        f0=None,
     ):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         # if self.n_speakers > 0:
@@ -620,6 +649,16 @@ class SynthesizerTrn(nn.Module):
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = generate_path(w_ceil, attn_mask)
 
+        if f0 is None and self.use_f0:
+            assert f0 is None
+            x_expanded = torch.bmm(x, attn.squeeze(1).transpose(1, 2))
+            f0 = self.f0_predictor.infer(
+                None,
+                x_expanded,
+                g.squeeze(2),
+                y_lengths,
+            )
+
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(
             1, 2
         )  # [b, t', t], [b, t, d] -> [b, d, t']
@@ -628,7 +667,7 @@ class SynthesizerTrn(nn.Module):
         )  # [b, t', t], [b, t, d] -> [b, d, t']
 
         z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
-        z = self.flow(z_p, y_mask, g=g, reverse=True)
+        z = self.flow(z_p, y_mask, g=g, reverse=True, local_conditioning=f0)
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
         return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
