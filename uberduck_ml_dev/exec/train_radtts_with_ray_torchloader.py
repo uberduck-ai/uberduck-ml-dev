@@ -87,7 +87,6 @@ class ResNetSpeakerEncoderCallable:
         for audiopath in audiopaths:
             audio_data = read(audiopath)[1]
             datum = torch.FloatTensor(audio_data).unsqueeze(-1).t().cuda()
-            # datum = torch.FloatTensor(audio_data).unsqueeze(-1).t()
             emb = self.model(datum)
             emb = emb.cpu().detach().numpy()
             yield {
@@ -630,11 +629,10 @@ def ray_df_preprocessing(df):
     f0_paths = df.f0_path.tolist()
     audio_embeddings = df.audio_embedding.tolist()
     # NOTE (Sam): I'm great at naming things.
-    # shuffle_indices = np.load('/usr/src/app/radtts/30shuffle_sdfixed_indices.pt.npy')[:100]
+    shuffle_indices = np.load('/usr/src/app/radtts/30shuffle_sdfixed_indices.pt.npy')
     # shuffle_indices = get_shuffle_indices(speaker_ids)
     # np.save('/usr/src/app/radtts/asdfasdfasdfasdfasdf.pt', shuffle_indices)
-    # audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
-    # audio_embeddings = audio_embeddings[:100]
+    audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
     collate_input = []
     for transcript, audio_bytes, speaker_id, f0_path, audio_embedding in zip(
         transcripts, audio_bytes_list, speaker_ids, f0_paths, audio_embeddings
@@ -685,12 +683,21 @@ def ray_df_preprocessing(df):
 
 def get_ray_dataset():
 
+    # ctx = ray.data.context.DatasetContext.get_current()
+    # ctx.use_streaming_executor = True
     lj_df = pd.read_csv(
-        # '/usr/src/app/radtts/data/30_small_decoder.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_emb.txt',
         '/usr/src/app/radtts/data/30_decoder_pitch.txt',
+        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
+        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
         sep="|",
         header=None,
         quoting=3,
+        # names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
+        # names = ['path', 'transcript', 'speaker_id', 'f0_path']
         names = ['path', 'transcript', 'speaker_id', 'f0_path', 'emb_path']
     )
 
@@ -705,6 +712,7 @@ def get_ray_dataset():
     audio_ds = ray.data.read_binary_files(
         paths,
         parallelism=parallelism_length,
+        # ray_remote_args={"num_cpus": 0.2},
         ray_remote_args={"num_cpus": 1.},
     )
     audio_ds = audio_ds.map_batches(
@@ -735,7 +743,7 @@ def get_ray_dataset():
     embs_ds = ray.data.from_items(paths, parallelism=parallelism_length)
     embs_ds = embs_ds.map_batches(
         ResNetSpeakerEncoderCallable,
-        num_gpus=1.,
+        num_gpus=.2,
         compute="actors",
     )
 
@@ -916,8 +924,8 @@ def _train_step(
     with autocast(enabled= False):
 
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        # batch_dict = batch
-        batch_dict = collate_fn(batch)
+        batch_dict = batch
+        # batch_dict = collate_fn(batch)
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
         attn_prior = to_gpu(batch_dict['attn_prior'])
@@ -930,9 +938,6 @@ def _train_step(
         energy_avg = to_gpu(batch_dict['energy_avg'])
         audio_embedding = to_gpu(batch_dict['audio_embedding'])
 
-        print(mel.size(), text.size(), attn_prior.size(), f0.size(), energy_avg.size(), audio_embedding.size())
-        # import pdb
-        # pdb.set_trace()
         outputs = model(
                     mel, speaker_ids, text, in_lens, out_lens,
                     binarize_attention=binarize, attn_prior=attn_prior,
@@ -1000,17 +1005,17 @@ def _train_step(
 
 
 # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-    for batch_idx, ray_batch_df in enumerate(
-        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
-    ):
+def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+# def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    # for batch_idx, ray_batch_df in enumerate(
+    #     dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
+    # ):
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    # for batch in train_dataloader:
+    for batch in train_dataloader:
         _train_step(
-            ray_batch_df,
+            # ray_batch_df,
             # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-            # batch,
+            batch,
             model,
             optim,
             iteration,
@@ -1028,6 +1033,8 @@ def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scale
         
 
     return iteration 
+
+        
 
 
 def warmstart(checkpoint_path, model, include_layers=[],
@@ -1074,8 +1081,8 @@ def train_func(config: dict):
     start_epoch = 0
 
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    # train_dataloader = train.torch.prepare_data_loader(train_loader)
+    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     optim = RAdam(model.parameters(), config["learning_rate"],
                         weight_decay=config["weight_decay"])
@@ -1100,8 +1107,8 @@ def train_func(config: dict):
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        # iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        # iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
         
 def prepare_dataloaders(data_config, n_gpus, batch_size):
     # Get data, data loaders and collate function ready
@@ -1249,8 +1256,7 @@ if __name__ == "__main__":
     data_config = config['data_config']
 
     # NOTE (Sam): uncomment for ray dataset training
-    ray_dataset = get_ray_dataset()
-    ray_dataset.fully_executed()
+    # ray_dataset = get_ray_dataset()
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -1270,7 +1276,7 @@ if __name__ == "__main__":
             sync_config=SyncConfig()
         ),
         # NOTE (Sam): uncomment for ray dataset training
-        datasets={"train": ray_dataset},
+        # datasets={"train": ray_dataset},
     )
 
     result = trainer.fit()
