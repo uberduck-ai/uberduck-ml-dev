@@ -57,41 +57,45 @@ HIFI_GAN_CONFIG_PATH = '/usr/src/app/radtts/models/hifigan_22khz_config.json'
 HIFI_GAN_GENERATOR_PATH = '/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt'
 RESNET_SE_MODEL_PATH = '/usr/src/app/radtts/resnet_se.pth.tar'
 RESNET_SE_CONFIG_PATH = '/usr/src/app/radtts/resnet_se_config.json'
+RESNET_SE_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/resnet_se_config.json"
+RESNET_SE_MODEL_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/resnet_se.pth.tar"
 
 
 
+# class ResNetSpeakerEncoderCallable:
+#     def __init__(self):
+#         print('initializing resnet speaker encoder')
+#         # with open(RESNET_SE_CONFIG_PATH) as f:
+#         #     resnet_config =json.load(f)
+#         response = requests.get(RESNET_SE_CONFIG_URL)
+#         resnet_config = response.json()
+#         response = requests.get(RESNET_SE_MODEL_URL)
+        
+#         # state_dict = torch.load(RESNET_SE_MODEL_PATH)['model']
+#         state_dict = torch.load(BytesIO(response.content))['model']
+#         audio_config = dict(resnet_config["audio"])
+#         model_params = resnet_config["model_params"]
+#         if "model_name" in model_params:
+#             del model_params["model_name"]
 
+#         self.device = "cuda"
+#         self.model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
+#         self.model.load_state_dict(state_dict)
+#         self.model.eval()
+#         self.model.cuda()
 
-class ResNetSpeakerEncoderCallable:
-    def __init__(self):
-        print('initializing resnet speaker encoder')
-        with open(RESNET_SE_CONFIG_PATH) as f:
-            resnet_config =json.load(f)
-            
-        state_dict = torch.load(RESNET_SE_MODEL_PATH)['model']
-        audio_config = dict(resnet_config["audio"])
-        model_params = resnet_config["model_params"]
-        if "model_name" in model_params:
-            del model_params["model_name"]
+#     # NOTE (Sam): might have to accept bytes input for anyscale distributed data loading?
+#     def __call__(self, audiopaths):
 
-        self.device = "cuda"
-        self.model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
-        self.model.load_state_dict(state_dict)
-        self.model.eval()
-        self.model.cuda()
-
-    # NOTE (Sam): might have to accept bytes input for anyscale distributed data loading?
-    def __call__(self, audiopaths):
-
-        print('calling resnet speaker encoder')
-        for audiopath in audiopaths:
-            audio_data = read(audiopath)[1]
-            datum = torch.FloatTensor(audio_data).unsqueeze(-1).t().cuda()
-            emb = self.model(datum)
-            emb = emb.cpu().detach().numpy()
-            yield {
-                    "audio_embedding": emb
-                }
+#         print('calling resnet speaker encoder')
+#         for audiopath in audiopaths:
+#             audio_data = read(audiopath)[1]
+#             datum = torch.FloatTensor(audio_data).unsqueeze(-1).t().cuda()
+#             emb = self.model(datum)
+#             emb = emb.cpu().detach().numpy()
+#             yield {
+#                     "audio_embedding": emb
+#                 }
             
 class DataCollate():
     """ Zero-pads model inputs and targets given number of steps """
@@ -625,53 +629,45 @@ def ray_df_preprocessing(df):
     transcripts = df.transcript.tolist()
     audio_bytes_list = df.audio_bytes.tolist()
     speaker_ids = df.speaker_id.tolist()
-    paths = df.path.tolist()
-    f0_paths = df.f0_path.tolist()
-    audio_embeddings = df.audio_embedding.tolist()
-    # NOTE (Sam): I'm great at naming things.
-    shuffle_indices = np.load('/usr/src/app/radtts/30shuffle_sdfixed_indices.pt.npy')
+    emb_bytes_list = df.emb_bytes.tolist()
+    f0_bytes_list = df.f0_bytes.tolist()
+    attn_prior_bytes_list = df.attn_prior_bytes.tolist()
+    # shuffle_indices = np.load('/usr/src/app/radtts/30shuffle_sdfixed_indices.pt.npy')
+    # shuffle_indices = list(range(len(audio_embeddings)))
     # shuffle_indices = get_shuffle_indices(speaker_ids)
     # np.save('/usr/src/app/radtts/asdfasdfasdfasdfasdf.pt', shuffle_indices)
-    audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
+    # audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
     collate_input = []
-    for transcript, audio_bytes, speaker_id, f0_path, audio_embedding in zip(
-        transcripts, audio_bytes_list, speaker_ids, f0_paths, audio_embeddings
+    for transcript, audio_bytes, speaker_id, f0_bytes, emb_bytes, attn_prior_bytes in zip(
+        transcripts, audio_bytes_list, speaker_ids, f0_bytes_list, emb_bytes_list, attn_prior_bytes_list
     ):
-        # print(datetime.now(), 'start')
-        # Audio
-        # print(datetime.now(), 'pre wav read and norm')
+
         bio = BytesIO(audio_bytes)
         sr, wav_data = wavfile.read(bio)
         audio = torch.FloatTensor(wav_data)
         # TODO (Sam): fix this for anyscale training
         audio_norm = audio / (np.abs(audio).max() * 2)
-        # print(datetime.now(), 'pre text embed')
         text_sequence = get_text(transcript)
-        # print(datetime.now(), 'pre mel compute')
         mel = get_mel(audio_norm, data_config['max_wav_value'], stft)
         mel = torch.squeeze(mel, 0)
-        # print(datetime.now(), 'pre f0 load')
-        dikt = torch.load(f0_path)
-        f0 = dikt['f0']
-        p_voiced = dikt['p_voiced']
-        voiced_mask = dikt['voiced_mask']
-        # f0, voiced_mask, p_voiced = get_f0_pvoiced(
-        #     audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)   
+        f0_bio = BytesIO(f0_bytes)
+        dikt = torch.load(f0_bio)
+        f0 = dikt[0]
+        p_voiced = dikt[1]
+        voiced_mask = dikt[2]
         f0 = f0_normalize(f0, f0_min = data_config['f0_min'])
-        # print(datetime.now(), 'pre energy compute')
         energy_avg = get_energy_average(mel)
-        # print(datetime.now(), 'pre prior load')
-        prior_path = "{}_{}".format(text_sequence.shape[0], mel.shape[1])
-        prior_path = os.path.join('/usr/src/app/radtts/data_cache', prior_path)
-        prior_path += "_prior.pth"
-        attn_prior = torch.load(prior_path)
-        # attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
+        # prior_path = "{}_{}".format(text_sequence.shape[0], mel.shape[1])
+        # prior_path = os.path.join('/usr/src/app/radtts/data_cache', prior_path)
+        # prior_path += "_prior.pth"
+        prior_bio = BytesIO(attn_prior_bytes)
+        attn_prior = torch.load(prior_bio)
         speaker_id =  get_speaker_id(speaker_id)
-        # datum = torch.FloatTensor(audio_norm).unsqueeze(-1).t().cuda()
-        # audio_embedding = torch.load(emb_path)
+        emb_bio = BytesIO(emb_bytes)
+        audio_embedding = torch.load(emb_bio)
         audio_embedding = torch.FloatTensor(audio_embedding)
-        # audio_embeddings = audio_encoder(datum)
-        # audio_embeddings = None
+
+        # print(f0, '\n\n\n\n\n asdfasdf')
         # NOTE (Sam): might be faster to return dictionary arrays of batched inputs instead of list
         collate_input.append({'text_encoded': text_sequence, 'mel':mel, 'speaker_id':speaker_id, 'f0': f0, 'p_voiced' : p_voiced, 'voiced_mask': voiced_mask, 'energy_avg': energy_avg, 'attn_prior' : attn_prior, 'audiopath': None, 'audio_embedding': audio_embedding})
         # print(datetime.now(), 'end')
@@ -679,34 +675,19 @@ def ray_df_preprocessing(df):
     return collate_input
 
 
-            
 
-def get_ray_dataset():
+# def get_ray_dataset():
+def get_ray_dataset(path):
+    # print(path)
 
-    # ctx = ray.data.context.DatasetContext.get_current()
-    # ctx.use_streaming_executor = True
-    lj_df = pd.read_csv(
-        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full.txt',
-        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch.txt',
-        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_emb.txt',
-        '/usr/src/app/radtts/data/30_decoder_pitch.txt',
-        # '/usr/src/app/radtts/data/lj_data/LJSpeech-1.1/metadata_formatted_full_pitch_100.txt',
-        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/meta_full_s3.txt",
-        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/lj_for_upload/metadata_formatted_100_edited.txt",
-        sep="|",
-        header=None,
-        quoting=3,
-        # names=["path", "transcript", "speaker_id"], # pitch path is implicit - this should be changed
-        # names = ['path', 'transcript', 'speaker_id', 'f0_path']
-        names = ['path', 'transcript', 'speaker_id', 'f0_path', 'emb_path']
-    )
+    lj_df = pd.read_csv('/home/ray/default/100_dataset.csv', sep = '|', index_col = None, quoting = 3)
 
     paths = lj_df.path.tolist()
     transcripts = lj_df.transcript.tolist()
     speaker_ids = lj_df.speaker_id.tolist()
 
-    pitches = lj_df.f0_path.tolist()
-    emb_paths = lj_df.emb_path.tolist()
+    # pitches = lj_df.f0_path.tolist()
+    # emb_paths = lj_df.emb_path.tolist()
 
     parallelism_length = 400
     audio_ds = ray.data.read_binary_files(
@@ -730,29 +711,54 @@ def get_ray_dataset():
     speaker_ids_ds = speaker_ids_ds.map_batches(
         lambda x: x, batch_format="pyarrow", batch_size=None
     )
-    pitches_ds = ray.data.from_items(pitches, parallelism=parallelism_length)
-    pitches_ds = pitches_ds.map_batches(
-        lambda x: x, batch_format="pyarrow", batch_size=None
-    )
-
-    # embs_ds = ray.data.from_items(emb_paths, parallelism=parallelism_length)
-    # embs_ds = embs_ds.map_batches(
+    # pitches_ds = ray.data.from_items(pitches, parallelism=parallelism_length)
+    # pitches_ds = pitches_ds.map_batches(
     #     lambda x: x, batch_format="pyarrow", batch_size=None
     # )
 
-    embs_ds = ray.data.from_items(paths, parallelism=parallelism_length)
-    embs_ds = embs_ds.map_batches(
-        ResNetSpeakerEncoderCallable,
-        num_gpus=.2,
-        compute="actors",
+    prior_paths = lj_df.attention_prior_path.tolist()
+    prior_ds = ray.data.read_binary_files(
+        prior_paths,
+        parallelism=parallelism_length,
+        # ray_remote_args={"num_cpus": 0.2},
+        ray_remote_args={"num_cpus": 1.},
+    )
+    prior_ds = prior_ds.map_batches(
+        lambda x: x, batch_format="pyarrow", batch_size=None
+    )
+
+
+    pitch_paths = [f"{path.split('files/')[0]}files/{path.split('files/')[1].split('resampled_unnormalized.wav')[0]}f0.pt" for path in paths]
+    emb_paths = [f"{path.split('files/')[0]}files/{path.split('files/')[1].split('resampled_unnormalized.wav')[0]}coqui_resnet_512_emb.pt" for path in paths]
+
+    pitch_ds = ray.data.read_binary_files(
+        pitch_paths,
+        parallelism=parallelism_length,
+        # ray_remote_args={"num_cpus": 0.2},
+        ray_remote_args={"num_cpus": 1.},
+    )
+    emb_ds = ray.data.read_binary_files(
+        emb_paths,
+        parallelism=parallelism_length,
+        # ray_remote_args={"num_cpus": 0.2},
+        ray_remote_args={"num_cpus": 1.},
+    )
+
+    pitch_ds = pitch_ds.map_batches(
+        lambda x: x, batch_format="pyarrow", batch_size=None
+    )
+
+    emb_ds = emb_ds.map_batches(
+        lambda x: x, batch_format="pyarrow", batch_size=None
     )
 
     output_dataset = (
         transcripts_ds.zip(audio_ds)
         .zip(paths_ds)
         .zip(speaker_ids_ds)
-        .zip(pitches_ds)
-        .zip(embs_ds)
+        .zip(pitch_ds)
+        .zip(emb_ds)
+        .zip(prior_ds)
     )
     output_dataset = output_dataset.map_batches(
         lambda table: table.rename(
@@ -761,15 +767,15 @@ def get_ray_dataset():
                 "value_1": "audio_bytes",
                 "value_2": "path",
                 "value_3": "speaker_id",
-                "value_4": "f0_path",
-                "value_5": "emb_path",
+                "value_4": "f0_bytes",
+                "value_5": "emb_bytes",
+                "value_6": "attn_prior_bytes"
             }
         )
     )
 
     processed_dataset = output_dataset.map_batches(ray_df_preprocessing)
     return processed_dataset.fully_executed()
-    # return processed_dataset
 
 @torch.no_grad()
 def log(metrics, audios = {}):
@@ -799,6 +805,7 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
     energy_avg = to_gpu(batch_dict['energy_avg'])
     audio_embedding = to_gpu(batch_dict['audio_embedding'])
 
+    # print(f0, '\n\n\n\n asdfasdf')
     # NOTE (Sam): I don't think we can reuse the previous outputs since binarize_attention must be true
     outputs = model(
                 mel, speaker_ids, text, in_lens, out_lens,
@@ -997,10 +1004,18 @@ def _train_step(
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
 
-        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
-        save_checkpoint(model, optim, iteration,
-                                    checkpoint_path)
-    
+        # checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
+        # save_checkpoint(model, optim, iteration,
+        #                             checkpoint_path)
+        checkpoint = Checkpoint.from_dict(
+            dict(
+                epoch=epoch,
+                global_step=iteration,
+                state_dict=model.state_dict(),
+            )
+        )
+        session.report({}, checkpoint=checkpoint)
+
     print(f"Loss: {loss.item()}")
 
 
@@ -1145,20 +1160,22 @@ def parse_args(args):
     args = parser.parse_args(args)
     return args
 
+import requests
 def load_pretrained(model):
     # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
-    # bio = BytesIO(response.content)
-    loaded = torch.load(HIFI_GAN_GENERATOR_PATH)
+    response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
+    bio = BytesIO(response.content)
+    loaded = torch.load(bio)
+    # loaded = torch.load(HIFI_GAN_GENERATOR_PATH)
     model.load_state_dict(loaded['generator'])
 
 def get_vocoder():
     print("Getting vocoder")
     # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_CONFIG_URL)
-
-    with open(HIFI_GAN_CONFIG_PATH) as f:
-        hifigan_config = json.load(f)
+    response = requests.get(HIFI_GAN_CONFIG_URL)
+    hifigan_config = response.json()
+    # with open(HIFI_GAN_CONFIG_PATH) as f:
+    #     hifigan_config = json.load(f)
 
     h = AttrDict(hifigan_config)
     if 'gaussian_blur' in hifigan_config:
@@ -1205,15 +1222,15 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda = True):
 if __name__ == "__main__":
 
     args = parse_args(sys.argv[1:])
-    if args.config:
-        with open(args.config) as f:
-            config = json.load(f)
+    
+    with open(args.config) as f:
+        config = json.load(f)
 
     data_config = config['data_config']
     train_config = config['train_config']
     model_config = config['model_config']
     MAX_WAV_VALUE = data_config['max_wav_value']
-
+    filelist_path = data_config['training_filelist_path']
     # NOTE (Sam): we can use ray trainer with ray datasets or torch dataloader.  torch dataloader is a little faster for now.
     # See comments for optionality
 
@@ -1256,7 +1273,8 @@ if __name__ == "__main__":
     data_config = config['data_config']
 
     # NOTE (Sam): uncomment for ray dataset training
-    ray_dataset = get_ray_dataset()
+    # ray_dataset = get_ray_dataset()
+    ray_dataset = get_ray_dataset(filelist_path)
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -1267,13 +1285,13 @@ if __name__ == "__main__":
         train_loop_per_worker=train_func,
         train_loop_config=train_config,
         scaling_config=ScalingConfig(
-            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
+            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
             # num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=.8)
         ),
         run_config=RunConfig(
         # NOTE (Sam): uncomment for saving on anyscale
-            # sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
-            sync_config=SyncConfig()
+            sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
+            # sync_config=SyncConfig()
         ),
         # NOTE (Sam): uncomment for ray dataset training
         datasets={"train": ray_dataset},
