@@ -42,6 +42,7 @@ from ..utils.utils import *
 from .transforms import piecewise_rational_quadratic_transform
 from .components.partialconv1d import PartialConv1d as pconv1d
 
+
 class Conv1d(nn.Module):
     def __init__(
         self,
@@ -300,7 +301,7 @@ class MelSTFT:
             n_fft=filter_length,
             n_mels=n_mel_channels,
             fmin=mel_fmin,
-            fmax=mel_fmax
+            fmax=mel_fmax,
         )
         mel_basis = torch.from_numpy(mel_basis).float()
         if device == "cuda":

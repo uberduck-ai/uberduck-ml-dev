@@ -4,21 +4,22 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-# import modules
-# import attentions
-# import monotonic_align
-
 from torch.nn import Conv1d, ConvTranspose1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
 from uberduck_ml_dev.models import common
+from uberduck_ml_dev.models.components.attribute_prediction_model import (
+    get_attribute_prediction_model,
+)
 from uberduck_ml_dev.models.components.encoders.duration import (
     StochasticDurationPredictor,
     DurationPredictor,
 )
 from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
-    ResNetSpeakerEncoder, DEFAULT_AUDIO_CONFIG as RESNET_SE_AUDIO_CONFIG,
-    load_pretrained, get_pretrained_model,
+    ResNetSpeakerEncoder,
+    DEFAULT_AUDIO_CONFIG as RESNET_SE_AUDIO_CONFIG,
+    load_pretrained,
+    get_pretrained_model,
 )
 from uberduck_ml_dev.utils.utils import (
     init_weights,
@@ -29,6 +30,30 @@ from uberduck_ml_dev.utils.utils import (
 )
 from uberduck_ml_dev import monotonic_align
 from uberduck_ml_dev.models.attentions import VITSEncoder
+
+F0_MODEL_CONFIG = {
+    "name": "dap",
+    "hparams": {
+        # "n_speaker_dim": 16,
+        "n_speaker_dim": 512,
+        "bottleneck_hparams": {
+            # "in_dim": 512,
+            "in_dim": 192,
+            "reduction_factor": 16,
+            "norm": "weightnorm",
+            "non_linearity": "relu",
+        },
+        "take_log_of_input": False,
+        "use_transformer": False,
+        "arch_hparams": {
+            "out_dim": 1,
+            "n_layers": 2,
+            "n_channels": 256,
+            "kernel_size": 11,
+            "p_dropout": 0.5,
+        },
+    },
+}
 
 
 class TextEncoder(nn.Module):
@@ -398,6 +423,8 @@ class SynthesizerTrn(nn.Module):
         use_audio_embedding=False,
         gin_channels=0,
         use_sdp=True,
+        use_f0=False,
+        use_energy=False,
         **kwargs
     ):
         super().__init__()
@@ -422,7 +449,8 @@ class SynthesizerTrn(nn.Module):
         self.gin_channels = gin_channels
 
         self.use_sdp = use_sdp
-
+        self.use_f0 = use_f0
+        self.use_energy = use_energy
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -466,6 +494,9 @@ class SynthesizerTrn(nn.Module):
                 hidden_channels, 256, 3, 0.5, gin_channels=gin_channels
             )
 
+        if self.use_f0:
+            self.f0_predictor = get_attribute_prediction_model(F0_MODEL_CONFIG)
+
         # if n_speakers > 1:
         #     self.emb_g = nn.Embedding(n_speakers, gin_channels)
         if self.use_audio_embedding:
@@ -473,12 +504,21 @@ class SynthesizerTrn(nn.Module):
             for _param in self.emb_audio.parameters():
                 _param.requires_grad = False
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None, audio_embedding=None):
+    def forward(
+        self,
+        x,
+        x_lengths,
+        y,
+        y_lengths,
+        sid=None,
+        audio_embedding=None,
+        f0=None,
+        voiced_mask=None,
+    ):
+        if self.use_f0:
+            assert f0 is not None
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
-        # if self.n_speakers > 0:
-        #     g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         if self.use_audio_embedding:
-            # g = self.emb_audio(x).unsqueeze(-1)
             g = audio_embedding.unsqueeze(-1)
         else:
             g = None
@@ -517,6 +557,16 @@ class SynthesizerTrn(nn.Module):
         m_p = torch.einsum("klmn, kjm -> kjn", [attn, m_p])
         logs_p = torch.einsum("klmn, kjm -> kjn", [attn, logs_p])
 
+        # F0
+        if self.use_f0:
+            x_expanded = torch.bmm(x, attn.squeeze(1))  # .transpose(1, 2))
+            # NOTE(zach): Taken from RadTTS. scale to ~[0, 1] in log space.
+            f0[voiced_mask.bool()] = torch.log(f0[voiced_mask.bool()])
+            f0 = f0 / 6
+            f0_model_outputs = self.f0_predictor(
+                x_expanded, g.squeeze(2), f0, y_lengths
+            )
+
         z_slice, ids_slice = rand_slice_segments(z, y_lengths, self.segment_size)
         o = self.dec(z_slice, g=g)
         return (
@@ -527,6 +577,9 @@ class SynthesizerTrn(nn.Module):
             x_mask,
             y_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
+            {
+                "f0_model_outputs": f0_model_outputs if self.use_f0 else None,
+            },
         )
 
     def infer(

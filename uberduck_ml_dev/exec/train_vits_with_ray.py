@@ -46,6 +46,7 @@ from uberduck_ml_dev.utils.utils import (
     clip_grad_value_,
 )
 from uberduck_ml_dev.losses import (
+    AttributePredictionLoss,
     discriminator_loss,
     generator_loss,
     kl_loss,
@@ -54,7 +55,9 @@ from uberduck_ml_dev.losses import (
 
 
 def _fix_state_dict(sd):
-    return {k[7:]: v for k, v in sd.items()}
+    # For each key, if the key starts with "module.", remove it. Make sure you
+    # only remove that string when it appears at the beginning of the key.
+    return {k.replace("module.", ""): v for k, v in sd.items()}
 
 
 def _load_checkpoint_dict():
@@ -85,6 +88,7 @@ class TextAudioCollate:
         max_text_len = max([len(x[0]) for x in batch])
         max_spec_len = max([x[1].size(1) for x in batch])
         max_wav_len = max([x[2].size(1) for x in batch])
+        max_f0_len = max([x[4].size(0) for x in batch])
 
         text_lengths = torch.LongTensor(len(batch))
         spec_lengths = torch.LongTensor(len(batch))
@@ -94,6 +98,8 @@ class TextAudioCollate:
         spec_padded = torch.FloatTensor(len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
         audio_embs = torch.FloatTensor(len(batch), 512)
+        f0s = torch.zeros(len(batch), max_spec_len, dtype=torch.float32)
+        voiced_masks = torch.zeros(len(batch), max_spec_len, dtype=torch.float32)
         text_padded.zero_()
         spec_padded.zero_()
         wav_padded.zero_()
@@ -115,16 +121,17 @@ class TextAudioCollate:
             audio_emb = row[3]
             audio_embs[i, :] = audio_emb
 
-        if self.return_ids:
-            return (
-                text_padded,
-                text_lengths,
-                spec_padded,
-                spec_lengths,
-                wav_padded,
-                wav_lengths,
-                ids_sorted_decreasing,
-            )
+            f0 = row[4]
+            voiced_mask = row[5]
+            # NOTE(zach): there can be off by one errors between the spec and f0.
+            assert f0.size(0) - max_spec_len <= 1
+            f0s[i, : min(f0.size(0), max_spec_len)] = f0[
+                : min(f0.size(0), max_spec_len)
+            ]
+            voiced_masks[i, : min(f0.size(0), max_spec_len)] = voiced_mask[
+                : min(f0.size(0), max_spec_len)
+            ]
+
         return (
             text_padded,
             text_lengths,
@@ -133,12 +140,15 @@ class TextAudioCollate:
             wav_padded,
             wav_lengths,
             F.normalize(audio_embs),
+            f0s,
+            voiced_masks,
         )
 
 
 MODEL_CONFIG = {
     "inter_channels": 192,
-    "hidden_channels": 192,
+    # "hidden_channels": 384,
+    # "hidden_channels": 192,
     "filter_channels": 768,
     "n_heads": 2,
     "n_layers": 6,
@@ -225,11 +235,15 @@ def ray_df_to_batch(df, intersperse_blank=True):
         emb_bytes_list = df.emb_path.tolist()
     else:
         emb_bytes_list = [None for _ in transcripts]
+    if hasattr(df, "f0_path"):
+        f0_list = df.f0_path.tolist()
+    else:
+        f0_list = [None for _ in transcripts]
 
     collate_fn = TextAudioCollate()
     collate_input = []
-    for transcript, audio_bytes, emb_bytes in zip(
-        transcripts, audio_bytes_list, emb_bytes_list
+    for transcript, audio_bytes, emb_bytes, f0_bytes in zip(
+        transcripts, audio_bytes_list, emb_bytes_list, f0_list
     ):
         # Audio
         bio = BytesIO(audio_bytes)
@@ -256,26 +270,36 @@ def ray_df_to_batch(df, intersperse_blank=True):
         else:
             bio = BytesIO(emb_bytes)
             audio_emb = torch.load(bio)
+        # F0
+        if f0_bytes is None:
+            f0, voiced_mask = None, None
+        else:
+            bio = BytesIO(f0_bytes)
+            # NOTE(zach): The f0s are stored as (f0, voiced_mask, voiced_probs),
+            # which is the output of librosa.pyin.
+            f0, voiced_mask, *_ = torch.load(bio)
 
-        collate_input.append((text_sequence, spec, audio_norm, audio_emb))
+        collate_input.append(
+            (text_sequence, spec, audio_norm, audio_emb, f0, voiced_mask)
+        )
     return collate_fn(collate_input)
 
 
-def get_ray_dataset_with_embedding():
+def get_ray_dataset_with_embedding(use_f0=False):
+    columns = ["path", "speaker_id", "transcript", "dataset_audio_file_id", "emb_path"]
+    if use_f0:
+        columns.append("f0_path")
+
     lj_df = pd.read_csv(
-        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/vctk_mic1/all_with_embs.txt",
-        # "https://uberduck-datasets-dirty.s3.amazonaws.com/vctk-plus-va/list-with-emb-2023-03-06.txt",
-        # "https://uberduck-datasets-dirty.s3.us-west-2.amazonaws.com/yourtts/vctk-libritts-va-rapper-2023-03-08-with-embs.txt",
-        # NOTE(zach): this is the one with the 1000 speakers from libritts and vctk.
-        # "https://uberduck-datasets-dirty.s3.amazonaws.com/vctk-va-libritts/list-2023-03-13.txt",
-        # NOTE(zach): Just uberduck rappers.
-        # "https://uberduck-datasets-dirty.s3.amazonaws.com/yourtts-replication/rappers-with-embs-2023-03-15.txt",
         # NOTE(zach): vctk + libritts + rappers + va + synergy
-        "https://uberduck-datasets-dirty.s3.amazonaws.com/yourtts-replication/vctk-libritts-va-rapper-synergyx-2023-03-16-with-emb.txt",
+        # "https://uberduck-datasets-dirty.s3.amazonaws.com/yourtts-replication/vctk-libritts-va-rapper-synergyx-2023-03-16-with-emb.txt",
+        # NOTE(zach): va + rappers + synergy
+        # "https://uberduck-datasets-dirty.s3.amazonaws.com/yourtts-replication/va-rappers-synergyx-2023-03-22-with-emb.txt",
+        "https://uberduck-datasets-dirty.s3.amazonaws.com/yeezy-2023-03-23-with-emb-and-f0.txt",
         sep="|",
         header=None,
         quoting=3,
-        names=["path", "speaker_id", "transcript", "dataset_audio_file_id", "emb_path"],
+        names=columns,
     )
     # lj_df = lj_df.head(1000)
     paths = lj_df.path.tolist()
@@ -283,13 +307,10 @@ def get_ray_dataset_with_embedding():
     dataset_audio_files = lj_df.dataset_audio_file_id.tolist()
     emb_paths = lj_df.emb_path.tolist()
 
-    parallelism_length = 500
+    parallelism_length = 250
     audio_ds = ray.data.read_binary_files(
         paths,
         parallelism=parallelism_length,
-        # meta_provider=FastFileMetadataProvider(),
-        # NOTE(zach): my hypothesis is that settings this too low causes aws timeouts.
-        # ray_remote_args={"num_cpus": 0.1},
     )
     transcripts_ds = ray.data.from_items(transcripts, parallelism=parallelism_length)
     dataset_audio_file_ids = ray.data.from_items(
@@ -299,8 +320,6 @@ def get_ray_dataset_with_embedding():
     emb_paths_ds = ray.data.read_binary_files(
         emb_paths,
         parallelism=parallelism_length,
-        # meta_provider=FastFileMetadataProvider(),
-        # ray_remote_args={"num_cpus": 0.1},
     )
 
     audio_ds = audio_ds.map_batches(
@@ -323,15 +342,31 @@ def get_ray_dataset_with_embedding():
         .zip(paths_ds)
         .zip(emb_paths_ds)
     )
+    if use_f0:
+        f0_paths = lj_df.f0_path.tolist()
+        f0_paths_ds = ray.data.read_binary_files(
+            f0_paths,
+            parallelism=parallelism_length,
+        )
+        f0_paths_ds = f0_paths_ds.map_batches(
+            lambda x: x, batch_format="pyarrow", batch_size=None
+        )
+        output_dataset = output_dataset.zip(f0_paths_ds)
+        extra_renames = {"value_5": "f0_path"}
+    else:
+        extra_renames = {}
     output_dataset = output_dataset.map_batches(
         lambda table: table.rename(
-            columns={
-                "value": "transcript",
-                "value_1": "audio_bytes",
-                "value_2": "dataset_audio_file_id",
-                "value_3": "path",
-                "value_4": "emb_path",
-            }
+            columns=dict(
+                {
+                    "value": "transcript",
+                    "value_1": "audio_bytes",
+                    "value_2": "dataset_audio_file_id",
+                    "value_3": "path",
+                    "value_4": "emb_path",
+                },
+                **extra_renames,
+            )
         )
     )
 
@@ -371,16 +406,31 @@ def _train_step(
     scheduler_g,
     scheduler_d,
     intersperse_blank,
+    extra_losses={},
 ):
     optim_d.zero_grad()
     optim_g.zero_grad()
-    # Transform ray_batch_df to (x, x_lengths, spec, spec_lengths, y, y_lengths)
     with autocast():
-        (x, x_lengths, spec, spec_lengths, y, y_lengths, audio_embs) = [
-            to_gpu(el) for el in ray_df_to_batch(batch, intersperse_blank)
-        ]
+        (
+            x,
+            x_lengths,
+            spec,
+            spec_lengths,
+            y,
+            y_lengths,
+            audio_embs,
+            f0,
+            voiced_mask,
+        ) = [to_gpu(el) for el in ray_df_to_batch(batch, intersperse_blank)]
+        # Generator forward
         generator_output = generator(
-            x, x_lengths, spec, spec_lengths, audio_embedding=audio_embs
+            x,
+            x_lengths,
+            spec,
+            spec_lengths,
+            audio_embedding=audio_embs,
+            f0=f0,
+            voiced_mask=voiced_mask,
         )
         (
             y_hat,
@@ -390,6 +440,7 @@ def _train_step(
             x_mask,
             z_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
+            attribute_predictor_output,
         ) = generator_output
 
         mel = spec_to_mel_torch(spec)
@@ -401,11 +452,12 @@ def _train_step(
 
         y = slice_segments(y, ids_slice * hop_length, segment_size)
 
+        # Discriminator forward
         discriminator_output = discriminator(y, y_hat.detach())
         y_d_hat_r, y_d_hat_g, _, _ = discriminator_output
 
         with autocast(enabled=False):
-            # Generator step
+            # Discriminator step
             loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
                 y_d_hat_r, y_d_hat_g
             )
@@ -418,15 +470,22 @@ def _train_step(
     scheduler_d.step()
 
     with autocast():
-        # Discriminator step
+        # Generator step
         y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(y, y_hat)
         with autocast(enabled=False):
             loss_dur = torch.sum(l_length.float())
+            # NOTE(zach): called reconstruction loss in the vits paper.
             loss_mel = F.l1_loss(y_mel, y_hat_mel) * TRAIN_CONFIG["c_mel"]
             loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * TRAIN_CONFIG["c_kl"]
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, losses_gen = generator_loss(y_d_hat_g)
-            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
+            if generator.use_f0:
+                f0_output = attribute_predictor_output["f0_model_outputs"]
+                f0_criterion = extra_losses["f0"]
+                f0_loss = f0_criterion(f0_output, spec_lengths)["loss_f0"][0]
+            else:
+                f0_loss = 0
+            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + f0_loss
     optim_g.zero_grad()
     scaler.scale(loss_gen_all).backward()
     scaler.unscale_(optim_g)
@@ -445,6 +504,7 @@ def _train_step(
             "loss_fm": loss_fm.item(),
             "loss_dur": loss_dur.item(),
             "loss_kl": loss_kl.item(),
+            "loss_f0": f0_loss.item(),
             "lr_g": scheduler_g.get_last_lr()[0],
             "lr_d": scheduler_d.get_last_lr()[0],
         },
@@ -467,7 +527,8 @@ def _train_step(
 def train_func(config: dict):
     setup_wandb(
         config,
-        project="yourtts-replication",
+        # project="yourtts-replication",
+        project="zach-debuggin",
         entity="uberduck-ai",
         rank_zero_only=True,
     )
@@ -478,13 +539,16 @@ def train_func(config: dict):
     use_audio_embedding = (config["use_audio_embedding"],)
     gin_channels = config["gin_channels"]
     intersperse_blank = config["intersperse_blank"]
+    use_f0 = config["use_f0"]
     generator = SynthesizerTrn(
         n_vocab=len(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS]),
         spec_channels=DATA_CONFIG["filter_length"] // 2 + 1,
         segment_size=TRAIN_CONFIG["segment_size"] // DATA_CONFIG["hop_length"],
         **MODEL_CONFIG,
+        hidden_channels=config["hidden_channels"],
         use_audio_embedding=use_audio_embedding,
         gin_channels=gin_channels,
+        use_f0=use_f0,
     )
     generator = train.torch.prepare_model(generator)
     discriminator = MultiPeriodDiscriminator(MODEL_CONFIG["use_spectral_norm"])
@@ -517,6 +581,16 @@ def train_func(config: dict):
                         for k, v in generator.module.emb_audio.state_dict().items()
                     }
                     generator_sd.update(emb_state_dict)
+            # NOTE(zach): Testing changing layer sizes.
+            keys_to_delete = []
+            new_generator_sd = generator.state_dict()
+            for k, v in generator_sd.items():
+                if v.shape != new_generator_sd[k].shape:
+                    keys_to_delete.append(k)
+
+            for k in keys_to_delete:
+                del generator_sd[k]
+
             # NOTE(zach): Pass strict=False due to different nuber of gin_channels
             generator.load_state_dict(generator_sd, strict=False)
             # If discriminator_sd does not have module. prefix, add it.
@@ -570,6 +644,9 @@ def train_func(config: dict):
     dataset_shard = session.get_dataset_shard("train")
     global_step = 0
     scaler = GradScaler()
+    f0_criterion = AttributePredictionLoss(
+        "f0", {"name": "vits", "hparams": dict()}, loss_weight=1.0
+    )
     for epoch in range(start_epoch, start_epoch + epochs):
         for batch_idx, ray_batch_df in enumerate(
             dataset_shard.iter_batches(batch_size=batch_size)
@@ -591,6 +668,7 @@ def train_func(config: dict):
                 scheduler_g,
                 scheduler_d,
                 intersperse_blank,
+                extra_losses={"f0": f0_criterion},
             )
             global_step += 1
             total_files_seen += batch_size * session.get_world_size()
@@ -626,29 +704,36 @@ class TorchCheckpointFixed(TorchCheckpoint):
 if __name__ == "__main__":
     print("Loading dataset")
     # ray_dataset = get_ray_dataset()
-    ray_dataset = get_ray_dataset_with_embedding()
+    use_f0 = True
+    ray_dataset = get_ray_dataset_with_embedding(use_f0=use_f0)
     # NOTE(zach): This is an LJSpeech checkpoint
     # checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-02-17_17-49-00/TorchTrainer_6a5ed_00000_0_2023-02-17_17-52-52/checkpoint_000598/"
     # NOTE(zach): This is VCTK + VA, the latest checkpoint before the job died.
     # checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-03-06_10-16-53/TorchTrainer_12bb4_00000_0_2023-03-06_10-18-03/checkpoint_000338/"
     # checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-03-13_11-26-04/TorchTrainer_8405d_00000_0_2023-03-13_11-27-19/checkpoint_000345/"
     # checkpoint = Checkpoint.from_uri(checkpoint_uri)
-    checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-03-13_20-28-33/TorchTrainer_4c425_00000_0_2023-03-13_20-28-33/checkpoint_000431/"
+    # checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-03-13_20-28-33/TorchTrainer_4c425_00000_0_2023-03-13_20-28-33/checkpoint_000431/"
+    checkpoint_uri = "s3://uberduck-anyscale-data/checkpoints/TorchTrainer_2023-03-16_14-42-51/TorchTrainer_80f1b_00000_0_2023-03-16_14-42-52/checkpoint_000529/"
     checkpoint = TorchCheckpointFixed.from_uri(checkpoint_uri)
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config={
             "epochs": 300,
+            # "batch_size": 12,
             "batch_size": 24,
             "steps_per_sample": 200,
             "use_audio_embedding": True,
             # NOTE(zach): Set this to 0 if use_audio_embedding is False.
             "gin_channels": 512,
+            # NOTE(zach): doubled from the original 192.
+            # "hidden_channels": 384,
+            "hidden_channels": 192,
             # NOTE(zach): whether to add a blank token in between characters.
             "intersperse_blank": True,
+            "use_f0": True,
         },
         scaling_config=ScalingConfig(
-            num_workers=10, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=1, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
         ),
         run_config=RunConfig(
             sync_config=SyncConfig(
@@ -659,6 +744,7 @@ if __name__ == "__main__":
             ),
         ),
         datasets={"train": ray_dataset},
+        # NOTE(zach): uncomment to resume from checkpoint.
         resume_from_checkpoint=checkpoint,
     )
     print("Starting trainer")
