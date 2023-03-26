@@ -34,7 +34,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader
 from ray.train.torch import TorchTrainer, TorchCheckpoint, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
-from TTS.encoder.models.resnet import ResNetSpeakerEncoder
+# from TTS.encoder.models.resnet import ResNetSpeakerEncoder
 from librosa import pyin
 
 from uberduck_ml_dev.models.radtts import RADTTS
@@ -680,8 +680,8 @@ def ray_df_preprocessing(df):
 def get_ray_dataset(path):
     # print(path)
 
-    lj_df = pd.read_csv('/home/ray/default/100_dataset.csv', sep = '|', index_col = None, quoting = 3)
-
+    # lj_df = pd.read_csv('/home/ray/default/100_dataset.csv', sep = '|', index_col = None, quoting = 3)
+    lj_df = pd.read_csv('./full_dataset.csv', sep = '|', index_col = None, quoting = 3)
     paths = lj_df.path.tolist()
     transcripts = lj_df.transcript.tolist()
     speaker_ids = lj_df.speaker_id.tolist()
@@ -1003,18 +1003,20 @@ def _train_step(
 
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
-
-        # checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
-        # save_checkpoint(model, optim, iteration,
-        #                             checkpoint_path)
-        checkpoint = Checkpoint.from_dict(
-            dict(
-                epoch=epoch,
-                global_step=iteration,
-                state_dict=model.state_dict(),
-            )
-        )
-        session.report({}, checkpoint=checkpoint)
+        # pass
+        checkpoint_path = f'/mnt/shared_storage/radtts_decoder_checkpoint_{iteration}.pt'
+        # model.cpu()
+        save_checkpoint(model, optim, iteration,
+                                    checkpoint_path)
+        # model.cuda()
+        # checkpoint = Checkpoint.from_dict(
+        #     dict(
+        #         epoch=epoch,
+        #         global_step=iteration,
+        #         state_dict=model.state_dict(),
+        #     )
+        # )
+        # session.report({}, checkpoint=checkpoint)
 
     print(f"Loss: {loss.item()}")
 
@@ -1285,7 +1287,7 @@ if __name__ == "__main__":
         train_loop_per_worker=train_func,
         train_loop_config=train_config,
         scaling_config=ScalingConfig(
-            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=1)
+            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
             # num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=.8)
         ),
         run_config=RunConfig(
