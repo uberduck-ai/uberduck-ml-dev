@@ -430,70 +430,46 @@ class Data(torch.utils.data.Dataset):
         return attn_prior
 
     def __getitem__(self, index):
+        my_path = '/usr/src/app/radtts/data/big_data'
+        
         data = self.data[index]
-        audiopath, text = data['audiopath'], data['text']
+        audiopath_s3, text = data['audiopath'], data['text']
+        rel_path_folder = audiopath_s3.split('uberduck-audio-files/')[1].split('/resampled_unnormalized.wav')[0]
+        sub_path = os.path.join(my_path,rel_path_folder)
+        audiopath = f"{sub_path}/resampled_unnormalized.wav"              
+        audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
+        f0_path = f"{sub_path}/f0.pt"
+        mel_path = f"{sub_path}/spectrogram.pt"
+        
         speaker_id = data['speaker']
+        # audio_emb_path = data['audio_emb_path']
+        # f0_path = data['f0_path']
+        # mel_path = data['mel_path']
+        f0, voiced_mask, p_voiced = torch.load(f0_path)
+        f0 = self.f0_normalize(f0)
+        if self.distance_tx_unvoiced:
+            mask = f0 <= 0.0
+            distance_map = np.log(distance_transform(mask))
+            distance_map[distance_map <= 0] = 0.0
+            f0 = f0 - distance_map
 
-        if data['lmdb_key'] is not None:
-            data_dict = pkl.loads(
-                self.audio_lmdb_dict[data['lmdb_key']].get(
-                    audiopath.encode('ascii')))
-            audio = data_dict['audio']
-            sampling_rate = data_dict['sampling_rate']
-        else:
-            audio, sampling_rate = load_wav_to_torch(audiopath)
 
-        if sampling_rate != self.sampling_rate:
-            raise ValueError("{} SR doesn't match target {} SR".format(
-                sampling_rate, self.sampling_rate))
+        # if data['lmdb_key'] is not None:
+        #     data_dict = pkl.loads(
+        #         self.audio_lmdb_dict[data['lmdb_key']].get(
+        #             audiopath.encode('ascii')))
+        #     audio = data_dict['audio']
+        #     sampling_rate = data_dict['sampling_rate']
+        # else:
+        #     audio, sampling_rate = load_wav_to_torch(audiopath)
 
-        mel = self.get_mel(audio)
-        f0 = None
-        p_voiced = None
-        voiced_mask = None
-        if self.use_f0:
-            filename = '_'.join(audiopath.split('/')[-4:])
-            f0_path = os.path.join(self.betabinom_cache_path, filename)
-            f0_path += "_f0_sr{}_fl{}_hl{}_f0min{}_f0max{}_log{}.pt".format(
-                self.sampling_rate, self.filter_length, self.hop_length,
-                self.f0_min, self.f0_max, self.use_log_f0)
+        # if sampling_rate != self.sampling_rate:
+        #     raise ValueError("{} SR doesn't match target {} SR".format(
+        #         sampling_rate, self.sampling_rate))
 
-            dikt = None
-            if len(self.lmdb_cache_path) > 0:
-                dikt = pkl.loads(
-                    self.cache_data_lmdb.get(f0_path.encode('ascii')))
-                f0 = dikt['f0']
-                p_voiced = dikt['p_voiced']
-                voiced_mask = dikt['voiced_mask']
-            elif os.path.exists(f0_path):
-                try:
-                    dikt = torch.load(f0_path)
-                except:
-                    print(f"f0 loading from {f0_path} is broken, recomputing.")
-
-            if dikt is not None:
-                f0 = dikt['f0']
-                p_voiced = dikt['p_voiced']
-                voiced_mask = dikt['voiced_mask']
-            else:
-                f0, voiced_mask, p_voiced = self.get_f0_pvoiced(
-                    audio.cpu().numpy(), self.sampling_rate,
-                    self.filter_length, self.hop_length, self.f0_min,
-                    self.f0_max)
-                print(audio.cpu().numpy().max(), f0.max(), "saving f0 to {}".format(f0_path))
-                torch.save({'f0': f0,
-                            'voiced_mask': voiced_mask,
-                            'p_voiced': p_voiced}, f0_path)
-            if f0 is None:
-                raise Exception("STOP, BROKEN F0 {}".format(audiopath))
-
-            f0 = self.f0_normalize(f0)
-            if self.distance_tx_unvoiced:
-                mask = f0 <= 0.0
-                distance_map = np.log(distance_transform(mask))
-                distance_map[distance_map <= 0] = 0.0
-                f0 = f0 - distance_map
-
+        # mel = self.get_mel(audio)
+        mel = torch.load(mel_path)
+        
         energy_avg = None
         if self.use_energy_avg:
             energy_avg = self.get_energy_average(mel)
@@ -502,13 +478,13 @@ class Data(torch.utils.data.Dataset):
 
         speaker_id = self.get_speaker_id(speaker_id)
         text_encoded = self.get_text(text)
-
         attn_prior = self.get_attention_prior(
                 text_encoded.shape[0], mel.shape[1])
 
         if not self.use_attn_prior_masking:
             attn_prior = None
 
+        audio_emb = torch.load(audio_emb_path)
         return {'mel': mel,
                 'speaker_id': speaker_id,
                 'text_encoded': text_encoded,
@@ -518,29 +494,12 @@ class Data(torch.utils.data.Dataset):
                 'p_voiced': p_voiced,
                 'voiced_mask': voiced_mask,
                 'energy_avg': energy_avg,
+                'audio_embedding': audio_emb
                 }
 
     def __len__(self):
         return len(self.data)
 
-
-def get_f0_pvoiced(audio, sampling_rate=22050, frame_length=1024,
-                    hop_length=256, f0_min=100, f0_max=300):
-
-    # NOTE (Sam): is this normalization kosher?
-    audio_norm = audio / MAX_WAV_VALUE
-    f0, voiced_mask, p_voiced = pyin(
-        y = audio_norm, fmin = f0_min, fmax = f0_max, sr = sampling_rate,
-        frame_length=frame_length, win_length=frame_length // 2,
-        hop_length=hop_length)
-    f0[~voiced_mask] = 0.0
-    f0 = torch.FloatTensor(f0)
-    p_voiced = torch.FloatTensor(p_voiced)
-    voiced_mask = torch.FloatTensor(voiced_mask)
-    return f0, voiced_mask, p_voiced
-
-
-    
 
 def energy_avg_normalize(x):
     use_scaled_energy = True
@@ -916,8 +875,8 @@ def _train_step(
     with autocast(enabled= False):
 
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        # batch_dict = batch
-        batch_dict = collate_fn(batch)
+        batch_dict = batch
+        # batch_dict = collate_fn(batch)
         mel = to_gpu(batch_dict['mel'])
         speaker_ids = to_gpu(batch_dict['speaker_ids'])
         attn_prior = to_gpu(batch_dict['attn_prior'])
@@ -1000,17 +959,17 @@ def _train_step(
 
 
 # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-# def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
-    for batch_idx, ray_batch_df in enumerate(
-        dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
-    ):
+def train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+# def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
+    # for batch_idx, ray_batch_df in enumerate(
+    #     dataset_shard.iter_batches(batch_size=batch_size, prefetch_blocks=6)
+    # ):
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    # for batch in train_dataloader:
+    for batch in train_dataloader:
         _train_step(
-            ray_batch_df,
+            # ray_batch_df,
             # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-            # batch,
+            batch,
             model,
             optim,
             iteration,
@@ -1074,8 +1033,8 @@ def train_func(config: dict):
     start_epoch = 0
 
     # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-    # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    # train_dataloader = train.torch.prepare_data_loader(train_loader)
+    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     optim = RAdam(model.parameters(), config["learning_rate"],
                         weight_decay=config["weight_decay"])
@@ -1100,8 +1059,8 @@ def train_func(config: dict):
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        # iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
+        # iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
         
 def prepare_dataloaders(data_config, n_gpus, batch_size):
     # Get data, data loaders and collate function ready
@@ -1249,8 +1208,8 @@ if __name__ == "__main__":
     data_config = config['data_config']
 
     # NOTE (Sam): uncomment for ray dataset training
-    ray_dataset = get_ray_dataset()
-    ray_dataset.fully_executed()
+    # ray_dataset = get_ray_dataset()
+    # ray_dataset.fully_executed()
     train_config['n_group_size'] = model_config['n_group_size']
     train_config['dur_model_config'] = model_config['dur_model_config']
     train_config['f0_model_config'] = model_config['f0_model_config']
@@ -1270,7 +1229,7 @@ if __name__ == "__main__":
             sync_config=SyncConfig()
         ),
         # NOTE (Sam): uncomment for ray dataset training
-        datasets={"train": ray_dataset},
+        # datasets={"train": ray_dataset},
     )
 
     result = trainer.fit()
