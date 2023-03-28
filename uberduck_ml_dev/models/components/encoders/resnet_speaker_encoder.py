@@ -37,7 +37,7 @@ DEFAULT_AUDIO_CONFIG = {
 }
 
 
-def get_pretrained_model(config_url=None):
+def get_pretrained_model(config_url=None, model_url=None):
     print("Getting model config...")
     if config_url is None:
         config_url = os.environ["RESNET_SE_CONFIG_URL"]
@@ -50,7 +50,7 @@ def get_pretrained_model(config_url=None):
     audio_config["sample_rate"] = 22050
     model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
     print("Loading pretrained model...")
-    load_pretrained(model)
+    load_pretrained(model, model_url=model_url)
     print("Got pretrained model...")
     model.eval()
     return model
