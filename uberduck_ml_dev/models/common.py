@@ -719,6 +719,8 @@ class WN(torch.nn.Module):
                 local_conditioning_channels, 2 * hidden_channels * n_layers, 1
             )
             self.local_cond_layer = weight_norm(local_cond_layer, name="weight")
+        else:
+            self.local_cond_layer = None
 
         for i in range(n_layers):
             dilation = dilation_rate**i
@@ -749,7 +751,7 @@ class WN(torch.nn.Module):
 
         if g is not None:
             g = self.cond_layer(g)
-        if local_conditioning is not None:
+        if local_conditioning is not None and self.local_cond_layer is not None:
             l = self.local_cond_layer(local_conditioning)
 
         for i in range(self.n_layers):
@@ -779,7 +781,7 @@ class WN(torch.nn.Module):
     def remove_weight_norm(self):
         if self.gin_channels != 0:
             remove_weight_norm(self.cond_layer)
-        if self.local_conditioning_channels != 0:
+        if self.local_conditioning_channels != 0 and self.local_cond_layer is not None:
             remove_weight_norm(self.local_cond_layer)
         for l in self.in_layers:
             remove_weight_norm(l)

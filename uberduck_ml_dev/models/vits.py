@@ -54,6 +54,29 @@ F0_MODEL_CONFIG = {
         },
     },
 }
+ENERGY_MODEL_CONFIG = {
+    "name": "dap",
+    "hparams": {
+        # "n_speaker_dim": 16,
+        "n_speaker_dim": 512,
+        "bottleneck_hparams": {
+            # "in_dim": 512,
+            "in_dim": 192,
+            "reduction_factor": 16,
+            "norm": "weightnorm",
+            "non_linearity": "relu",
+        },
+        "take_log_of_input": False,
+        "use_transformer": False,
+        "arch_hparams": {
+            "out_dim": 1,
+            "n_layers": 2,
+            "n_channels": 256,
+            "kernel_size": 3,
+            "p_dropout": 0.25,
+        },
+    },
+}
 
 
 class TextEncoder(nn.Module):
@@ -522,6 +545,8 @@ class SynthesizerTrn(nn.Module):
 
         if self.use_f0:
             self.f0_predictor = get_attribute_prediction_model(F0_MODEL_CONFIG)
+        if self.use_energy:
+            self.energy_predictor = get_attribute_prediction_model(ENERGY_MODEL_CONFIG)
 
         # if n_speakers > 1:
         #     self.emb_g = nn.Embedding(n_speakers, gin_channels)
@@ -540,11 +565,14 @@ class SynthesizerTrn(nn.Module):
         audio_embedding=None,
         f0=None,
         voiced_mask=None,
+        energy=None,
     ):
         if self.use_f0:
             assert f0 is not None
             f0[voiced_mask.bool()] = torch.log(f0[voiced_mask.bool()])
             f0 = f0 / 6
+        if self.use_energy:
+            assert energy is not None
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.use_audio_embedding:
             g = audio_embedding.unsqueeze(-1)
@@ -594,6 +622,11 @@ class SynthesizerTrn(nn.Module):
             f0_model_outputs = self.f0_predictor(
                 x_expanded, g.squeeze(2), f0, y_lengths
             )
+        # Energy
+        if self.use_energy:
+            energy_model_outputs = self.energy_predictor(
+                x_expanded, g.squeeze(2), y_lengths
+            )
 
         z_slice, ids_slice = rand_slice_segments(z, y_lengths, self.segment_size)
         o = self.dec(z_slice, g=g)
@@ -607,6 +640,9 @@ class SynthesizerTrn(nn.Module):
             (z, z_p, m_p, logs_p, m_q, logs_q),
             {
                 "f0_model_outputs": f0_model_outputs if self.use_f0 else None,
+                "energy_model_outputs": energy_model_outputs
+                if self.use_energy
+                else None,
             },
         )
 
