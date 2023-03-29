@@ -21,7 +21,6 @@ __all__ = [
 
 """ from https://github.com/jik876/hifi-gan """
 
-import argparse
 import json
 import datetime as dt
 import numpy as np
