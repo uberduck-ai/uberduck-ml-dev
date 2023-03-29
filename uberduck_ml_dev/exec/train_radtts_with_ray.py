@@ -143,6 +143,7 @@ class DataCollate():
 
         if batch[0]['audio_embedding'] is not None:
             audio_embedding_padded = torch.FloatTensor(len(batch), 512) # emb size - TODO (Sam): try to reduce this via PCA
+            # audio_embedding_padded = torch.FloatTensor(len(batch), 16) # PCA version
             audio_embedding_padded.zero_()
 
 
@@ -441,6 +442,7 @@ class Data(torch.utils.data.Dataset):
         sub_path = os.path.join(my_path,rel_path_folder)
         audiopath = f"{sub_path}/resampled_unnormalized.wav"              
         audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
+        # audio_emb_path = f"{sub_path}/coqui_resnet_512_pca15_emb.pt"
         f0_path = f"{sub_path}/f0.pt"
         mel_path = f"{sub_path}/spectrogram.pt"
         
@@ -954,7 +956,8 @@ def _train_step(
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
 
-        checkpoint_path = f'/usr/src/app/radtts/outputs/230k_dap_checkpoint_{iteration}.pt'
+        # checkpoint_path = f'/usr/src/app/radtts/outputs/230k_pca15_decoder_checkpoint_{iteration}.pt'
+        checkpoint_path = f'/usr/src/app/radtts/outputs/230k_test_decoder_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration,
                                     checkpoint_path)
     
