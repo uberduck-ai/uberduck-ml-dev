@@ -311,11 +311,13 @@ class Data(torch.utils.data.Dataset):
                 duration = -1 # if len(d) == 3 else d[4]
                 dataset.append(
                     {'audiopath': os.path.join(wav_folder_prefix, d[0]),
-                     'text': d[1],
-                     'speaker': d[2] + '-' + emotion if self.combine_speaker_and_emotion else d[2],
-                     'emotion': emotion,
+                    #  NOTE (Sam): change/comment depending on filelist
+                     'text': d[2],
+                     'speaker': d[1], # should be unused
+                    #  'speaker': d[2] + '-' + emotion if self.combine_speaker_and_emotion else d[2],
+                    #  'emotion': emotion,
                      'duration': float(duration),
-                     'lmdb_key': audio_lmdb_key
+                    #  'lmdb_key': audio_lmdb_key
                      })
         return dataset
 
@@ -433,6 +435,7 @@ class Data(torch.utils.data.Dataset):
         my_path = '/usr/src/app/radtts/data/big_data'
         
         data = self.data[index]
+        # print(data['text'])
         audiopath_s3, text = data['audiopath'], data['text']
         rel_path_folder = audiopath_s3.split('uberduck-audio-files/')[1].split('/resampled_unnormalized.wav')[0]
         sub_path = os.path.join(my_path,rel_path_folder)
@@ -951,7 +954,7 @@ def _train_step(
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
 
-        checkpoint_path = f'/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt'
+        checkpoint_path = f'/usr/src/app/radtts/outputs/230k_dap_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration,
                                     checkpoint_path)
     
