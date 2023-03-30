@@ -259,7 +259,7 @@ class RADTTS(torch.nn.Module):
     # NOTE (Sam): make this more refined
     def encode_speaker(self, spk_ids: Optional[str], audio_encodings: Optional[torch.Tensor] = None):
 
-        assert not (spk_ids and audio_encodings), "Only one of spk_ids and audio_encodings can be provided"
+        assert not (spk_ids is not None and audio_encodings is not None), "Only one of spk_ids and audio_encodings can be provided"
         if audio_encodings is not None:
             return audio_encodings
         spk_ids = spk_ids * 0 if self.dummy_speaker_embedding else spk_ids
