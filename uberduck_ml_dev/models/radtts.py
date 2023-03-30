@@ -578,7 +578,9 @@ class RADTTS(torch.nn.Module):
               sigma_energy=0.8, token_dur_scaling=1.0, token_duration_max=100,
               speaker_id_text=None, speaker_id_attributes=None, dur=None,
               f0=None, energy_avg=None, voiced_mask=None, f0_mean=0.0,
-              f0_std=0.0, energy_mean=0.0, energy_std=0.0, audio_embedding=None):
+              f0_std=0.0, energy_mean=0.0, energy_std=0.0, audio_embedding=None,
+              text_lengths=None,
+                ):
         batch_size = text.shape[0]
         n_tokens = text.shape[1]
         if audio_embedding is not None:
@@ -607,7 +609,7 @@ class RADTTS(torch.nn.Module):
                 z_dur = torch.FloatTensor(batch_size, 1, n_tokens)
             z_dur = z_dur.normal_() * sigma_dur
 
-            dur = self.dur_pred_layer.infer(z_dur, txt_enc, spk_vec_text)
+            dur = self.dur_pred_layer.infer(z_dur, txt_enc, spk_vec_text, lens=text_lengths)
             if dur.shape[-1] < txt_enc.shape[-1]:
                 to_pad = txt_enc.shape[-1] - dur.shape[2]
                 pad_fn = nn.ReplicationPad1d((0, to_pad))
@@ -624,13 +626,14 @@ class RADTTS(torch.nn.Module):
 
         txt_enc_time_expanded = self.length_regulator(
             txt_enc.transpose(1, 2), dur).transpose(1, 2)
+        dur_lengths = dur.sum(dim=1)
         if not self.is_attribute_unconditional():
             # if explicitly modeling attributes
             if voiced_mask is None:
                 if self.use_vpred_module:
                     # get logits
                     voiced_mask = self.v_pred_module.infer(
-                        None, txt_enc_time_expanded, spk_vec_attributes)
+                        None, txt_enc_time_expanded, spk_vec_attributes, lens=dur_lengths)
                     voiced_mask = (torch.sigmoid(voiced_mask[:, 0]) > 0.5)
                     voiced_mask = voiced_mask.float()
 
