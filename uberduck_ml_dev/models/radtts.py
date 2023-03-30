@@ -18,10 +18,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+from typing import Optional
+
 import torch
 from torch import nn
 from .common import Encoder, LengthRegulator, ConvAttention, Invertible1x1ConvLUS, Invertible1x1Conv, AffineTransformationLayer, LinearNorm, ExponentialClass
-# from common import get_mask_from_lengths
 from ..utils.utils import get_mask_from_lengths
 from .components.attribute_prediction_model import get_attribute_prediction_model
 from .components.alignment import mas_width1 as mas
@@ -71,7 +72,6 @@ class FlowStep(nn.Module):
 #     mask = (ids < lengths.unsqueeze(1)).bool()
 #     return mask
 
-from typing import Optional
 class RADTTS(torch.nn.Module):
     def __init__(self, n_speakers, n_speaker_dim, n_text, n_text_dim, n_flows,
                  n_conv_layers_per_step, n_mel_channels, n_hidden,
@@ -601,7 +601,10 @@ class RADTTS(torch.nn.Module):
         txt_enc, txt_emb = self.encode_text(text, None)
         if dur is None:
             # get token durations
-            z_dur = torch.cuda.FloatTensor(batch_size, 1, n_tokens)
+            if torch.cuda.is_available():
+                z_dur = torch.cuda.FloatTensor(batch_size, 1, n_tokens)
+            else:
+                z_dur = torch.FloatTensor(batch_size, 1, n_tokens)
             z_dur = z_dur.normal_() * sigma_dur
 
             dur = self.dur_pred_layer.infer(z_dur, txt_enc, spk_vec_text)
@@ -647,8 +650,13 @@ class RADTTS(torch.nn.Module):
 
             if f0 is None:
                 n_f0_feature_channels = 2 if self.use_first_order_features else 1
-                z_f0 = torch.cuda.FloatTensor(
-                    batch_size, n_f0_feature_channels, max_n_frames).normal_() * sigma_f0
+                if torch.cuda.is_available():
+                    z_f0 = torch.cuda.FloatTensor(
+                        batch_size, n_f0_feature_channels, max_n_frames).normal_() * sigma_f0
+                else:
+                    z_f0 = torch.FloatTensor(
+                        batch_size, n_f0_feature_channels, max_n_frames).normal_() * sigma_f0
+
                 f0 = self.infer_f0(
                     z_f0, ap_txt_enc_time_expanded, spk_vec_attributes,
                     voiced_mask, out_lens)[:, 0]
@@ -662,8 +670,12 @@ class RADTTS(torch.nn.Module):
 
             if energy_avg is None:
                 n_energy_feature_channels = 2 if self.use_first_order_features else 1
-                z_energy_avg = torch.cuda.FloatTensor(
-                    batch_size, n_energy_feature_channels, max_n_frames).normal_() * sigma_energy
+                if torch.cuda.is_available():
+                    z_energy_avg = torch.cuda.FloatTensor(
+                        batch_size, n_energy_feature_channels, max_n_frames).normal_() * sigma_energy
+                else:
+                    z_energy_avg = torch.FloatTensor(
+                        batch_size, n_energy_feature_channels, max_n_frames).normal_() * sigma_energy
                 energy_avg = self.infer_energy(
                     z_energy_avg, ap_txt_enc_time_expanded, spk_vec, out_lens)[:, 0]
 
@@ -694,9 +706,12 @@ class RADTTS(torch.nn.Module):
 
         # NOTE (Sam): comment hacky to get to work on cpu
         # NOTE (Sam): not helpful when available but used.
-        # if torch.cuda.is_available():
-        residual = torch.cuda.FloatTensor(
-            batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        if torch.cuda.is_available():
+            residual = torch.cuda.FloatTensor(
+                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        else:
+            residual = torch.FloatTensor(
+                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
         # else:
         # residual = torch.FloatTensor(
         #     batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
@@ -798,7 +813,7 @@ class RADTTS(torch.nn.Module):
             except:
                 pass
 
-DEFAULT_MODEL_CONFIG = {
+DEFAULTS = {
  # 'n_speakers': <replace-me>,
  # 'n_speaker_dim': <replace-me>,
  'n_text': 185,
