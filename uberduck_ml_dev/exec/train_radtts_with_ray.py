@@ -307,7 +307,7 @@ class Data(torch.utils.data.Dataset):
                 data = [line.strip().split(split) for line in f]
 
             for d in data:
-                emotion = 'other' if len(d) == 3 else d[3]
+                # emotion = 'other' if len(d) == 3 else d[3]
                 # NOTE (Sam): temporary change due to pitch being in filelist (not durations).
                 duration = -1 # if len(d) == 3 else d[4]
                 dataset.append(
@@ -740,8 +740,13 @@ def log(metrics, audios = {}):
         wandb.log(wandb_metrics)
 
 
+# want to test out of sample but can only do proper inference with zero shot dap so lets just look at zero shot decoder samples
+# in particular, the out of sample here will probably be worse than inference since the f0 and energy models are not being used.
 @torch.no_grad()
-def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask):
+def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask, audio_embedding_oos = None, oos_name = None):
+
+    print( audio_embedding_oos, oos_name, bool(audio_embedding_oos is None), bool(oos_name is None))
+    assert bool(audio_embedding_oos is None) == bool(oos_name is None), "must provide both or neither of audio_embedding_oos and oos_name"
 
     mel = to_gpu(batch_dict['mel'])
     speaker_ids = to_gpu(batch_dict['speaker_ids'])
@@ -792,6 +797,8 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
                 else:
                     attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])                
         if len(attribute_sigmas) > 0:
+            if audio_embedding_oos is not None:
+                audio_embedding = audio_embedding_oos.unsqueeze(0)
             durations = attn_used[0, 0].sum(0, keepdim=True)
             # NOTE (Sam): this is causing problems when durations are > x.5 and binarize_attention is false.
             #  In that case, durations + 0.5 . floor > durations
@@ -839,6 +846,8 @@ def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f
                     sample_tag = "decoder_sample_gt_attributes"
                 else:
                     sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
+                if oos_name is not None:
+                    sample_tag = f"{sample_tag}_oos_{oos_name}"
                 audios[sample_tag] = audio
 
     return images, audios
@@ -947,6 +956,13 @@ def _train_step(
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
         images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
+        gt_path = '/usr/src/app/radtts/ground_truth'
+        oos_embs = os.listdir(gt_path)
+        #this doesn't help for reasons described above
+        for oos_name in oos_embs:
+            audio_embedding_oos = torch.load(f"{gt_path}/{oos_name}").cuda()
+            _, audios_oos = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask, oos_name=oos_name, audio_embedding_oos=audio_embedding_oos)
+            audios.update(audios_oos)
         log(metrics, audios)
         model.train()
     else:
@@ -957,7 +973,7 @@ def _train_step(
     if log_checkpoint and session.get_world_rank() == 0:
 
         # checkpoint_path = f'/usr/src/app/radtts/outputs/230k_pca15_decoder_checkpoint_{iteration}.pt'
-        checkpoint_path = f'/usr/src/app/radtts/outputs/230k_test_decoder_checkpoint_{iteration}.pt'
+        checkpoint_path = f'/usr/src/app/radtts/outputs/230k_test_decoder_emrestart_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration,
                                     checkpoint_path)
     
