@@ -745,7 +745,7 @@ def log(metrics, audios = {}):
 @torch.no_grad()
 def get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask, audio_embedding_oos = None, oos_name = None):
 
-    print( audio_embedding_oos, oos_name, bool(audio_embedding_oos is None), bool(oos_name is None))
+    # print( audio_embedding_oos, oos_name, bool(audio_embedding_oos is None), bool(oos_name is None))
     assert bool(audio_embedding_oos is None) == bool(oos_name is None), "must provide both or neither of audio_embedding_oos and oos_name"
 
     mel = to_gpu(batch_dict['mel'])
@@ -955,6 +955,7 @@ def _train_step(
     if log_sample and session.get_world_rank() == 0:
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
+        # TODO (Sam): add logging of ground truth
         images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
         gt_path = '/usr/src/app/radtts/ground_truth'
         oos_embs = os.listdir(gt_path)
@@ -973,7 +974,8 @@ def _train_step(
     if log_checkpoint and session.get_world_rank() == 0:
 
         # checkpoint_path = f'/usr/src/app/radtts/outputs/230k_pca15_decoder_checkpoint_{iteration}.pt'
-        checkpoint_path = f'/usr/src/app/radtts/outputs/230k_test_decoder_emrestart_checkpoint_{iteration}.pt'
+        checkpoint_path = f"{train_config['output_directory']}/model_{iteration}.pt"
+        # checkpoint_path = f'/usr/src/app/radtts/outputs/230k_test_decoder_emrestart_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration,
                                     checkpoint_path)
     
