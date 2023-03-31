@@ -399,10 +399,8 @@ class RADTTS(torch.nn.Module):
         if audio_embedding is not None:
             speaker_vecs = audio_embedding
 
-        # print(text.type())
         text_enc, text_embeddings = self.encode_text(text, in_lens)
-        # print(text_enc.type(), text_enc)
-        # text_enc = text_enc.double() # NOTE (Sam): this was necessary for inference without dataloader - no clue why.
+        #  NOTE (Sam): text_enc = text_enc.double() was necessary for inference without dataloader - no clue why.
         log_s_list, log_det_W_list, z_mel = [], [], []
         attn = None
         attn_soft = None
@@ -712,9 +710,6 @@ class RADTTS(torch.nn.Module):
         else:
             residual = torch.FloatTensor(
                 batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
-        # else:
-        # residual = torch.FloatTensor(
-        #     batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
             
         residual = residual.normal_() * sigma
 
