@@ -20,19 +20,25 @@
 # DEALINGS IN THE SOFTWARE.
 import torch
 from torch import nn
-from ..common import ConvNorm, Invertible1x1Conv, AffineTransformationLayer, SplineTransformationLayer, ConvLSTMLinear
+from ..common import (
+    ConvNorm,
+    Invertible1x1Conv,
+    AffineTransformationLayer,
+    SplineTransformationLayer,
+    ConvLSTMLinear,
+)
 from .transformer import FFTransformer
 from .autoregressive_flow import AR_Step, AR_Back_Step
 
 
 def get_attribute_prediction_model(config):
-    name = config['name']
-    hparams = config['hparams']
-    if name == 'dap':
+    name = config["name"]
+    hparams = config["hparams"]
+    if name == "dap":
         model = DAP(**hparams)
-    elif name == 'bgap':
+    elif name == "bgap":
         model = BGAP(**hparams)
-    elif name == 'agap':
+    elif name == "agap":
         model = AGAP(**hparams)
     else:
         raise Exception("{} model is not supported".format(name))
@@ -40,7 +46,7 @@ def get_attribute_prediction_model(config):
     return model
 
 
-class AttributeProcessing():
+class AttributeProcessing:
     def __init__(self, take_log_of_input=False):
         super(AttributeProcessing).__init__()
         self.take_log_of_input = take_log_of_input
@@ -57,24 +63,34 @@ class AttributeProcessing():
 
 
 class BottleneckLayerLayer(nn.Module):
-    def __init__(self, in_dim, reduction_factor, norm='weightnorm',
-                 non_linearity='relu', kernel_size=3, use_partial_padding=False):
+    def __init__(
+        self,
+        in_dim,
+        reduction_factor,
+        norm="weightnorm",
+        non_linearity="relu",
+        kernel_size=3,
+        use_partial_padding=False,
+    ):
         super(BottleneckLayerLayer, self).__init__()
 
         self.reduction_factor = reduction_factor
         reduced_dim = int(in_dim / reduction_factor)
         self.out_dim = reduced_dim
         if self.reduction_factor > 1:
-            fn = ConvNorm(in_dim, reduced_dim, kernel_size=kernel_size,
-                          use_weight_norm=(norm == 'weightnorm'))
-            if norm == 'instancenorm':
-                fn = nn.Sequential(
-                    fn, nn.InstanceNorm1d(reduced_dim, affine=True))
+            fn = ConvNorm(
+                in_dim,
+                reduced_dim,
+                kernel_size=kernel_size,
+                use_weight_norm=(norm == "weightnorm"),
+            )
+            if norm == "instancenorm":
+                fn = nn.Sequential(fn, nn.InstanceNorm1d(reduced_dim, affine=True))
 
             self.projection_fn = fn
             self.non_linearity = nn.ReLU()
-            if non_linearity == 'leakyrelu':
-                self.non_linearity= nn.LeakyReLU()
+            if non_linearity == "leakyrelu":
+                self.non_linearity = nn.LeakyReLU()
 
     def forward(self, x):
         if self.reduction_factor > 1:
@@ -84,13 +100,19 @@ class BottleneckLayerLayer(nn.Module):
 
 
 class DAP(nn.Module):
-    def __init__(self, n_speaker_dim, bottleneck_hparams, take_log_of_input,
-                 arch_hparams, use_transformer=False):
+    def __init__(
+        self,
+        n_speaker_dim,
+        bottleneck_hparams,
+        take_log_of_input,
+        arch_hparams,
+        use_transformer=False,
+    ):
         super(DAP, self).__init__()
         self.attribute_processing = AttributeProcessing(take_log_of_input)
         self.bottleneck_layer = BottleneckLayerLayer(**bottleneck_hparams)
 
-        arch_hparams['in_dim'] = self.bottleneck_layer.out_dim + n_speaker_dim
+        arch_hparams["in_dim"] = self.bottleneck_layer.out_dim + n_speaker_dim
         if use_transformer:
             self.feat_pred_fn = FFTransformer(**arch_hparams)
         else:
@@ -106,22 +128,33 @@ class DAP(nn.Module):
 
         x_hat = self.feat_pred_fn(context, lens)
 
-        outputs = {'x_hat': x_hat, 'x': x}
+        outputs = {"x_hat": x_hat, "x": x}
         return outputs
 
     def infer(self, z, txt_enc, spk_emb, lens=None):
-        x_hat = self.forward(txt_enc, spk_emb, x=None, lens=lens)['x_hat']
+        x_hat = self.forward(txt_enc, spk_emb, x=None, lens=lens)["x_hat"]
         x_hat = self.attribute_processing.denormalize(x_hat)
         return x_hat
 
 
 class BGAP(torch.nn.Module):
-    def __init__(self, n_in_dim, n_speaker_dim, bottleneck_hparams, n_flows,
-                 n_group_size, n_layers, with_dilation,
-                 kernel_size, scaling_fn,
-                 take_log_of_input=False,
-                 n_channels=1024,
-                 use_quadratic=False, n_bins=8, n_spline_steps=2):
+    def __init__(
+        self,
+        n_in_dim,
+        n_speaker_dim,
+        bottleneck_hparams,
+        n_flows,
+        n_group_size,
+        n_layers,
+        with_dilation,
+        kernel_size,
+        scaling_fn,
+        take_log_of_input=False,
+        n_channels=1024,
+        use_quadratic=False,
+        n_bins=8,
+        n_spline_steps=2,
+    ):
         super(BGAP, self).__init__()
         # assert(n_group_size % 2 == 0)
         self.n_flows = n_flows
@@ -137,31 +170,51 @@ class BGAP(torch.nn.Module):
         context_dim = n_txt_reduced_dim * n_group_size + n_speaker_dim
 
         if self.n_group_size > 1:
-            self.unfold_params = {'kernel_size': (n_group_size, 1),
-                                  'stride': n_group_size,
-                                  'padding': 0, 'dilation': 1}
+            self.unfold_params = {
+                "kernel_size": (n_group_size, 1),
+                "stride": n_group_size,
+                "padding": 0,
+                "dilation": 1,
+            }
             self.unfold = nn.Unfold(**self.unfold_params)
 
         for k in range(n_flows):
             self.convinv.append(Invertible1x1Conv(n_in_dim * n_group_size))
-            if k >= n_flows-self.n_spline_steps:
+            if k >= n_flows - self.n_spline_steps:
                 left = -3
-                right= 3
+                right = 3
                 top = 3
                 bottom = -3
-                self.transforms.append(SplineTransformationLayer(
-                    n_in_dim * n_group_size, context_dim, n_layers,
-                    with_dilation=with_dilation, kernel_size=kernel_size,
-                    scaling_fn=scaling_fn,
-                    n_channels=n_channels, top=top,
-                    bottom=bottom, left = left, right=right,
-                    use_quadratic=use_quadratic, n_bins=n_bins))
+                self.transforms.append(
+                    SplineTransformationLayer(
+                        n_in_dim * n_group_size,
+                        context_dim,
+                        n_layers,
+                        with_dilation=with_dilation,
+                        kernel_size=kernel_size,
+                        scaling_fn=scaling_fn,
+                        n_channels=n_channels,
+                        top=top,
+                        bottom=bottom,
+                        left=left,
+                        right=right,
+                        use_quadratic=use_quadratic,
+                        n_bins=n_bins,
+                    )
+                )
             else:
-                self.transforms.append(AffineTransformationLayer(
-                    n_in_dim * n_group_size, context_dim, n_layers,
-                    with_dilation=with_dilation, kernel_size=kernel_size,
-                    scaling_fn=scaling_fn,
-                    affine_model='simple_conv', n_channels=n_channels))
+                self.transforms.append(
+                    AffineTransformationLayer(
+                        n_in_dim * n_group_size,
+                        context_dim,
+                        n_layers,
+                        with_dilation=with_dilation,
+                        kernel_size=kernel_size,
+                        scaling_fn=scaling_fn,
+                        affine_model="simple_conv",
+                        n_channels=n_channels,
+                    )
+                )
 
     def fold(self, data):
         """Inverse of the self.unfold(data.unsqueeze(-1)) operation used for
@@ -170,9 +223,10 @@ class BGAP(torch.nn.Module):
         Args:
             data: B x C x T tensor of temporal data
         """
-        output_size = (data.shape[2]*self.n_group_size, 1)
+        output_size = (data.shape[2] * self.n_group_size, 1)
         data = nn.functional.fold(
-            data, output_size=output_size, **self.unfold_params).squeeze(-1)
+            data, output_size=output_size, **self.unfold_params
+        ).squeeze(-1)
         return data
 
     def preprocess_context(self, txt_emb, speaker_vecs, std_scale=None):
@@ -184,7 +238,7 @@ class BGAP(torch.nn.Module):
 
     def forward(self, txt_enc, spk_emb, x, lens):
         """x<tensor>: duration or pitch or energy average"""
-        assert(txt_enc.size(2) >= x.size(1))
+        assert txt_enc.size(2) >= x.size(1)
         if len(x.shape) == 2:
             # add channel dimension
             x = x[:, None]
@@ -201,9 +255,7 @@ class BGAP(torch.nn.Module):
             log_det_W_list.append(log_det_W)
             log_s_list.append(log_s)
         # prepare outputs
-        outputs = {'z': x,
-                   'log_det_W_list': log_det_W_list,
-                   'log_s_list': log_s_list}
+        outputs = {"z": x, "log_det_W_list": log_det_W_list, "log_s_list": log_s_list}
 
         return outputs
 
@@ -214,8 +266,9 @@ class BGAP(torch.nn.Module):
         z = self.unfold(z[..., None])
         for k in reversed(range(self.n_flows)):
             z = self.convinv[k](z, inverse=True)
-            z = self.transforms[k].forward(z, context,
-                                           inverse=True, seq_lens=lens_grouped)
+            z = self.transforms[k].forward(
+                z, context, inverse=True, seq_lens=lens_grouped
+            )
         # z mapped to input domain
         x_hat = self.fold(z)
         # pad on the way out
@@ -223,10 +276,21 @@ class BGAP(torch.nn.Module):
 
 
 class AGAP(torch.nn.Module):
-    def __init__(self, n_in_dim, n_speaker_dim, n_flows, n_hidden,
-                 n_lstm_layers, bottleneck_hparams, scaling_fn='exp',
-                 take_log_of_input=False, p_dropout=0.0, setup='',
-                 spline_flow_params=None, n_group_size=1):
+    def __init__(
+        self,
+        n_in_dim,
+        n_speaker_dim,
+        n_flows,
+        n_hidden,
+        n_lstm_layers,
+        bottleneck_hparams,
+        scaling_fn="exp",
+        take_log_of_input=False,
+        p_dropout=0.0,
+        setup="",
+        spline_flow_params=None,
+        n_group_size=1,
+    ):
         super(AGAP, self).__init__()
         self.flows = torch.nn.ModuleList()
         self.n_group_size = n_group_size
@@ -237,25 +301,42 @@ class AGAP(torch.nn.Module):
         n_txt_reduced_dim = self.bottleneck_layer.out_dim
 
         if self.n_group_size > 1:
-            self.unfold_params = {'kernel_size': (n_group_size, 1),
-                                  'stride': n_group_size,
-                                  'padding': 0, 'dilation': 1}
+            self.unfold_params = {
+                "kernel_size": (n_group_size, 1),
+                "stride": n_group_size,
+                "padding": 0,
+                "dilation": 1,
+            }
             self.unfold = nn.Unfold(**self.unfold_params)
 
         if spline_flow_params is not None:
-            spline_flow_params['n_in_channels'] *= self.n_group_size
+            spline_flow_params["n_in_channels"] *= self.n_group_size
 
         for i in range(n_flows):
             if i % 2 == 0:
-                self.flows.append(AR_Step(
-                    n_in_dim * n_group_size, n_speaker_dim, n_txt_reduced_dim *
-                    n_group_size, n_hidden, n_lstm_layers, scaling_fn,
-                    spline_flow_params))
+                self.flows.append(
+                    AR_Step(
+                        n_in_dim * n_group_size,
+                        n_speaker_dim,
+                        n_txt_reduced_dim * n_group_size,
+                        n_hidden,
+                        n_lstm_layers,
+                        scaling_fn,
+                        spline_flow_params,
+                    )
+                )
             else:
-                self.flows.append(AR_Back_Step(
-                    n_in_dim * n_group_size, n_speaker_dim, n_txt_reduced_dim *
-                    n_group_size, n_hidden, n_lstm_layers, scaling_fn,
-                    spline_flow_params))
+                self.flows.append(
+                    AR_Back_Step(
+                        n_in_dim * n_group_size,
+                        n_speaker_dim,
+                        n_txt_reduced_dim * n_group_size,
+                        n_hidden,
+                        n_lstm_layers,
+                        scaling_fn,
+                        spline_flow_params,
+                    )
+                )
 
     def fold(self, data):
         """Inverse of the self.unfold(data.unsqueeze(-1)) operation used for
@@ -264,9 +345,10 @@ class AGAP(torch.nn.Module):
         Args:
             data: B x C x T tensor of temporal data
         """
-        output_size = (data.shape[2]*self.n_group_size, 1)
+        output_size = (data.shape[2] * self.n_group_size, 1)
         data = nn.functional.fold(
-            data, output_size=output_size, **self.unfold_params).squeeze(-1)
+            data, output_size=output_size, **self.unfold_params
+        ).squeeze(-1)
         return data
 
     def preprocess_context(self, txt_emb, speaker_vecs):
@@ -297,7 +379,7 @@ class AGAP(torch.nn.Module):
 
         x = x.permute(1, 2, 0)  # x mapped to z
         log_s_list = [log_s_elt.permute(1, 2, 0) for log_s_elt in log_s_list]
-        outputs = {'z': x, 'log_s_list': log_s_list, 'log_det_W_list': []}
+        outputs = {"z": x, "log_s_list": log_s_list, "log_det_W_list": []}
         return outputs
 
     def infer(self, z, txt_emb, spk_emb, seq_lens=None):

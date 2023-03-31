@@ -147,23 +147,28 @@ def plot_gate_outputs(gate_targets=None, gate_outputs=None):
     return figure
 
 
-
-
-def plot_alignment_to_numpy(alignment, title='', info=None, phoneme_seq=None,
-                            vmin=None, vmax=None):
+def plot_alignment_to_numpy(
+    alignment, title="", info=None, phoneme_seq=None, vmin=None, vmax=None
+):
     if phoneme_seq:
         fig, ax = plt.subplots(figsize=(15, 10))
     else:
         fig, ax = plt.subplots(figsize=(6, 4))
-    im = ax.imshow(alignment, aspect='auto', origin='lower',
-                   interpolation='none', vmin=vmin, vmax=vmax)
+    im = ax.imshow(
+        alignment,
+        aspect="auto",
+        origin="lower",
+        interpolation="none",
+        vmin=vmin,
+        vmax=vmax,
+    )
     ax.set_title(title)
     fig.colorbar(im, ax=ax)
-    xlabel = 'Decoder timestep'
+    xlabel = "Decoder timestep"
     if info is not None:
-        xlabel += '\n\n' + info
+        xlabel += "\n\n" + info
     plt.xlabel(xlabel)
-    plt.ylabel('Encoder timestep')
+    plt.ylabel("Encoder timestep")
     plt.tight_layout()
 
     if phoneme_seq != None:
@@ -176,4 +181,3 @@ def plot_alignment_to_numpy(alignment, title='', info=None, phoneme_seq=None,
     data = save_figure_to_numpy(fig)
     plt.close()
     return data
-
