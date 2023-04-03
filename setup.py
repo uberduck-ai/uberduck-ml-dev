@@ -104,6 +104,9 @@ setuptools.setup(
     url=cfg["git_url"],
     packages=setuptools.find_packages(),
     include_package_data=True,
+    package_data={
+        "": ["uberduck_ml_dev/text/heteronyms", "uberduck_ml_dev/text/cmudict-0.7b"]
+    },
     install_requires=requirements,
     extras_require={"dev": dev_requirements},
     python_requires=">=" + cfg["min_python"],
