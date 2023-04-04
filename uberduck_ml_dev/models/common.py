@@ -517,7 +517,6 @@ class GST(nn.Module):
         return style_embed
 
 
-# Cell
 class LayerNorm(nn.Module):
     def __init__(self, channels, eps=1e-5):
         super().__init__()
@@ -533,7 +532,6 @@ class LayerNorm(nn.Module):
         return x.transpose(1, -1)
 
 
-# Cell
 class Flip(nn.Module):
     def forward(self, x, *args, reverse=False, **kwargs):
         x = torch.flip(x, [1])
@@ -544,7 +542,6 @@ class Flip(nn.Module):
             return x
 
 
-# Cell
 class Log(nn.Module):
     def forward(self, x, x_mask, reverse=False, **kwargs):
         if not reverse:
@@ -556,7 +553,6 @@ class Log(nn.Module):
             return x
 
 
-# Cell
 class ElementwiseAffine(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -575,7 +571,6 @@ class ElementwiseAffine(nn.Module):
             return x
 
 
-# Cell
 class DDSConv(nn.Module):
     """
     Dialted and Depth-Separable Convolution
@@ -761,7 +756,7 @@ class WN(torch.nn.Module):
                 g_l = g[:, cond_offset : cond_offset + 2 * self.hidden_channels, :]
             else:
                 g_l = torch.zeros_like(x_in)
-            if local_conditioning is not None:
+            if local_conditioning is not None and self.local_cond_layer is not None:
                 g_l = (
                     g_l + l[:, cond_offset : cond_offset + 2 * self.hidden_channels, :]
                 )
@@ -927,9 +922,6 @@ class ResidualCouplingLayer(nn.Module):
             x1 = (x1 - m) * torch.exp(-logs) * x_mask
             x = torch.cat([x0, x1], 1)
             return x
-
-
-# Cell
 
 
 class ResBlock1(torch.nn.Module):
