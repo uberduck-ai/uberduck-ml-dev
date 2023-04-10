@@ -1,5 +1,5 @@
 # TODO (Sam): unite the 5 different forward / inference methods in the decoder as well.
-# TODO (Sam): treat "gst" and "speaker_embedding" generically (e.g. x_encoding, y_encoding)
+# TODO (Sam): treat "gst" and "speaker_embedding" generically (e.g. x_encoding, y_encoding) (note we will do this with speechbrain)
 # TODO (Sam): move to Hydra or more organized config
 from torch import nn
 import numpy as np
@@ -7,7 +7,6 @@ import torch
 from torch.nn import functional as F
 from typing import Optional
 
-# from speechbrain.pretrained import EncoderClassifier
 
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
