@@ -3,10 +3,8 @@
         "bacon": 0,
         "imports": [
             "uberduck_ml_dev",
-            "uberduck_ml_dev.alignment",
             "uberduck_ml_dev.applications",
             "uberduck_ml_dev.applications.streamlit",
-            "uberduck_ml_dev.attribute_prediction_model",
             "uberduck_ml_dev.data",
             "uberduck_ml_dev.data.audio_processing",
             "uberduck_ml_dev.data.batch",
@@ -24,9 +22,6 @@
             "uberduck_ml_dev.exec.parse_data",
             "uberduck_ml_dev.exec.preprocess_vits",
             "uberduck_ml_dev.exec.split_train_val",
-            "uberduck_ml_dev.exec.train_gradtts",
-            "uberduck_ml_dev.exec.train_mellotron",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits",
@@ -106,7 +101,6 @@
         "imported_by": [
             "__main__",
             "uberduck_ml_dev.applications.streamlit",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.models.components.encoders.duration",
@@ -116,14 +110,6 @@
         ],
         "name": "uberduck_ml_dev",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/__init__.py"
-    },
-    "uberduck_ml_dev.alignment": {
-        "bacon": 1,
-        "imported_by": [
-            "__main__"
-        ],
-        "name": "uberduck_ml_dev.alignment",
-        "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/alignment.py"
     },
     "uberduck_ml_dev.applications": {
         "bacon": 1,
@@ -146,14 +132,6 @@
         "name": "uberduck_ml_dev.applications.streamlit",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/applications/streamlit.py"
     },
-    "uberduck_ml_dev.attribute_prediction_model": {
-        "bacon": 1,
-        "imported_by": [
-            "__main__"
-        ],
-        "name": "uberduck_ml_dev.attribute_prediction_model",
-        "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/attribute_prediction_model.py"
-    },
     "uberduck_ml_dev.data": {
         "bacon": 1,
         "imported_by": [
@@ -161,7 +139,6 @@
             "uberduck_ml_dev.data.collate",
             "uberduck_ml_dev.exec.dataset_statistics",
             "uberduck_ml_dev.exec.generate_filelist",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.losses",
@@ -174,8 +151,7 @@
     "uberduck_ml_dev.data.audio_processing": {
         "bacon": 1,
         "imported_by": [
-            "__main__",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader"
+            "__main__"
         ],
         "name": "uberduck_ml_dev.data.audio_processing",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/data/audio_processing.py"
@@ -365,64 +341,6 @@
         "name": "uberduck_ml_dev.exec.split_train_val",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/exec/split_train_val.py"
     },
-    "uberduck_ml_dev.exec.train_gradtts": {
-        "bacon": 1,
-        "imported_by": [
-            "__main__"
-        ],
-        "imports": [
-            "uberduck_ml_dev.models",
-            "uberduck_ml_dev.trainer",
-            "uberduck_ml_dev.vendor",
-            "uberduck_ml_dev.vendor.tfcompat",
-            "uberduck_ml_dev.vendor.tfcompat.hparam"
-        ],
-        "name": "uberduck_ml_dev.exec.train_gradtts",
-        "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/exec/train_gradtts.py"
-    },
-    "uberduck_ml_dev.exec.train_mellotron": {
-        "bacon": 1,
-        "imported_by": [
-            "__main__"
-        ],
-        "imports": [
-            "uberduck_ml_dev.models",
-            "uberduck_ml_dev.trainer",
-            "uberduck_ml_dev.utils",
-            "uberduck_ml_dev.utils.argparse",
-            "uberduck_ml_dev.vendor",
-            "uberduck_ml_dev.vendor.tfcompat",
-            "uberduck_ml_dev.vendor.tfcompat.hparam"
-        ],
-        "name": "uberduck_ml_dev.exec.train_mellotron",
-        "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/exec/train_mellotron.py"
-    },
-    "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader": {
-        "bacon": 1,
-        "imported_by": [
-            "__main__"
-        ],
-        "imports": [
-            "uberduck_ml_dev",
-            "uberduck_ml_dev.data",
-            "uberduck_ml_dev.data.audio_processing",
-            "uberduck_ml_dev.losses",
-            "uberduck_ml_dev.models",
-            "uberduck_ml_dev.models.common",
-            "uberduck_ml_dev.models.radtts",
-            "uberduck_ml_dev.text",
-            "uberduck_ml_dev.text.symbols",
-            "uberduck_ml_dev.text.text_processing",
-            "uberduck_ml_dev.text.utils",
-            "uberduck_ml_dev.utils",
-            "uberduck_ml_dev.utils.plot",
-            "uberduck_ml_dev.utils.utils",
-            "uberduck_ml_dev.vocoders",
-            "uberduck_ml_dev.vocoders.hifigan"
-        ],
-        "name": "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
-        "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/exec/train_radtts_with_ray_torchloader.py"
-    },
     "uberduck_ml_dev.exec.train_tacotron2": {
         "bacon": 1,
         "imported_by": [
@@ -522,7 +440,6 @@
         "bacon": 1,
         "imported_by": [
             "__main__",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.trainer.tacotron2"
@@ -542,9 +459,6 @@
             "__main__",
             "uberduck_ml_dev.data.data",
             "uberduck_ml_dev.e2e",
-            "uberduck_ml_dev.exec.train_gradtts",
-            "uberduck_ml_dev.exec.train_mellotron",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits",
             "uberduck_ml_dev.exec.train_vits_with_ray",
@@ -566,6 +480,7 @@
             "uberduck_ml_dev.models.vits"
         ],
         "imports": [
+            "uberduck_ml_dev.models.common",
             "uberduck_ml_dev.utils",
             "uberduck_ml_dev.utils.utils"
         ],
@@ -595,15 +510,19 @@
             "__main__",
             "uberduck_ml_dev.data.data",
             "uberduck_ml_dev.e2e",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
+            "uberduck_ml_dev.models.attentions",
             "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.attribute_prediction_model",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
             "uberduck_ml_dev.models.components.decoders.tacotron2",
             "uberduck_ml_dev.models.components.encoders.duration",
             "uberduck_ml_dev.models.components.encoders.tacotron2",
             "uberduck_ml_dev.models.components.postnet",
             "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
             "uberduck_ml_dev.models.tacotron2",
             "uberduck_ml_dev.models.vits",
             "uberduck_ml_dev.trainer.base",
@@ -661,13 +580,22 @@
             "__main__",
             "uberduck_ml_dev.models.radtts"
         ],
+        "imports": [
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
+            "uberduck_ml_dev.models.components.transformer"
+        ],
         "name": "uberduck_ml_dev.models.components.attribute_prediction_model",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/models/components/attribute_prediction_model.py"
     },
     "uberduck_ml_dev.models.components.autoregressive_flow": {
         "bacon": 1,
         "imported_by": [
-            "__main__"
+            "__main__",
+            "uberduck_ml_dev.models.components.attribute_prediction_model"
+        ],
+        "imports": [
+            "uberduck_ml_dev.models.common"
         ],
         "name": "uberduck_ml_dev.models.components.autoregressive_flow",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/models/components/autoregressive_flow.py"
@@ -797,9 +725,11 @@
     "uberduck_ml_dev.models.components.transformer": {
         "bacon": 1,
         "imported_by": [
-            "__main__"
+            "__main__",
+            "uberduck_ml_dev.models.components.attribute_prediction_model"
         ],
         "imports": [
+            "uberduck_ml_dev.models.common",
             "uberduck_ml_dev.utils",
             "uberduck_ml_dev.utils.utils"
         ],
@@ -817,10 +747,10 @@
     "uberduck_ml_dev.models.radtts": {
         "bacon": 1,
         "imported_by": [
-            "__main__",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader"
+            "__main__"
         ],
         "imports": [
+            "uberduck_ml_dev.models.common",
             "uberduck_ml_dev.models.components",
             "uberduck_ml_dev.models.components.alignment",
             "uberduck_ml_dev.models.components.attribute_prediction_model",
@@ -985,7 +915,6 @@
             "uberduck_ml_dev.e2e",
             "uberduck_ml_dev.exec.dataset_statistics",
             "uberduck_ml_dev.exec.preprocess_vits",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.models.base",
@@ -1089,7 +1018,6 @@
             "__main__",
             "uberduck_ml_dev.data.data",
             "uberduck_ml_dev.e2e",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.models.base",
@@ -1109,8 +1037,7 @@
     "uberduck_ml_dev.text.text_processing": {
         "bacon": 1,
         "imported_by": [
-            "__main__",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader"
+            "__main__"
         ],
         "imports": [
             "uberduck_ml_dev",
@@ -1131,7 +1058,6 @@
             "uberduck_ml_dev.e2e",
             "uberduck_ml_dev.exec.dataset_statistics",
             "uberduck_ml_dev.exec.preprocess_vits",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.monitoring.generate",
@@ -1148,8 +1074,6 @@
         "bacon": 1,
         "imported_by": [
             "__main__",
-            "uberduck_ml_dev.exec.train_gradtts",
-            "uberduck_ml_dev.exec.train_mellotron",
             "uberduck_ml_dev.exec.train_tacotron2",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits",
@@ -1238,8 +1162,6 @@
             "uberduck_ml_dev.exec.generate_filelist",
             "uberduck_ml_dev.exec.normalize_audio",
             "uberduck_ml_dev.exec.preprocess_vits",
-            "uberduck_ml_dev.exec.train_mellotron",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.losses",
@@ -1260,8 +1182,7 @@
     "uberduck_ml_dev.utils.argparse": {
         "bacon": 1,
         "imported_by": [
-            "__main__",
-            "uberduck_ml_dev.exec.train_mellotron"
+            "__main__"
         ],
         "name": "uberduck_ml_dev.utils.argparse",
         "path": "/home/sjkoelle/uberduck-ml-dev/uberduck_ml_dev/utils/argparse.py"
@@ -1326,7 +1247,6 @@
         "bacon": 1,
         "imported_by": [
             "__main__",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_tacotron2_with_ray",
             "uberduck_ml_dev.trainer.tacotron2"
         ],
@@ -1344,7 +1264,6 @@
             "uberduck_ml_dev.data.batch",
             "uberduck_ml_dev.data.data",
             "uberduck_ml_dev.exec.preprocess_vits",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.exec.train_vits_with_ray",
             "uberduck_ml_dev.losses",
             "uberduck_ml_dev.models.attentions",
@@ -1364,8 +1283,6 @@
         "bacon": 1,
         "imported_by": [
             "__main__",
-            "uberduck_ml_dev.exec.train_gradtts",
-            "uberduck_ml_dev.exec.train_mellotron",
             "uberduck_ml_dev.exec.train_tacotron2",
             "uberduck_ml_dev.exec.train_vits",
             "uberduck_ml_dev.exec.train_vits_with_ray",
@@ -1381,8 +1298,6 @@
         "bacon": 1,
         "imported_by": [
             "__main__",
-            "uberduck_ml_dev.exec.train_gradtts",
-            "uberduck_ml_dev.exec.train_mellotron",
             "uberduck_ml_dev.exec.train_tacotron2",
             "uberduck_ml_dev.exec.train_vits",
             "uberduck_ml_dev.exec.train_vits_with_ray",
@@ -1398,8 +1313,6 @@
         "bacon": 1,
         "imported_by": [
             "__main__",
-            "uberduck_ml_dev.exec.train_gradtts",
-            "uberduck_ml_dev.exec.train_mellotron",
             "uberduck_ml_dev.exec.train_tacotron2",
             "uberduck_ml_dev.exec.train_vits",
             "uberduck_ml_dev.exec.train_vits_with_ray",
@@ -1416,7 +1329,6 @@
         "imported_by": [
             "__main__",
             "uberduck_ml_dev.e2e",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.trainer.base",
             "uberduck_ml_dev.trainer.hifigan"
         ],
@@ -1436,7 +1348,6 @@
         "imported_by": [
             "__main__",
             "uberduck_ml_dev.e2e",
-            "uberduck_ml_dev.exec.train_radtts_with_ray_torchloader",
             "uberduck_ml_dev.trainer.base",
             "uberduck_ml_dev.trainer.hifigan"
         ],
