@@ -37,19 +37,19 @@ from ray.air.config import ScalingConfig, RunConfig
 from TTS.encoder.models.resnet import ResNetSpeakerEncoder
 from librosa import pyin
 
-from uberduck_ml_dev.models.radtts import RADTTS
-from uberduck_ml_dev.text.utils import text_to_sequence
-from uberduck_ml_dev.text.symbols import NVIDIA_TACO2_SYMBOLS
-from uberduck_ml_dev.losses import RADTTSLoss, AttentionBinarizationLoss
-from uberduck_ml_dev.optimizers.radam import RAdam
-from uberduck_ml_dev.utils.utils import (
+from ..models.radtts import RADTTS
+from ..text.utils import text_to_sequence
+from ..text.symbols import NVIDIA_TACO2_SYMBOLS
+from ..losses import RADTTSLoss, AttentionBinarizationLoss
+from ..optimizers.radam import RAdam
+from ..utils.utils import (
     to_gpu,
 )
-from uberduck_ml_dev.vocoders.hifigan import AttrDict, Generator
-from uberduck_ml_dev.models.common import get_mel
-from uberduck_ml_dev.data.audio_processing import TacotronSTFT
-from uberduck_ml_dev.text.text_processing import TextProcessing
-from uberduck_ml_dev.utils.plot import plot_alignment_to_numpy
+from ..vocoders.hifigan import AttrDict, Generator
+from ..models.common import get_mel
+from ..data.audio_processing import TacotronSTFT
+from ..text.text_processing import TextProcessing
+from ..utils.plot import plot_alignment_to_numpy
 
 HIFI_GAN_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_22khz_config.json"
 HIFI_GAN_GENERATOR_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_libritts100360_generator0p5.pt"
