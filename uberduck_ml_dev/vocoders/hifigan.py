@@ -247,33 +247,48 @@ class ResBlock2(torch.nn.Module):
 
 
 class Generator(torch.nn.Module):
-    __constants__ = ['lrelu_slope', 'num_kernels', 'num_upsamples', 'p_blur']
+    __constants__ = ["lrelu_slope", "num_kernels", "num_upsamples", "p_blur"]
+
     def __init__(self, h):
         super(Generator, self).__init__()
         self.num_kernels = len(h.resblock_kernel_sizes)
         self.num_upsamples = len(h.upsample_rates)
-        self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
-        self.p_blur = h.gaussian_blur['p_blurring']
+        self.conv_pre = weight_norm(
+            Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3)
+        )
+        self.p_blur = h.gaussian_blur["p_blurring"]
         self.gaussian_blur_fn = None
         if self.p_blur > 0.0:
-            self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
+            self.gaussian_blur_fn = GaussianBlurAugmentation(
+                h.gaussian_blur["kernel_size"], h.gaussian_blur["sigmas"], self.p_blur
+            )
         else:
             self.gaussian_blur_fn = nn.Identity()
         self.lrelu_slope = LRELU_SLOPE
 
-        resblock = ResBlock1 if h.resblock == '1' else ResBlock2
+        resblock = ResBlock1 if h.resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
-            self.ups.append(weight_norm(
-                ConvTranspose1d(h.upsample_initial_channel//(2**i), h.upsample_initial_channel//(2**(i+1)),
-                                k, u, padding=(k-u)//2)))
+            self.ups.append(
+                weight_norm(
+                    ConvTranspose1d(
+                        h.upsample_initial_channel // (2**i),
+                        h.upsample_initial_channel // (2 ** (i + 1)),
+                        k,
+                        u,
+                        padding=(k - u) // 2,
+                    )
+                )
+            )
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
             resblock_list = nn.ModuleList()
-            ch = h.upsample_initial_channel//(2**(i+1))
-            for j, (k, d) in enumerate(zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)):
+            ch = h.upsample_initial_channel // (2 ** (i + 1))
+            for j, (k, d) in enumerate(
+                zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
+            ):
                 resblock_list.append(resblock(h, ch, k, d))
             self.resblocks.append(resblock_list)
 
@@ -285,7 +300,7 @@ class Generator(torch.nn.Module):
         new_state_dict = {}
         for k, v in state_dict.items():
             new_k = k
-            if 'resblocks' in k:
+            if "resblocks" in k:
                 parts = k.split(".")
                 # only do this is the checkpoint type is older
                 if len(parts) == 5:
@@ -313,7 +328,7 @@ class Generator(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        print('Removing weight norm...')
+        print("Removing weight norm...")
         for l in self.ups:
             remove_weight_norm(l)
         for group in self.resblocks:
@@ -321,7 +336,6 @@ class Generator(torch.nn.Module):
                 block.remove_weight_norm()
         remove_weight_norm(self.conv_pre)
         remove_weight_norm(self.conv_post)
-
 
 
 class DiscriminatorP(torch.nn.Module):

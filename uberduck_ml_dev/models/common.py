@@ -46,6 +46,7 @@ from .components.partialconv1d import PartialConv1d as pconv1d
 
 >>>>>>> master
 
+
 class Conv1d(nn.Module):
     def __init__(
         self,
@@ -305,10 +306,14 @@ class MelSTFT:
             n_mels=n_mel_channels,
             fmin=mel_fmin,
 <<<<<<< HEAD
+<<<<<<< HEAD
             fmax=mel_fmax
 =======
             fmax=mel_fmax,
 >>>>>>> master
+=======
+            fmax=mel_fmax,
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         )
         mel_basis = torch.from_numpy(mel_basis).float()
         if device == "cuda":
@@ -783,13 +788,17 @@ class WN(torch.nn.Module):
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 class WN_RADTTS(torch.nn.Module):
     """
     Adapted from WN() module in WaveGlow with modififcations to variable names
     """
+<<<<<<< HEAD
 <<<<<<< HEAD
     def __init__(self, n_in_channels, n_context_dim, n_layers, n_channels,
                  kernel_size=5, affine_activation='softplus',
@@ -813,10 +822,27 @@ class WN_RADTTS(torch.nn.Module):
         assert kernel_size % 2 == 1
         assert n_channels % 2 == 0
 >>>>>>> master
+=======
+
+    def __init__(
+        self,
+        n_in_channels,
+        n_context_dim,
+        n_layers,
+        n_channels,
+        kernel_size=5,
+        affine_activation="softplus",
+        use_partial_padding=True,
+    ):
+        super(WN_RADTTS, self).__init__()
+        assert kernel_size % 2 == 1
+        assert n_channels % 2 == 0
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         self.n_layers = n_layers
         self.n_channels = n_channels
         self.in_layers = torch.nn.ModuleList()
         self.res_skip_layers = torch.nn.ModuleList()
+<<<<<<< HEAD
 <<<<<<< HEAD
         start = torch.nn.Conv1d(n_in_channels+n_context_dim, n_channels, 1)
         start = torch.nn.utils.weight_norm(start, name='weight')
@@ -824,6 +850,10 @@ class WN_RADTTS(torch.nn.Module):
         start = torch.nn.Conv1d(n_in_channels + n_context_dim, n_channels, 1)
         start = torch.nn.utils.weight_norm(start, name="weight")
 >>>>>>> master
+=======
+        start = torch.nn.Conv1d(n_in_channels + n_context_dim, n_channels, 1)
+        start = torch.nn.utils.weight_norm(start, name="weight")
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         self.start = start
         self.softplus = torch.nn.Softplus()
         self.affine_activation = affine_activation
@@ -831,15 +861,20 @@ class WN_RADTTS(torch.nn.Module):
         # Initializing last layer to 0 makes the affine coupling layers
         # do nothing at first.  This helps with training stability
 <<<<<<< HEAD
+<<<<<<< HEAD
         end = torch.nn.Conv1d(n_channels, 2*n_in_channels, 1)
 =======
         end = torch.nn.Conv1d(n_channels, 2 * n_in_channels, 1)
 >>>>>>> master
+=======
+        end = torch.nn.Conv1d(n_channels, 2 * n_in_channels, 1)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         end.weight.data.zero_()
         end.bias.data.zero_()
         self.end = end
 
         for i in range(n_layers):
+<<<<<<< HEAD
 <<<<<<< HEAD
             dilation = 2 ** i
             padding = int((kernel_size*dilation - dilation)/2)
@@ -848,6 +883,8 @@ class WN_RADTTS(torch.nn.Module):
                                 use_partial_padding=use_partial_padding,
                                 use_weight_norm=True)
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             dilation = 2**i
             padding = int((kernel_size * dilation - dilation) / 2)
             in_layer = ConvNorm(
@@ -859,7 +896,10 @@ class WN_RADTTS(torch.nn.Module):
                 use_partial_padding=use_partial_padding,
                 use_weight_norm=True,
             )
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             # in_layer = nn.Conv1d(n_channels, n_channels, kernel_size,
             #                      dilation=dilation, padding=padding)
             # in_layer = nn.utils.weight_norm(in_layer)
@@ -869,14 +909,20 @@ class WN_RADTTS(torch.nn.Module):
             self.res_skip_layers.append(res_skip_layer)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     def forward(self, forward_input: Tuple[torch.Tensor, torch.Tensor], seq_lens: torch.Tensor = None):
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     def forward(
         self,
         forward_input: Tuple[torch.Tensor, torch.Tensor],
         seq_lens: torch.Tensor = None,
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         z, context = forward_input
         z = torch.cat((z, context), 1)  # append context to z as well
         z = self.start(z)
@@ -886,10 +932,14 @@ class WN_RADTTS(torch.nn.Module):
             mask = get_mask_from_lengths(seq_lens).unsqueeze(1).float()
         non_linearity = torch.relu
 <<<<<<< HEAD
+<<<<<<< HEAD
         if self.affine_activation == 'softplus':
 =======
         if self.affine_activation == "softplus":
 >>>>>>> master
+=======
+        if self.affine_activation == "softplus":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             non_linearity = self.softplus
 
         for i in range(self.n_layers):
@@ -902,9 +952,12 @@ class WN_RADTTS(torch.nn.Module):
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 # Cell
 class ResidualCouplingLayer(nn.Module):
     def __init__(
@@ -1114,9 +1167,13 @@ LRELU_SLOPE = 0.1
 mel_basis, hann_window = {}, {}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> master
+=======
+
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 def mel_spectrogram_torch(
     y,
     n_fft=FILTER_LENGTH,
@@ -1140,11 +1197,16 @@ def mel_spectrogram_torch(
     if fmax_dtype_device not in mel_basis:
         mel = librosa_mel(
 <<<<<<< HEAD
+<<<<<<< HEAD
             sr=sampling_rate, n_fft=n_fft,
 =======
             sr=sampling_rate,
             n_fft=n_fft,
 >>>>>>> master
+=======
+            sr=sampling_rate,
+            n_fft=n_fft,
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             n_mels=num_mels,
             fmin=fmin,
             fmax=fmax,
@@ -1190,6 +1252,7 @@ def mel_spectrogram_torch(
     return spec
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 def spec_to_mel_torch(spec, n_fft=FILTER_LENGTH, num_mels=N_MEL_CHANNELS, sampling_rate=SAMPLING_RATE, fmin=MEL_FMIN, fmax=MEL_FMAX):
     global mel_basis
     dtype_device = str(spec.dtype) + '_' + str(spec.device)
@@ -1208,6 +1271,20 @@ def spec_to_mel_torch(
     dtype_device = str(spec.dtype) + "_" + str(spec.device)
     fmax_dtype_device = str(fmax) + "_" + dtype_device
 >>>>>>> master
+=======
+
+def spec_to_mel_torch(
+    spec,
+    n_fft=FILTER_LENGTH,
+    num_mels=N_MEL_CHANNELS,
+    sampling_rate=SAMPLING_RATE,
+    fmin=MEL_FMIN,
+    fmax=MEL_FMAX,
+):
+    global mel_basis
+    dtype_device = str(spec.dtype) + "_" + str(spec.device)
+    fmax_dtype_device = str(fmax) + "_" + dtype_device
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     if fmax_dtype_device not in mel_basis:
         mel = librosa_mel(
             sr=sampling_rate,
@@ -1217,12 +1294,18 @@ def spec_to_mel_torch(
             fmax=fmax,
         )
 <<<<<<< HEAD
+<<<<<<< HEAD
         mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(dtype=spec.dtype, device=spec.device)
 =======
         mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
             dtype=spec.dtype, device=spec.device
         )
 >>>>>>> master
+=======
+        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
+            dtype=spec.dtype, device=spec.device
+        )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
 
     def spectral_normalize(magnitudes):
@@ -1233,21 +1316,44 @@ def spec_to_mel_torch(
     return spec
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 def spectrogram_torch(y, n_fft=FILTER_LENGTH, sampling_rate=SAMPLING_RATE, hop_size=HOP_LENGTH, win_size=WIN_LENGTH, center=False):
     if torch.min(y) < -1.:
         print('min value is ', torch.min(y))
     if torch.max(y) > 1.:
         print('max value is ', torch.max(y))
+=======
+
+def spectrogram_torch(
+    y,
+    n_fft=FILTER_LENGTH,
+    sampling_rate=SAMPLING_RATE,
+    hop_size=HOP_LENGTH,
+    win_size=WIN_LENGTH,
+    center=False,
+):
+    if torch.min(y) < -1.0:
+        print("min value is ", torch.min(y))
+    if torch.max(y) > 1.0:
+        print("max value is ", torch.max(y))
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
     global hann_window
-    dtype_device = str(y.dtype) + '_' + str(y.device)
-    wnsize_dtype_device = str(win_size) + '_' + dtype_device
+    dtype_device = str(y.dtype) + "_" + str(y.device)
+    wnsize_dtype_device = str(win_size) + "_" + dtype_device
     if wnsize_dtype_device not in hann_window:
-        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
+        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(
+            dtype=y.dtype, device=y.device
+        )
 
-    y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft-hop_size)/2), int((n_fft-hop_size)/2)), mode='reflect')
+    y = torch.nn.functional.pad(
+        y.unsqueeze(1),
+        (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
+        mode="reflect",
+    )
     y = y.squeeze(1)
 
+<<<<<<< HEAD
     spec = torch.stft(y, n_fft, hop_length=hop_size, win_length=win_size, window=hann_window[wnsize_dtype_device],
                       center=center, pad_mode='reflect', normalized=False, onesided=True)
 =======
@@ -1280,6 +1386,8 @@ def spectrogram_torch(
     )
     y = y.squeeze(1)
 
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     spec = torch.stft(
         y,
         n_fft,
@@ -1291,19 +1399,26 @@ def spectrogram_torch(
         normalized=False,
         onesided=True,
     )
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 # TODO (Sam): unite the get_mel methods
 def get_mel(audio, max_wav_value, stft):
-
 
     # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
     # NOTE (Sam): be carefuly of numerical issues with order of operations here.
     audio = torch.FloatTensor(audio)
+<<<<<<< HEAD
     audio_norm = ((max_wav_value - 1) / max_wav_value ) * (audio / (np.abs(audio).max()))
 =======
 
@@ -1315,6 +1430,9 @@ def get_mel(audio, max_wav_value, stft):
     audio = torch.FloatTensor(audio)
     audio_norm = ((max_wav_value - 1) / max_wav_value) * (audio / (np.abs(audio).max()))
 >>>>>>> master
+=======
+    audio_norm = ((max_wav_value - 1) / max_wav_value) * (audio / (np.abs(audio).max()))
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     # audio_norm = ((max_wav_value - 1) * audio / (np.abs(audio).max())) / max_wav_value
     audio_norm = audio_norm.unsqueeze(0)
     audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
@@ -1332,6 +1450,7 @@ def get_mel(audio, max_wav_value, stft):
     return melspec
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 class ConvAttention(torch.nn.Module):
     def __init__(self, n_mel_channels=80, n_text_channels=512,
                  n_att_channels=80, temperature=1.0):
@@ -1342,6 +1461,13 @@ class ConvAttention(torch.nn.Module):
         self, n_mel_channels=80, n_text_channels=512, n_att_channels=80, temperature=1.0
     ):
 >>>>>>> master
+=======
+
+class ConvAttention(torch.nn.Module):
+    def __init__(
+        self, n_mel_channels=80, n_text_channels=512, n_att_channels=80, temperature=1.0
+    ):
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         super(ConvAttention, self).__init__()
         self.temperature = temperature
         self.softmax = torch.nn.Softmax(dim=3)
@@ -1349,22 +1475,23 @@ class ConvAttention(torch.nn.Module):
 
         self.key_proj = nn.Sequential(
 <<<<<<< HEAD
+<<<<<<< HEAD
             ConvNorm(n_text_channels, n_text_channels*2, kernel_size=3,
                      bias=True, w_init_gain='relu'),
+=======
+            ConvNorm(
+                n_text_channels,
+                n_text_channels * 2,
+                kernel_size=3,
+                bias=True,
+                w_init_gain="relu",
+            ),
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             torch.nn.ReLU(),
-            ConvNorm(n_text_channels*2, n_att_channels, kernel_size=1,
-                     bias=True))
-
-        self.query_proj = nn.Sequential(
-            ConvNorm(n_mel_channels, n_mel_channels*2, kernel_size=3,
-                     bias=True, w_init_gain='relu'),
-            torch.nn.ReLU(),
-            ConvNorm(n_mel_channels*2, n_mel_channels, kernel_size=1,
-                     bias=True),
-            torch.nn.ReLU(),
-            ConvNorm(n_mel_channels, n_att_channels, kernel_size=1, bias=True)
+            ConvNorm(n_text_channels * 2, n_att_channels, kernel_size=1, bias=True),
         )
 
+<<<<<<< HEAD
     def run_padded_sequence(self, sorted_idx, unsort_idx, lens, padded_data,
                             recurrent_model):
 =======
@@ -1379,6 +1506,8 @@ class ConvAttention(torch.nn.Module):
             ConvNorm(n_text_channels * 2, n_att_channels, kernel_size=1, bias=True),
         )
 
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         self.query_proj = nn.Sequential(
             ConvNorm(
                 n_mel_channels,
@@ -1396,7 +1525,10 @@ class ConvAttention(torch.nn.Module):
     def run_padded_sequence(
         self, sorted_idx, unsort_idx, lens, padded_data, recurrent_model
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         """Sorts input data by previded ordering (and un-ordering) and runs the
         packed data through the recurrent model
         Args:
@@ -1421,6 +1553,7 @@ class ConvAttention(torch.nn.Module):
         return hidden_vectors
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     def forward(self, queries, keys, query_lens, mask=None, key_lens=None,
                 attn_prior=None):
 =======
@@ -1428,6 +1561,11 @@ class ConvAttention(torch.nn.Module):
         self, queries, keys, query_lens, mask=None, key_lens=None, attn_prior=None
     ):
 >>>>>>> master
+=======
+    def forward(
+        self, queries, keys, query_lens, mask=None, key_lens=None, attn_prior=None
+    ):
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         """Attention mechanism for radtts. Unlike in Flowtron, we have no
         restrictions such as causality etc, since we only need this during
         training.
@@ -1449,10 +1587,14 @@ class ConvAttention(torch.nn.Module):
         # Gaussian Isotopic Attention
         # B x n_attn_dims x T1 x T2
 <<<<<<< HEAD
+<<<<<<< HEAD
         attn = (queries_enc[:, :, :, None] - keys_enc[:, :, None])**2
 =======
         attn = (queries_enc[:, :, :, None] - keys_enc[:, :, None]) ** 2
 >>>>>>> master
+=======
+        attn = (queries_enc[:, :, :, None] - keys_enc[:, :, None]) ** 2
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         # compute log-likelihood from gaussian
         eps = 1e-8
@@ -1464,16 +1606,21 @@ class ConvAttention(torch.nn.Module):
 
         if mask is not None:
 <<<<<<< HEAD
+<<<<<<< HEAD
             attn.data.masked_fill_(
                 mask.permute(0, 2, 1).unsqueeze(2), -float("inf"))
 =======
             attn.data.masked_fill_(mask.permute(0, 2, 1).unsqueeze(2), -float("inf"))
 >>>>>>> master
+=======
+            attn.data.masked_fill_(mask.permute(0, 2, 1).unsqueeze(2), -float("inf"))
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         attn = self.softmax(attn)  # softmax along T2
         return attn, attn_logprob
 
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 
 
@@ -1484,6 +1631,9 @@ class AffineTransformationLayer(torch.nn.Module):
                  n_channels=1024, use_partial_padding=False):
 =======
 class AffineTransformationLayer(torch.nn.Module):
+=======
+class AffineTransformationLayer(torch.nn.Module):
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     def __init__(
         self,
         n_mel_channels,
@@ -1497,11 +1647,15 @@ class AffineTransformationLayer(torch.nn.Module):
         n_channels=1024,
         use_partial_padding=False,
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         super(AffineTransformationLayer, self).__init__()
         if affine_model not in ("wavenet", "simple_conv"):
             raise Exception("{} affine model not supported".format(affine_model))
         if isinstance(scaling_fn, list):
+<<<<<<< HEAD
 <<<<<<< HEAD
             if not all([x in ("translate", "exp", "tanh", "sigmoid") for x in scaling_fn]):
 =======
@@ -1509,6 +1663,11 @@ class AffineTransformationLayer(torch.nn.Module):
                 [x in ("translate", "exp", "tanh", "sigmoid") for x in scaling_fn]
             ):
 >>>>>>> master
+=======
+            if not all(
+                [x in ("translate", "exp", "tanh", "sigmoid") for x in scaling_fn]
+            ):
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                 raise Exception("{} scaling fn not supported".format(scaling_fn))
         else:
             if scaling_fn not in ("translate", "exp", "tanh", "sigmoid"):
@@ -1517,28 +1676,42 @@ class AffineTransformationLayer(torch.nn.Module):
         self.affine_model = affine_model
         self.scaling_fn = scaling_fn
 <<<<<<< HEAD
+<<<<<<< HEAD
         if affine_model == 'wavenet':
+=======
+        if affine_model == "wavenet":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             self.affine_param_predictor = WN_RADTTS(
-                int(n_mel_channels/2), n_context_dim, n_layers=n_layers,
-                n_channels=n_channels, affine_activation=affine_activation,
-                use_partial_padding=use_partial_padding)
-        elif affine_model == 'simple_conv':
+                int(n_mel_channels / 2),
+                n_context_dim,
+                n_layers=n_layers,
+                n_channels=n_channels,
+                affine_activation=affine_activation,
+                use_partial_padding=use_partial_padding,
+            )
+        elif affine_model == "simple_conv":
             self.affine_param_predictor = SimpleConvNet(
-                int(n_mel_channels / 2), n_context_dim, n_mel_channels,
-                n_layers, with_dilation=with_dilation, kernel_size=kernel_size,
-                use_partial_padding=use_partial_padding)
+                int(n_mel_channels / 2),
+                n_context_dim,
+                n_mel_channels,
+                n_layers,
+                with_dilation=with_dilation,
+                kernel_size=kernel_size,
+                use_partial_padding=use_partial_padding,
+            )
         self.n_mel_channels = n_mel_channels
 
     def get_scaling_and_logs(self, scale_unconstrained):
-        if self.scaling_fn == 'translate':
-            s = torch.exp(scale_unconstrained*0)
-            log_s = scale_unconstrained*0
-        elif self.scaling_fn == 'exp':
+        if self.scaling_fn == "translate":
+            s = torch.exp(scale_unconstrained * 0)
+            log_s = scale_unconstrained * 0
+        elif self.scaling_fn == "exp":
             s = torch.exp(scale_unconstrained)
             log_s = scale_unconstrained  # log(exp
-        elif self.scaling_fn == 'tanh':
+        elif self.scaling_fn == "tanh":
             s = torch.tanh(scale_unconstrained) + 1 + 1e-6
             log_s = torch.log(s)
+<<<<<<< HEAD
         elif self.scaling_fn == 'sigmoid':
 =======
         if affine_model == "wavenet":
@@ -1574,6 +1747,9 @@ class AffineTransformationLayer(torch.nn.Module):
             log_s = torch.log(s)
         elif self.scaling_fn == "sigmoid":
 >>>>>>> master
+=======
+        elif self.scaling_fn == "sigmoid":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             s = torch.sigmoid(scale_unconstrained + 10) + 1e-6
             log_s = torch.log(s)
         elif isinstance(self.scaling_fn, list):
@@ -1581,15 +1757,23 @@ class AffineTransformationLayer(torch.nn.Module):
             for i in range(scale_unconstrained.shape[1]):
                 scaling_i = self.scaling_fn[i]
 <<<<<<< HEAD
+<<<<<<< HEAD
                 if scaling_i == 'translate':
                     s_i = torch.exp(scale_unconstrained[:i]*0)
                     log_s_i = scale_unconstrained[:, i]*0
                 elif scaling_i == 'exp':
+=======
+                if scaling_i == "translate":
+                    s_i = torch.exp(scale_unconstrained[:i] * 0)
+                    log_s_i = scale_unconstrained[:, i] * 0
+                elif scaling_i == "exp":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                     s_i = torch.exp(scale_unconstrained[:, i])
                     log_s_i = scale_unconstrained[:, i]
-                elif scaling_i == 'tanh':
+                elif scaling_i == "tanh":
                     s_i = torch.tanh(scale_unconstrained[:, i]) + 1 + 1e-6
                     log_s_i = torch.log(s_i)
+<<<<<<< HEAD
                 elif scaling_i == 'sigmoid':
 =======
                 if scaling_i == "translate":
@@ -1603,6 +1787,9 @@ class AffineTransformationLayer(torch.nn.Module):
                     log_s_i = torch.log(s_i)
                 elif scaling_i == "sigmoid":
 >>>>>>> master
+=======
+                elif scaling_i == "sigmoid":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                     s_i = torch.sigmoid(scale_unconstrained[:, i]) + 1e-6
                     log_s_i = torch.log(s_i)
                 s_list.append(s_i[:, None])
@@ -1615,11 +1802,17 @@ class AffineTransformationLayer(torch.nn.Module):
         n_half = int(self.n_mel_channels / 2)
         z_0, z_1 = z[:, :n_half], z[:, n_half:]
 <<<<<<< HEAD
+<<<<<<< HEAD
         if self.affine_model == 'wavenet':
+=======
+        if self.affine_model == "wavenet":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             affine_params = self.affine_param_predictor(
-                (z_0, context), seq_lens=seq_lens)
-        elif self.affine_model == 'simple_conv':
+                (z_0, context), seq_lens=seq_lens
+            )
+        elif self.affine_model == "simple_conv":
             z_w_context = torch.cat((z_0, context), 1)
+<<<<<<< HEAD
             affine_params = self.affine_param_predictor(
                 z_w_context, seq_lens=seq_lens)
 =======
@@ -1631,6 +1824,9 @@ class AffineTransformationLayer(torch.nn.Module):
             z_w_context = torch.cat((z_0, context), 1)
             affine_params = self.affine_param_predictor(z_w_context, seq_lens=seq_lens)
 >>>>>>> master
+=======
+            affine_params = self.affine_param_predictor(z_w_context, seq_lens=seq_lens)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         scale_unconstrained = affine_params[:, :n_half, :]
         b = affine_params[:, n_half:, :]
@@ -1680,17 +1876,22 @@ class LengthRegulator(nn.Module):
         max_len = max([x[i].size(0) for i in range(len(x))])
         for i, seq in enumerate(x):
 <<<<<<< HEAD
+<<<<<<< HEAD
             padded = F.pad(
                 seq, [0, 0, 0, max_len - seq.size(0)], 'constant', 0.0)
 =======
             padded = F.pad(seq, [0, 0, 0, max_len - seq.size(0)], "constant", 0.0)
 >>>>>>> master
+=======
+            padded = F.pad(seq, [0, 0, 0, max_len - seq.size(0)], "constant", 0.0)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             output.append(padded)
         output = torch.stack(output)
         return output
 
 
 class ConvNorm(torch.nn.Module):
+<<<<<<< HEAD
 <<<<<<< HEAD
     def __init__(self, in_channels, out_channels, kernel_size=1, stride=1,
                  padding=None, dilation=1, bias=True, w_init_gain='linear',
@@ -1716,6 +1917,24 @@ class ConvNorm(torch.nn.Module):
         if padding is None:
             assert kernel_size % 2 == 1
 >>>>>>> master
+=======
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size=1,
+        stride=1,
+        padding=None,
+        dilation=1,
+        bias=True,
+        w_init_gain="linear",
+        use_partial_padding=False,
+        use_weight_norm=False,
+    ):
+        super(ConvNorm, self).__init__()
+        if padding is None:
+            assert kernel_size % 2 == 1
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             padding = int(dilation * (kernel_size - 1) / 2)
         self.kernel_size = kernel_size
         self.dilation = dilation
@@ -1724,6 +1943,7 @@ class ConvNorm(torch.nn.Module):
         conv_fn = torch.nn.Conv1d
         if self.use_partial_padding:
             conv_fn = pconv1d
+<<<<<<< HEAD
 <<<<<<< HEAD
         self.conv = conv_fn(in_channels, out_channels,
                             kernel_size=kernel_size, stride=stride,
@@ -1745,6 +1965,20 @@ class ConvNorm(torch.nn.Module):
             self.conv.weight, gain=torch.nn.init.calculate_gain(w_init_gain)
         )
 >>>>>>> master
+=======
+        self.conv = conv_fn(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            bias=bias,
+        )
+        torch.nn.init.xavier_uniform_(
+            self.conv.weight, gain=torch.nn.init.calculate_gain(w_init_gain)
+        )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         if self.use_weight_norm:
             self.conv = nn.utils.weight_norm(self.conv)
 
@@ -1763,6 +1997,7 @@ class ConvNorm(torch.nn.Module):
 class Encoder(nn.Module):
     """Encoder module:
 <<<<<<< HEAD
+<<<<<<< HEAD
         - Three 1-d convolution banks
         - Bidirectional LSTM
     """
@@ -1773,6 +2008,11 @@ class Encoder(nn.Module):
     - Three 1-d convolution banks
     - Bidirectional LSTM
     """
+=======
+    - Three 1-d convolution banks
+    - Bidirectional LSTM
+    """
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
     def __init__(
         self,
@@ -1782,12 +2022,16 @@ class Encoder(nn.Module):
         norm_fn=nn.BatchNorm1d,
         lstm_norm_fn=None,
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         super(Encoder, self).__init__()
 
         convolutions = []
         for _ in range(encoder_n_convolutions):
             conv_layer = nn.Sequential(
+<<<<<<< HEAD
 <<<<<<< HEAD
                 ConvNorm(encoder_embedding_dim,
                          encoder_embedding_dim,
@@ -1796,19 +2040,38 @@ class Encoder(nn.Module):
                          dilation=1, w_init_gain='relu',
                          use_partial_padding=True),
                 norm_fn(encoder_embedding_dim, affine=True))
+=======
+                ConvNorm(
+                    encoder_embedding_dim,
+                    encoder_embedding_dim,
+                    kernel_size=encoder_kernel_size,
+                    stride=1,
+                    padding=int((encoder_kernel_size - 1) / 2),
+                    dilation=1,
+                    w_init_gain="relu",
+                    use_partial_padding=True,
+                ),
+                norm_fn(encoder_embedding_dim, affine=True),
+            )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             convolutions.append(conv_layer)
         self.convolutions = nn.ModuleList(convolutions)
 
-        self.lstm = nn.LSTM(encoder_embedding_dim,
-                            int(encoder_embedding_dim / 2), 1,
-                            batch_first=True, bidirectional=True)
+        self.lstm = nn.LSTM(
+            encoder_embedding_dim,
+            int(encoder_embedding_dim / 2),
+            1,
+            batch_first=True,
+            bidirectional=True,
+        )
         if lstm_norm_fn is not None:
-            if 'spectral' in lstm_norm_fn:
+            if "spectral" in lstm_norm_fn:
                 print("Applying spectral norm to text encoder LSTM")
                 lstm_norm_fn_pntr = torch.nn.utils.spectral_norm
-            elif 'weight' in lstm_norm_fn:
+            elif "weight" in lstm_norm_fn:
                 print("Applying weight norm to text encoder LSTM")
                 lstm_norm_fn_pntr = torch.nn.utils.weight_norm
+<<<<<<< HEAD
             self.lstm = lstm_norm_fn_pntr(self.lstm, 'weight_hh_l0')
             self.lstm = lstm_norm_fn_pntr(self.lstm, 'weight_hh_l0_reverse')
 =======
@@ -1844,6 +2107,10 @@ class Encoder(nn.Module):
             self.lstm = lstm_norm_fn_pntr(self.lstm, "weight_hh_l0")
             self.lstm = lstm_norm_fn_pntr(self.lstm, "weight_hh_l0_reverse")
 >>>>>>> master
+=======
+            self.lstm = lstm_norm_fn_pntr(self.lstm, "weight_hh_l0")
+            self.lstm = lstm_norm_fn_pntr(self.lstm, "weight_hh_l0_reverse")
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
     @amp.autocast(False)
     def forward(self, x, in_lens):
@@ -1856,6 +2123,7 @@ class Encoder(nn.Module):
             x_embedded = []
             for b_ind in range(x.size()[0]):  # TODO: improve speed
 <<<<<<< HEAD
+<<<<<<< HEAD
                 curr_x = x[b_ind:b_ind+1, :, :in_lens[b_ind]].clone()
                 for conv in self.convolutions:
                     curr_x = F.dropout(F.relu(conv(curr_x)),
@@ -1865,6 +2133,11 @@ class Encoder(nn.Module):
                 for conv in self.convolutions:
                     curr_x = F.dropout(F.relu(conv(curr_x)), 0.5, self.training)
 >>>>>>> master
+=======
+                curr_x = x[b_ind : b_ind + 1, :, : in_lens[b_ind]].clone()
+                for conv in self.convolutions:
+                    curr_x = F.dropout(F.relu(conv(curr_x)), 0.5, self.training)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                 x_embedded.append(curr_x[0].transpose(0, 1))
             x = torch.nn.utils.rnn.pad_sequence(x_embedded, batch_first=True)
         else:
@@ -1881,11 +2154,15 @@ class Encoder(nn.Module):
         outputs, _ = self.lstm(x)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         outputs, _ = nn.utils.rnn.pad_packed_sequence(
             outputs, batch_first=True)
 =======
         outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
 >>>>>>> master
+=======
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=True)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         return outputs
 
@@ -1909,13 +2186,18 @@ class Invertible1x1ConvLUS(torch.nn.Module):
         # Ensure determinant is 1.0 not -1.0
         if torch.det(W) < 0:
 <<<<<<< HEAD
+<<<<<<< HEAD
             W[:, 0] = -1*W[:, 0]
+=======
+            W[:, 0] = -1 * W[:, 0]
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         p, lower, upper = torch.lu_unpack(*torch.lu(W))
 
-        self.register_buffer('p', p)
+        self.register_buffer("p", p)
         # diagonals of lower will always be 1s anyway
         lower = torch.tril(lower, -1)
         lower_diag = torch.diag(torch.eye(c, c))
+<<<<<<< HEAD
         self.register_buffer('lower_diag', lower_diag)
 =======
             W[:, 0] = -1 * W[:, 0]
@@ -1927,6 +2209,9 @@ class Invertible1x1ConvLUS(torch.nn.Module):
         lower_diag = torch.diag(torch.eye(c, c))
         self.register_buffer("lower_diag", lower_diag)
 >>>>>>> master
+=======
+        self.register_buffer("lower_diag", lower_diag)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         self.lower = nn.Parameter(lower)
         self.upper_diag = nn.Parameter(torch.diag(upper))
         self.upper = nn.Parameter(torch.triu(upper, 1))
@@ -1939,6 +2224,7 @@ class Invertible1x1ConvLUS(torch.nn.Module):
         W = torch.mm(self.p, torch.mm(L, U))
         if inverse:
 <<<<<<< HEAD
+<<<<<<< HEAD
             if not hasattr(self, 'W_inverse'):
                 # inverse computation
                 W_inverse = W.float().inverse()
@@ -1949,16 +2235,26 @@ class Invertible1x1ConvLUS(torch.nn.Module):
                 W_inverse = W.float().inverse()
                 if z.type() == "torch.cuda.HalfTensor":
 >>>>>>> master
+=======
+            if not hasattr(self, "W_inverse"):
+                # inverse computation
+                W_inverse = W.float().inverse()
+                if z.type() == "torch.cuda.HalfTensor":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                     W_inverse = W_inverse.half()
 
                 self.W_inverse = W_inverse[..., None]
             z = F.conv1d(z, self.W_inverse, bias=None, stride=1, padding=0)
             if not self.cache_inverse:
 <<<<<<< HEAD
+<<<<<<< HEAD
                 delattr(self, 'W_inverse')
 =======
                 delattr(self, "W_inverse")
 >>>>>>> master
+=======
+                delattr(self, "W_inverse")
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             return z
         else:
             W = W[..., None]
@@ -1974,6 +2270,7 @@ class Invertible1x1Conv(torch.nn.Module):
     inverse
     """
 <<<<<<< HEAD
+<<<<<<< HEAD
     def __init__(self, c, cache_inverse=False):
         super(Invertible1x1Conv, self).__init__()
         self.conv = torch.nn.Conv1d(c, c, kernel_size=1, stride=1, padding=0,
@@ -1986,6 +2283,14 @@ class Invertible1x1Conv(torch.nn.Module):
             c, c, kernel_size=1, stride=1, padding=0, bias=False
         )
 >>>>>>> master
+=======
+
+    def __init__(self, c, cache_inverse=False):
+        super(Invertible1x1Conv, self).__init__()
+        self.conv = torch.nn.Conv1d(
+            c, c, kernel_size=1, stride=1, padding=0, bias=False
+        )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         # Sample a random orthonormal matrix to initialize weights
         W = torch.qr(torch.FloatTensor(c, c).normal_())[0]
@@ -1993,10 +2298,14 @@ class Invertible1x1Conv(torch.nn.Module):
         # Ensure determinant is 1.0 not -1.0
         if torch.det(W) < 0:
 <<<<<<< HEAD
+<<<<<<< HEAD
             W[:, 0] = -1*W[:, 0]
 =======
             W[:, 0] = -1 * W[:, 0]
 >>>>>>> master
+=======
+            W[:, 0] = -1 * W[:, 0]
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         W = W.view(c, c, 1)
         self.conv.weight.data = W
         self.cache_inverse = cache_inverse
@@ -2006,6 +2315,7 @@ class Invertible1x1Conv(torch.nn.Module):
         W = self.conv.weight.squeeze()
 
         if inverse:
+<<<<<<< HEAD
 <<<<<<< HEAD
             if not hasattr(self, 'W_inverse'):
                 # Inverse computation
@@ -2017,16 +2327,26 @@ class Invertible1x1Conv(torch.nn.Module):
                 W_inverse = W.float().inverse()
                 if z.type() == "torch.cuda.HalfTensor":
 >>>>>>> master
+=======
+            if not hasattr(self, "W_inverse"):
+                # Inverse computation
+                W_inverse = W.float().inverse()
+                if z.type() == "torch.cuda.HalfTensor":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                     W_inverse = W_inverse.half()
 
                 self.W_inverse = W_inverse[..., None]
             z = F.conv1d(z, self.W_inverse, bias=None, stride=1, padding=0)
             if not self.cache_inverse:
 <<<<<<< HEAD
+<<<<<<< HEAD
                 delattr(self, 'W_inverse')
 =======
                 delattr(self, "W_inverse")
 >>>>>>> master
+=======
+                delattr(self, "W_inverse")
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             return z
         else:
             # Forward computation
@@ -2037,10 +2357,13 @@ class Invertible1x1Conv(torch.nn.Module):
 
 class SimpleConvNet(torch.nn.Module):
 <<<<<<< HEAD
+<<<<<<< HEAD
     def __init__(self, n_mel_channels, n_context_dim, final_out_channels,
                  n_layers=2, kernel_size=5, with_dilation=True,
                  max_channels=1024, zero_init=True, use_partial_padding=True):
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     def __init__(
         self,
         n_mel_channels,
@@ -2053,7 +2376,10 @@ class SimpleConvNet(torch.nn.Module):
         zero_init=True,
         use_partial_padding=True,
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         super(SimpleConvNet, self).__init__()
         self.layers = torch.nn.ModuleList()
         self.n_layers = n_layers
@@ -2062,17 +2388,31 @@ class SimpleConvNet(torch.nn.Module):
         self.use_partial_padding = use_partial_padding
         for i in range(n_layers):
 <<<<<<< HEAD
+<<<<<<< HEAD
             dilation = 2 ** i if with_dilation else 1
             padding = int((kernel_size*dilation - dilation)/2)
+=======
+            dilation = 2**i if with_dilation else 1
+            padding = int((kernel_size * dilation - dilation) / 2)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             out_channels = min(max_channels, in_channels * 2)
-            self.layers.append(ConvNorm(in_channels, out_channels,
-                                        kernel_size=kernel_size, stride=1,
-                                        padding=padding, dilation=dilation,
-                                        bias=True, w_init_gain='relu',
-                                        use_partial_padding=use_partial_padding))
+            self.layers.append(
+                ConvNorm(
+                    in_channels,
+                    out_channels,
+                    kernel_size=kernel_size,
+                    stride=1,
+                    padding=padding,
+                    dilation=dilation,
+                    bias=True,
+                    w_init_gain="relu",
+                    use_partial_padding=use_partial_padding,
+                )
+            )
             in_channels = out_channels
 
         self.last_layer = torch.nn.Conv1d(
+<<<<<<< HEAD
             out_channels, final_out_channels, kernel_size=1)
 =======
             dilation = 2**i if with_dilation else 1
@@ -2097,6 +2437,10 @@ class SimpleConvNet(torch.nn.Module):
             out_channels, final_out_channels, kernel_size=1
         )
 >>>>>>> master
+=======
+            out_channels, final_out_channels, kernel_size=1
+        )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         if zero_init:
             self.last_layer.weight.data *= 0
@@ -2118,6 +2462,7 @@ class SimpleConvNet(torch.nn.Module):
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 # Affine Coupling Layers
 class SplineTransformationLayerAR(torch.nn.Module):
@@ -2128,6 +2473,10 @@ class SplineTransformationLayerAR(torch.nn.Module):
 =======
 # Affine Coupling Layers
 class SplineTransformationLayerAR(torch.nn.Module):
+=======
+# Affine Coupling Layers
+class SplineTransformationLayerAR(torch.nn.Module):
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     def __init__(
         self,
         n_in_channels,
@@ -2145,7 +2494,10 @@ class SplineTransformationLayerAR(torch.nn.Module):
         top=6,
         use_quadratic=False,
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         super(SplineTransformationLayerAR, self).__init__()
         self.n_in_channels = n_in_channels  # input dimensions
         self.left = left
@@ -2166,10 +2518,13 @@ class SplineTransformationLayerAR(torch.nn.Module):
         # autoregressive flow, kernel size 1 and no dilation
         self.param_predictor = SimpleConvNet(
 <<<<<<< HEAD
+<<<<<<< HEAD
             n_context_dim, 0, final_out_channels, n_layers,
             with_dilation=False, kernel_size=1, zero_init=True,
             use_partial_padding=False)
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             n_context_dim,
             0,
             final_out_channels,
@@ -2179,7 +2534,10 @@ class SplineTransformationLayerAR(torch.nn.Module):
             zero_init=True,
             use_partial_padding=False,
         )
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         # output is unnormalized bin weights
 
@@ -2207,11 +2565,15 @@ class SplineTransformationLayerAR(torch.nn.Module):
 
         if z.min() < 0.0 or z.max() > 1.0:
 <<<<<<< HEAD
+<<<<<<< HEAD
             print('spline z scaled beyond [0, 1]', z.min(), z.max())
 
 =======
             print("spline z scaled beyond [0, 1]", z.min(), z.max())
 >>>>>>> master
+=======
+            print("spline z scaled beyond [0, 1]", z.min(), z.max())
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         z_reshaped = z.permute(0, 2, 1).reshape(b_s * t_s, -1)
         affine_params = self.param_predictor(context)
@@ -2219,11 +2581,18 @@ class SplineTransformationLayerAR(torch.nn.Module):
         with amp.autocast(enabled=False):
             if self.use_quadratic:
 <<<<<<< HEAD
+<<<<<<< HEAD
                 w = q_tilde[:, :, :self.n_bins // 2]
                 v = q_tilde[:, :, self.n_bins // 2:]
+=======
+                w = q_tilde[:, :, : self.n_bins // 2]
+                v = q_tilde[:, :, self.n_bins // 2 :]
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                 z_tformed, log_s = self.spline_fn(
-                    z_reshaped.float(), w.float(), v.float(), inverse=inverse)
+                    z_reshaped.float(), w.float(), v.float(), inverse=inverse
+                )
             else:
+<<<<<<< HEAD
                 z_tformed, log_s = self.spline_fn(
                     z_reshaped.float(), q_tilde.float())
 =======
@@ -2235,6 +2604,9 @@ class SplineTransformationLayerAR(torch.nn.Module):
             else:
                 z_tformed, log_s = self.spline_fn(z_reshaped.float(), q_tilde.float())
 >>>>>>> master
+=======
+                z_tformed, log_s = self.spline_fn(z_reshaped.float(), q_tilde.float())
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         z = z_tformed.reshape(b_s, t_s, -1).permute(0, 2, 1)
         z = self.denormalize(z, inverse)
@@ -2244,6 +2616,7 @@ class SplineTransformationLayerAR(torch.nn.Module):
         log_s = log_s.reshape(b_s, t_s, -1)
         log_s = log_s.permute(0, 2, 1)
 <<<<<<< HEAD
+<<<<<<< HEAD
         log_s = log_s + c_s * (np.log(self.top - self.bottom) -
                                np.log(self.right - self.left))
 =======
@@ -2251,6 +2624,11 @@ class SplineTransformationLayerAR(torch.nn.Module):
             np.log(self.top - self.bottom) - np.log(self.right - self.left)
         )
 >>>>>>> master
+=======
+        log_s = log_s + c_s * (
+            np.log(self.top - self.bottom) - np.log(self.right - self.left)
+        )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         return z, log_s
 
 
@@ -2260,15 +2638,21 @@ class DenseLayer(nn.Module):
         in_sizes = [in_dim] + sizes[:-1]
         self.layers = nn.ModuleList(
 <<<<<<< HEAD
+<<<<<<< HEAD
             [LinearNorm(in_size, out_size, bias=True)
              for (in_size, out_size) in zip(in_sizes, sizes)])
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             [
                 LinearNorm(in_size, out_size, bias=True)
                 for (in_size, out_size) in zip(in_sizes, sizes)
             ]
         )
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
     def forward(self, x):
         for linear in self.layers:
@@ -2276,18 +2660,42 @@ class DenseLayer(nn.Module):
         return x
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 from .components.splines import (piecewise_linear_transform,
                      piecewise_linear_inverse_transform,
                      unbounded_piecewise_quadratic_transform)
                      
+=======
+
+from .components.splines import (
+    piecewise_linear_transform,
+    piecewise_linear_inverse_transform,
+    unbounded_piecewise_quadratic_transform,
+)
+
+
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 class SplineTransformationLayer(torch.nn.Module):
-    def __init__(self, n_mel_channels, n_context_dim, n_layers,
-                 with_dilation=True, kernel_size=5,
-                 scaling_fn='exp', affine_activation='softplus',
-                 n_channels=1024, n_bins=8, left=-4, right=4, bottom=-4, top=4,
-                 use_quadratic=False):
+    def __init__(
+        self,
+        n_mel_channels,
+        n_context_dim,
+        n_layers,
+        with_dilation=True,
+        kernel_size=5,
+        scaling_fn="exp",
+        affine_activation="softplus",
+        n_channels=1024,
+        n_bins=8,
+        left=-4,
+        right=4,
+        bottom=-4,
+        top=4,
+        use_quadratic=False,
+    ):
         super(SplineTransformationLayer, self).__init__()
         self.n_mel_channels = n_mel_channels  # input dimensions
+<<<<<<< HEAD
         self.half_mel_channels = int(n_mel_channels/2)  # half, because we split
 =======
 
@@ -2320,6 +2728,9 @@ class SplineTransformationLayer(torch.nn.Module):
         self.n_mel_channels = n_mel_channels  # input dimensions
         self.half_mel_channels = int(n_mel_channels / 2)  # half, because we split
 >>>>>>> master
+=======
+        self.half_mel_channels = int(n_mel_channels / 2)  # half, because we split
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         self.left = left
         self.right = right
         self.bottom = bottom
@@ -2333,6 +2744,7 @@ class SplineTransformationLayer(torch.nn.Module):
             self.spline_fn = unbounded_piecewise_quadratic_transform
             self.inv_spline_fn = unbounded_piecewise_quadratic_transform
 <<<<<<< HEAD
+<<<<<<< HEAD
             self.n_bins = 2*self.n_bins+1
         final_out_channels = self.half_mel_channels*self.n_bins
 
@@ -2345,6 +2757,12 @@ class SplineTransformationLayer(torch.nn.Module):
         final_out_channels = self.half_mel_channels * self.n_bins
 
         self.param_predictor = SimpleConvNet(
+=======
+            self.n_bins = 2 * self.n_bins + 1
+        final_out_channels = self.half_mel_channels * self.n_bins
+
+        self.param_predictor = SimpleConvNet(
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             self.half_mel_channels,
             n_context_dim,
             final_out_channels,
@@ -2353,7 +2771,10 @@ class SplineTransformationLayer(torch.nn.Module):
             kernel_size=kernel_size,
             zero_init=False,
         )
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         # output is unnormalized bin weights
 
@@ -2367,21 +2788,25 @@ class SplineTransformationLayer(torch.nn.Module):
         # normalize to [0,1]
         if inverse:
 <<<<<<< HEAD
+<<<<<<< HEAD
             z_1 = (z_1 - self.bottom)/(self.top - self.bottom)
+=======
+            z_1 = (z_1 - self.bottom) / (self.top - self.bottom)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         else:
-            z_1 = (z_1 - self.left)/(self.right - self.left)
+            z_1 = (z_1 - self.left) / (self.right - self.left)
 
         z_w_context = torch.cat((z_0, context), 1)
         affine_params = self.param_predictor(z_w_context, seq_lens)
-        z_1_reshaped = z_1.permute(0, 2, 1).reshape(b_s*t_s, -1)
-        q_tilde = affine_params.permute(0, 2, 1).reshape(
-            b_s*t_s, n_half, self.n_bins)
+        z_1_reshaped = z_1.permute(0, 2, 1).reshape(b_s * t_s, -1)
+        q_tilde = affine_params.permute(0, 2, 1).reshape(b_s * t_s, n_half, self.n_bins)
 
         with autocast(enabled=False):
             if self.use_quadratic:
-                w = q_tilde[:, :, :self.n_bins//2]
-                v = q_tilde[:, :, self.n_bins//2:]
+                w = q_tilde[:, :, : self.n_bins // 2]
+                v = q_tilde[:, :, self.n_bins // 2 :]
                 z_1_tformed, log_s = self.spline_fn(
+<<<<<<< HEAD
                     z_1_reshaped.float(), w.float(), v.float(),
                     inverse=inverse)
 =======
@@ -2402,11 +2827,16 @@ class SplineTransformationLayer(torch.nn.Module):
                     z_1_reshaped.float(), w.float(), v.float(), inverse=inverse
                 )
 >>>>>>> master
+=======
+                    z_1_reshaped.float(), w.float(), v.float(), inverse=inverse
+                )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                 if not inverse:
                     log_s = torch.sum(log_s, 1)
             else:
                 if inverse:
                     z_1_tformed, _dc = self.inv_spline_fn(
+<<<<<<< HEAD
 <<<<<<< HEAD
                         z_1_reshaped.float(), q_tilde.float(), False)
                 else:
@@ -2420,6 +2850,14 @@ class SplineTransformationLayer(torch.nn.Module):
                         z_1_reshaped.float(), q_tilde.float()
                     )
 >>>>>>> master
+=======
+                        z_1_reshaped.float(), q_tilde.float(), False
+                    )
+                else:
+                    z_1_tformed, log_s = self.spline_fn(
+                        z_1_reshaped.float(), q_tilde.float()
+                    )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         z_1 = z_1_tformed.reshape(b_s, t_s, -1).permute(0, 2, 1)
 
@@ -2432,6 +2870,7 @@ class SplineTransformationLayer(torch.nn.Module):
             z_1 = z_1 * (self.top - self.bottom) + self.bottom
             z = torch.cat((z_0, z_1), dim=1)
 <<<<<<< HEAD
+<<<<<<< HEAD
             log_s = log_s.reshape(b_s, t_s).unsqueeze(1) + \
                 n_half*(np.log(self.top - self.bottom) -
                         np.log(self.right-self.left))
@@ -2440,15 +2879,23 @@ class SplineTransformationLayer(torch.nn.Module):
                 np.log(self.top - self.bottom) - np.log(self.right - self.left)
             )
 >>>>>>> master
+=======
+            log_s = log_s.reshape(b_s, t_s).unsqueeze(1) + n_half * (
+                np.log(self.top - self.bottom) - np.log(self.right - self.left)
+            )
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             return z, log_s
 
 
 class ConvLSTMLinear(nn.Module):
 <<<<<<< HEAD
+<<<<<<< HEAD
     def __init__(self, in_dim, out_dim, n_layers=2, n_channels=256,
                  kernel_size=3, p_dropout=0.1, lstm_type='bilstm',
                  use_linear=True):
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     def __init__(
         self,
         in_dim,
@@ -2460,7 +2907,10 @@ class ConvLSTMLinear(nn.Module):
         lstm_type="bilstm",
         use_linear=True,
     ):
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         super(ConvLSTMLinear, self).__init__()
         self.out_dim = out_dim
         self.lstm_type = lstm_type
@@ -2471,6 +2921,7 @@ class ConvLSTMLinear(nn.Module):
         for i in range(n_layers):
             conv_layer = ConvNorm(
 <<<<<<< HEAD
+<<<<<<< HEAD
                 in_dim if i == 0 else n_channels, n_channels,
                 kernel_size=kernel_size, stride=1,
                 padding=int((kernel_size - 1) / 2), dilation=1,
@@ -2478,6 +2929,8 @@ class ConvLSTMLinear(nn.Module):
             conv_layer = torch.nn.utils.weight_norm(
                 conv_layer.conv, name='weight')
 =======
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
                 in_dim if i == 0 else n_channels,
                 n_channels,
                 kernel_size=kernel_size,
@@ -2487,7 +2940,10 @@ class ConvLSTMLinear(nn.Module):
                 w_init_gain="relu",
             )
             conv_layer = torch.nn.utils.weight_norm(conv_layer.conv, name="weight")
+<<<<<<< HEAD
 >>>>>>> master
+=======
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             convolutions.append(conv_layer)
 
         self.convolutions = nn.ModuleList(convolutions)
@@ -2496,16 +2952,22 @@ class ConvLSTMLinear(nn.Module):
             n_channels = out_dim
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         if self.lstm_type != '':
+=======
+        if self.lstm_type != "":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             use_bilstm = False
             lstm_channels = n_channels
-            if self.lstm_type == 'bilstm':
+            if self.lstm_type == "bilstm":
                 use_bilstm = True
                 lstm_channels = int(n_channels // 2)
 
-            self.bilstm = nn.LSTM(n_channels, lstm_channels, 1,
-                                  batch_first=True, bidirectional=use_bilstm)
+            self.bilstm = nn.LSTM(
+                n_channels, lstm_channels, 1, batch_first=True, bidirectional=use_bilstm
+            )
             lstm_norm_fn_pntr = nn.utils.spectral_norm
+<<<<<<< HEAD
             self.bilstm = lstm_norm_fn_pntr(self.bilstm, 'weight_hh_l0')
             if self.lstm_type == 'bilstm':
                 self.bilstm = lstm_norm_fn_pntr(self.bilstm, 'weight_hh_l0_reverse')
@@ -2525,6 +2987,11 @@ class ConvLSTMLinear(nn.Module):
             if self.lstm_type == "bilstm":
                 self.bilstm = lstm_norm_fn_pntr(self.bilstm, "weight_hh_l0_reverse")
 >>>>>>> master
+=======
+            self.bilstm = lstm_norm_fn_pntr(self.bilstm, "weight_hh_l0")
+            if self.lstm_type == "bilstm":
+                self.bilstm = lstm_norm_fn_pntr(self.bilstm, "weight_hh_l0_reverse")
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         if self.use_linear:
             self.dense = nn.Linear(n_channels, out_dim)
@@ -2532,6 +2999,7 @@ class ConvLSTMLinear(nn.Module):
     def run_padded_sequence(self, context, lens):
         context_embedded = []
         for b_ind in range(context.size()[0]):  # TODO: speed up
+<<<<<<< HEAD
 <<<<<<< HEAD
             curr_context = context[b_ind:b_ind+1, :, :lens[b_ind]].clone()
             for conv in self.convolutions:
@@ -2546,6 +3014,13 @@ class ConvLSTMLinear(nn.Module):
             context_embedded.append(curr_context[0].transpose(0, 1))
         context = torch.nn.utils.rnn.pad_sequence(context_embedded, batch_first=True)
 >>>>>>> master
+=======
+            curr_context = context[b_ind : b_ind + 1, :, : lens[b_ind]].clone()
+            for conv in self.convolutions:
+                curr_context = self.dropout(F.relu(conv(curr_context)))
+            context_embedded.append(curr_context[0].transpose(0, 1))
+        context = torch.nn.utils.rnn.pad_sequence(context_embedded, batch_first=True)
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         return context
 
     def run_unsorted_inputs(self, fn, context, lens):
@@ -2558,6 +3033,7 @@ class ConvLSTMLinear(nn.Module):
         context = context[ids_sorted]
         context = nn.utils.rnn.pack_padded_sequence(
 <<<<<<< HEAD
+<<<<<<< HEAD
             context, lens_sorted, batch_first=True)
         context = fn(context)[0]
         context = nn.utils.rnn.pad_packed_sequence(
@@ -2568,6 +3044,12 @@ class ConvLSTMLinear(nn.Module):
         context = fn(context)[0]
         context = nn.utils.rnn.pad_packed_sequence(context, batch_first=True)[0]
 >>>>>>> master
+=======
+            context, lens_sorted, batch_first=True
+        )
+        context = fn(context)[0]
+        context = nn.utils.rnn.pad_packed_sequence(context, batch_first=True)[0]
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 
         # map back to original indices
         context = context[unsort_ids]
@@ -2583,10 +3065,14 @@ class ConvLSTMLinear(nn.Module):
                 context = self.dropout(F.relu(conv(context)))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         if self.lstm_type != '':
 =======
         if self.lstm_type != "":
 >>>>>>> master
+=======
+        if self.lstm_type != "":
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
             context = context.transpose(1, 2)
             self.bilstm.flatten_parameters()
             if lens is not None:
@@ -2603,6 +3089,7 @@ class ConvLSTMLinear(nn.Module):
 
     def infer(self, z, txt_enc, spk_emb):
 <<<<<<< HEAD
+<<<<<<< HEAD
         x_hat = self.forward(txt_enc, spk_emb)['x_hat']
         x_hat = self.feature_processing.denormalize(x_hat)
         return x_hat
@@ -2612,3 +3099,8 @@ class ConvLSTMLinear(nn.Module):
         x_hat = self.feature_processing.denormalize(x_hat)
         return x_hat
 >>>>>>> master
+=======
+        x_hat = self.forward(txt_enc, spk_emb)["x_hat"]
+        x_hat = self.feature_processing.denormalize(x_hat)
+        return x_hat
+>>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b

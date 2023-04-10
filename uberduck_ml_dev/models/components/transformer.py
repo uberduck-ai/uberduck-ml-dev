@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from uberduck_ml_dev.utils.utils import get_mask_from_lengths
+from ...utils.utils import get_mask_from_lengths
 
 from ..common import LinearNorm
 
@@ -24,11 +24,12 @@ class PositionalEmbedding(nn.Module):
         super(PositionalEmbedding, self).__init__()
         self.demb = demb
         inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
-        self.register_buffer('inv_freq', inv_freq)
+        self.register_buffer("inv_freq", inv_freq)
 
     def forward(self, pos_seq, bsz=None):
-        sinusoid_inp = torch.matmul(torch.unsqueeze(pos_seq, -1),
-                                    torch.unsqueeze(self.inv_freq, 0))
+        sinusoid_inp = torch.matmul(
+            torch.unsqueeze(pos_seq, -1), torch.unsqueeze(self.inv_freq, 0)
+        )
         pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=1)
         if bsz is not None:
             return pos_emb[None, :, :].expand(bsz, -1, -1)
@@ -79,14 +80,13 @@ class PositionwiseConvFF(nn.Module):
 
 
 class MultiHeadAttn(nn.Module):
-    def __init__(self, n_head, d_model, d_head, dropout, dropatt=0.1,
-                 pre_lnorm=False):
+    def __init__(self, n_head, d_model, d_head, dropout, dropatt=0.1, pre_lnorm=False):
         super(MultiHeadAttn, self).__init__()
 
         self.n_head = n_head
         self.d_model = d_model
         self.d_head = d_head
-        self.scale = 1 / (d_head ** 0.5)
+        self.scale = 1 / (d_head**0.5)
         self.pre_lnorm = pre_lnorm
 
         self.qkv_net = nn.Linear(d_model, 3 * n_head * d_head)
@@ -122,15 +122,18 @@ class MultiHeadAttn(nn.Module):
         if attn_mask is not None:
             attn_mask = attn_mask.unsqueeze(1).to(attn_score.dtype)
             attn_mask = attn_mask.repeat(n_head, attn_mask.size(2), 1)
-            attn_score.masked_fill_(attn_mask.to(torch.bool), -float('inf'))
+            attn_score.masked_fill_(attn_mask.to(torch.bool), -float("inf"))
 
         attn_prob = F.softmax(attn_score, dim=2)
         attn_prob = self.dropatt(attn_prob)
         attn_vec = torch.bmm(attn_prob, v)
 
         attn_vec = attn_vec.view(n_head, inp.size(0), inp.size(1), d_head)
-        attn_vec = attn_vec.permute(1, 2, 0, 3).contiguous().view(
-            inp.size(0), inp.size(1), n_head * d_head)
+        attn_vec = (
+            attn_vec.permute(1, 2, 0, 3)
+            .contiguous()
+            .view(inp.size(0), inp.size(1), n_head * d_head)
+        )
 
         # linear projection
         attn_out = self.o_net(attn_vec)
@@ -145,8 +148,9 @@ class MultiHeadAttn(nn.Module):
 
 
 class TransformerLayer(nn.Module):
-    def __init__(self, n_head, d_model, d_head, d_inner, kernel_size, dropout,
-                 **kwargs):
+    def __init__(
+        self, n_head, d_model, d_head, d_inner, kernel_size, dropout, **kwargs
+    ):
         super(TransformerLayer, self).__init__()
 
         self.dec_attn = MultiHeadAttn(n_head, d_model, d_head, dropout, **kwargs)
@@ -161,9 +165,19 @@ class TransformerLayer(nn.Module):
 
 
 class FFTransformer(nn.Module):
-    def __init__(self, in_dim, out_dim=1, n_layers=6, n_head=1, d_head=64,
-                 d_inner=1024, kernel_size=3, dropout=0.1, dropatt=0.1,
-                 dropemb=0.0):
+    def __init__(
+        self,
+        in_dim,
+        out_dim=1,
+        n_layers=6,
+        n_head=1,
+        d_head=64,
+        d_inner=1024,
+        kernel_size=3,
+        dropout=0.1,
+        dropatt=0.1,
+        dropemb=0.0,
+    ):
         super(FFTransformer, self).__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -177,8 +191,14 @@ class FFTransformer(nn.Module):
         for _ in range(n_layers):
             self.layers.append(
                 TransformerLayer(
-                    n_head, in_dim, d_head, d_inner, kernel_size, dropout,
-                    dropatt=dropatt)
+                    n_head,
+                    in_dim,
+                    d_head,
+                    d_inner,
+                    kernel_size,
+                    dropout,
+                    dropatt=dropatt,
+                )
             )
 
         self.dense = LinearNorm(in_dim, out_dim)

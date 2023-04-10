@@ -146,10 +146,12 @@ def to_gpu(x):
 
     return x
 
+
 def to_gpu_radtts(batch):
 
     output = {k: to_gpu(v) for k, v in batch}
     return output
+
 
 def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     """Return a mask matrix. Unmasked entires are true."""
@@ -158,6 +160,7 @@ def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     ids = torch.arange(0, max_len, device=lengths.device, dtype=torch.long)
     mask = ids < lengths.unsqueeze(1)
     return mask
+
 
 def get_mask_from_lengths_radtts(lengths):
     """Constructs binary mask from a 1D torch tensor of input lengths

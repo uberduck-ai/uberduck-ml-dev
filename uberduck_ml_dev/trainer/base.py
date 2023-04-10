@@ -16,6 +16,7 @@ from ..vocoders.hifigan import HiFiGanGenerator
 from ..models.base import DEFAULTS as MODEL_DEFAULTS
 from ..vendor.tfcompat.hparam import HParams
 
+
 def sample(mel, algorithm="griffin-lim"):
     if algorithm == "griffin-lim":
         mel_stft = MelSTFT()
@@ -34,6 +35,7 @@ def sample(mel, algorithm="griffin-lim"):
     else:
         raise NotImplemented
     return audio
+
 
 # Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class.
 class TTSTrainer:

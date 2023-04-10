@@ -15,10 +15,10 @@
 # without limitation the rights to use, copy, modify, merge, publish,
 # distribute, sublicense, and/or sell copies of the Software, and to
 # permit persons to whom the Software is furnished to do so, subject to
-# the following conditions: 
+# the following conditions:
 
 # The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software. 
+# included in all copies or substantial portions of the Software.
 
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -26,16 +26,18 @@
 # NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. 
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 import torch
 import torch.nn.functional as F
+
 third_dimension_softmax = torch.nn.Softmax(dim=2)
 
 
-def piecewise_linear_transform(x, q_tilde, compute_jacobian=True,
-                               outlier_passthru=True):
+def piecewise_linear_transform(
+    x, q_tilde, compute_jacobian=True, outlier_passthru=True
+):
     """Apply an element-wise piecewise-linear transformation to some variables
 
     Parameters
@@ -69,10 +71,10 @@ def piecewise_linear_transform(x, q_tilde, compute_jacobian=True,
     Nx, kx = x.shape
     assert N == Nx and k == kx, "Shape mismatch"
 
-    w = 1. / b
+    w = 1.0 / b
 
     # Compute normalized bin heights with softmax function on bin dimension
-    q = 1. / w * third_dimension_softmax(q_tilde)
+    q = 1.0 / w * third_dimension_softmax(q_tilde)
     # x is in the mx-th bin: x \in [0,1],
     # mx \in [[0,b-1]], so we clamp away the case x == 1
     mx = torch.clamp(torch.floor(b * x), 0, b - 1).to(torch.long)
@@ -105,25 +107,23 @@ def piecewise_linear_transform(x, q_tilde, compute_jacobian=True,
     # Regularization: points must be strictly within the unit hypercube
     # Use the dtype information from pytorch
     eps = torch.finfo(out.dtype).eps
-    out = out.clamp(
-        min=eps,
-        max=1. - eps
-    )
-    oob_mask = torch.logical_or(x < 0.0, x >1.0).detach().float()
+    out = out.clamp(min=eps, max=1.0 - eps)
+    oob_mask = torch.logical_or(x < 0.0, x > 1.0).detach().float()
     if outlier_passthru:
-        out = out * (1-oob_mask) + x * oob_mask
-        slopes = slopes * (1-oob_mask) + oob_mask
+        out = out * (1 - oob_mask) + x * oob_mask
+        slopes = slopes * (1 - oob_mask) + oob_mask
 
     if compute_jacobian:
-        #logj = torch.log(torch.prod(slopes.float(), 1))
+        # logj = torch.log(torch.prod(slopes.float(), 1))
         logj = torch.sum(torch.log(slopes), 1)
     del slopes
 
     return out, logj
 
 
-def piecewise_linear_inverse_transform(y, q_tilde, compute_jacobian=True,
-                                       outlier_passthru=True):
+def piecewise_linear_inverse_transform(
+    y, q_tilde, compute_jacobian=True, outlier_passthru=True
+):
     """
     Apply inverse of an element-wise piecewise-linear transformation to some
     variables
@@ -159,10 +159,10 @@ def piecewise_linear_inverse_transform(y, q_tilde, compute_jacobian=True,
     Ny, ky = y.shape
     assert N == Ny and k == ky, "Shape mismatch"
 
-    w = 1. / b
+    w = 1.0 / b
 
     # Compute normalized bin heights with softmax function on the bin dimension
-    q = 1. / w * third_dimension_softmax(q_tilde)
+    q = 1.0 / w * third_dimension_softmax(q_tilde)
 
     # Compute the integral over the left-bins in the forward transform.
     # 1. Compute all integrals: cumulative sum of bin height * bin weight.
@@ -180,12 +180,16 @@ def piecewise_linear_inverse_transform(y, q_tilde, compute_jacobian=True,
     # so that their difference is at most 1.
     # By setting the negative values to 2., we know that the
     # smallest value left is the smallest positive
-    edges[edges < 0] = 2.
+    edges[edges < 0] = 2.0
     edges = torch.clamp(torch.argmin(edges, dim=2), 0, b - 1).to(torch.long)
 
     # Need special error handling because trying to index with mx
     # if it contains nans will lock the GPU. (device-side assert triggered)
-    if torch.any(torch.isnan(edges)).item() or torch.any(edges < 0) or torch.any(edges >= b):
+    if (
+        torch.any(torch.isnan(edges)).item()
+        or torch.any(edges < 0)
+        or torch.any(edges >= b)
+    ):
         raise AvertedCUDARuntimeError("NaN detected in PWLinear bin indexing")
 
     # Gather the left integrals at each edge. See comment about gathering in q_left_integrals
@@ -201,25 +205,23 @@ def piecewise_linear_inverse_transform(y, q_tilde, compute_jacobian=True,
     # Regularization: points must be strictly within the unit hypercube
     # Use the dtype information from pytorch
     eps = torch.finfo(x.dtype).eps
-    x = x.clamp(
-        min=eps,
-        max=1. - eps
-    )
-    oob_mask = torch.logical_or(y < 0.0, y >1.0).detach().float()
+    x = x.clamp(min=eps, max=1.0 - eps)
+    oob_mask = torch.logical_or(y < 0.0, y > 1.0).detach().float()
     if outlier_passthru:
-        x = x * (1-oob_mask) + y * oob_mask
-        q = q * (1-oob_mask) + oob_mask
+        x = x * (1 - oob_mask) + y * oob_mask
+        q = q * (1 - oob_mask) + oob_mask
 
     # Prepare the jacobian
     logj = None
     if compute_jacobian:
-        #logj = - torch.log(torch.prod(q, 1))
+        # logj = - torch.log(torch.prod(q, 1))
         logj = -torch.sum(torch.log(q.float()), 1)
     return x.detach(), logj
 
 
-def unbounded_piecewise_quadratic_transform(x, w_tilde, v_tilde, upper=1,
-                                            lower=0, inverse=False):
+def unbounded_piecewise_quadratic_transform(
+    x, w_tilde, v_tilde, upper=1, lower=0, inverse=False
+):
     assert upper > lower
     _range = upper - lower
     inside_interval_mask = (x >= lower) & (x < upper)
@@ -235,7 +237,8 @@ def unbounded_piecewise_quadratic_transform(x, w_tilde, v_tilde, upper=1,
         (x[inside_interval_mask] - lower) / _range,
         w_tilde[inside_interval_mask, :],
         v_tilde[inside_interval_mask, :],
-        inverse=inverse)
+        inverse=inverse,
+    )
     outputs[inside_interval_mask] = output * _range + lower
     if not inverse:
         # the before and after transformation cancel out, so the log_j would be just as it is.
@@ -244,12 +247,14 @@ def unbounded_piecewise_quadratic_transform(x, w_tilde, v_tilde, upper=1,
         log_j = None
     return outputs, log_j
 
+
 def weighted_softmax(v, w):
     # to avoid NaN...
     v = v - torch.max(v, dim=-1, keepdim=True)[0]
-    v = torch.exp(v) + 1e-8 # to avoid NaN...
+    v = torch.exp(v) + 1e-8  # to avoid NaN...
     v_sum = torch.sum((v[..., :-1] + v[..., 1:]) / 2 * w, dim=-1, keepdim=True)
     return v / v_sum
+
 
 def piecewise_quadratic_transform(x, w_tilde, v_tilde, inverse=False):
     """Element-wise piecewise-quadratic transformation
@@ -274,12 +279,12 @@ def piecewise_quadratic_transform(x, w_tilde, v_tilde, inverse=False):
     v = weighted_softmax(v_tilde, w)
     w_cumsum = torch.cumsum(w, dim=-1)
     # force sum = 1
-    w_cumsum[..., -1] = 1.
-    w_cumsum_shift = F.pad(w_cumsum, (1,0), 'constant', 0)
+    w_cumsum[..., -1] = 1.0
+    w_cumsum_shift = F.pad(w_cumsum, (1, 0), "constant", 0)
     cdf = torch.cumsum((v[..., 1:] + v[..., :-1]) / 2 * w, dim=-1)
     # force sum = 1
-    cdf[..., -1] = 1.
-    cdf_shift = F.pad(cdf, (1,0), 'constant', 0)
+    cdf[..., -1] = 1.0
+    cdf_shift = F.pad(cdf, (1, 0), "constant", 0)
 
     if not inverse:
         # * x D x 1, (w_cumsum[idx-1] < x <= w_cumsum[idx])
@@ -296,13 +301,13 @@ def piecewise_quadratic_transform(x, w_tilde, v_tilde, inverse=False):
 
     if not inverse:
         alpha = (x - w_bn1) / w_b.clamp(min=torch.finfo(w_b.dtype).eps)
-        c = (alpha ** 2) / 2 * (v_bp1 - v_b) * w_b + alpha * v_b * w_b + cdf_bn1
+        c = (alpha**2) / 2 * (v_bp1 - v_b) * w_b + alpha * v_b * w_b + cdf_bn1
 
         # just sum of log pdfs
         log_j = torch.lerp(v_b, v_bp1, alpha).clamp(min=torch.finfo(c.dtype).eps).log()
 
         # make sure it falls into [0,1)
-        c = c.clamp(min=torch.finfo(c.dtype).eps, max=1. - torch.finfo(c.dtype).eps)
+        c = c.clamp(min=torch.finfo(c.dtype).eps, max=1.0 - torch.finfo(c.dtype).eps)
         return c, log_j
     else:
         # quadratic equation for alpha
@@ -315,5 +320,7 @@ def piecewise_quadratic_transform(x, w_tilde, v_tilde, inverse=False):
         inv = alpha * w_b + w_bn1
 
         # make sure it falls into [0,1)
-        inv = inv.clamp(min=torch.finfo(c.dtype).eps, max=1. - torch.finfo(inv.dtype).eps)
+        inv = inv.clamp(
+            min=torch.finfo(c.dtype).eps, max=1.0 - torch.finfo(inv.dtype).eps
+        )
         return inv, None

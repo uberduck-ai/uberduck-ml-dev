@@ -17,8 +17,10 @@ from uberduck_ml_dev.models.components.encoders.duration import (
     DurationPredictor,
 )
 from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
-    ResNetSpeakerEncoder, DEFAULT_AUDIO_CONFIG as RESNET_SE_AUDIO_CONFIG,
-    load_pretrained, get_pretrained_model,
+    ResNetSpeakerEncoder,
+    DEFAULT_AUDIO_CONFIG as RESNET_SE_AUDIO_CONFIG,
+    load_pretrained,
+    get_pretrained_model,
 )
 from uberduck_ml_dev.utils.utils import (
     init_weights,
@@ -422,7 +424,6 @@ class SynthesizerTrn(nn.Module):
         self.gin_channels = gin_channels
 
         self.use_sdp = use_sdp
-
 
         self.enc_p = TextEncoder(
             n_vocab,
