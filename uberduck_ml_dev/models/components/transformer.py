@@ -15,10 +15,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from uberduck_ml_dev.utils.utils import get_mask_from_lengths_radtts
+from uberduck_ml_dev.utils.utils import get_mask_from_lengths
 
 from ..common import LinearNorm
-from ...utils.utils import get_mask_from_lengths_radtts as get_mask_from_lengths
 
 class PositionalEmbedding(nn.Module):
     def __init__(self, demb):

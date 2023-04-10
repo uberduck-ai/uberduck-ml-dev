@@ -18,11 +18,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+from typing import Optional
+
 import torch
 from torch import nn
 from .common import Encoder, LengthRegulator, ConvAttention, Invertible1x1ConvLUS, Invertible1x1Conv, AffineTransformationLayer, LinearNorm, ExponentialClass
-# from common import get_mask_from_lengths
-from ..utils.utils import get_mask_from_lengths_radtts as get_mask_from_lengths
+from ..utils.utils import get_mask_from_lengths
 from .components.attribute_prediction_model import get_attribute_prediction_model
 from .components.alignment import mas_width1 as mas
 
@@ -71,7 +72,6 @@ class FlowStep(nn.Module):
 #     mask = (ids < lengths.unsqueeze(1)).bool()
 #     return mask
 
-from typing import Optional
 class RADTTS(torch.nn.Module):
     def __init__(self, n_speakers, n_speaker_dim, n_text, n_text_dim, n_flows,
                  n_conv_layers_per_step, n_mel_channels, n_hidden,
@@ -259,7 +259,7 @@ class RADTTS(torch.nn.Module):
     # NOTE (Sam): make this more refined
     def encode_speaker(self, spk_ids: Optional[str], audio_encodings: Optional[torch.Tensor] = None):
 
-        assert not (spk_ids and audio_encodings), "Only one of spk_ids and audio_encodings can be provided"
+        assert not ((spk_ids is not None) and (audio_encodings is not None)), "Only one of spk_ids and audio_encodings can be provided"
         if audio_encodings is not None:
             return audio_encodings
         spk_ids = spk_ids * 0 if self.dummy_speaker_embedding else spk_ids
@@ -399,10 +399,8 @@ class RADTTS(torch.nn.Module):
         if audio_embedding is not None:
             speaker_vecs = audio_embedding
 
-        # print(text.type())
         text_enc, text_embeddings = self.encode_text(text, in_lens)
-        # print(text_enc.type(), text_enc)
-        # text_enc = text_enc.double() # NOTE (Sam): this was necessary for inference without dataloader - no clue why.
+        #  NOTE (Sam): text_enc = text_enc.double() was necessary for inference without dataloader - no clue why.
         log_s_list, log_det_W_list, z_mel = [], [], []
         attn = None
         attn_soft = None
@@ -578,7 +576,9 @@ class RADTTS(torch.nn.Module):
               sigma_energy=0.8, token_dur_scaling=1.0, token_duration_max=100,
               speaker_id_text=None, speaker_id_attributes=None, dur=None,
               f0=None, energy_avg=None, voiced_mask=None, f0_mean=0.0,
-              f0_std=0.0, energy_mean=0.0, energy_std=0.0, audio_embedding=None):
+              f0_std=0.0, energy_mean=0.0, energy_std=0.0, audio_embedding=None,
+              text_lengths=None,
+                ):
         batch_size = text.shape[0]
         n_tokens = text.shape[1]
         if audio_embedding is not None:
@@ -600,11 +600,14 @@ class RADTTS(torch.nn.Module):
 
         txt_enc, txt_emb = self.encode_text(text, None)
         if dur is None:
-            # get token durations
-            z_dur = torch.cuda.FloatTensor(batch_size, 1, n_tokens)
+            # TODO (Sam): replace non-controllable is_available with controllable global setting. This is useful for debugging.
+            if torch.cuda.is_available():
+                z_dur = torch.cuda.FloatTensor(batch_size, 1, n_tokens)
+            else:
+                z_dur = torch.FloatTensor(batch_size, 1, n_tokens)
             z_dur = z_dur.normal_() * sigma_dur
 
-            dur = self.dur_pred_layer.infer(z_dur, txt_enc, spk_vec_text)
+            dur = self.dur_pred_layer.infer(z_dur, txt_enc, spk_vec_text, lens=text_lengths)
             if dur.shape[-1] < txt_enc.shape[-1]:
                 to_pad = txt_enc.shape[-1] - dur.shape[2]
                 pad_fn = nn.ReplicationPad1d((0, to_pad))
@@ -621,13 +624,14 @@ class RADTTS(torch.nn.Module):
 
         txt_enc_time_expanded = self.length_regulator(
             txt_enc.transpose(1, 2), dur).transpose(1, 2)
+        dur_lengths = dur.sum(dim=1)
         if not self.is_attribute_unconditional():
             # if explicitly modeling attributes
             if voiced_mask is None:
                 if self.use_vpred_module:
                     # get logits
                     voiced_mask = self.v_pred_module.infer(
-                        None, txt_enc_time_expanded, spk_vec_attributes)
+                        None, txt_enc_time_expanded, spk_vec_attributes, lens=dur_lengths)
                     voiced_mask = (torch.sigmoid(voiced_mask[:, 0]) > 0.5)
                     voiced_mask = voiced_mask.float()
 
@@ -647,8 +651,13 @@ class RADTTS(torch.nn.Module):
 
             if f0 is None:
                 n_f0_feature_channels = 2 if self.use_first_order_features else 1
-                z_f0 = torch.cuda.FloatTensor(
-                    batch_size, n_f0_feature_channels, max_n_frames).normal_() * sigma_f0
+                if torch.cuda.is_available():
+                    z_f0 = torch.cuda.FloatTensor(
+                        batch_size, n_f0_feature_channels, max_n_frames).normal_() * sigma_f0
+                else:
+                    z_f0 = torch.FloatTensor(
+                        batch_size, n_f0_feature_channels, max_n_frames).normal_() * sigma_f0
+
                 f0 = self.infer_f0(
                     z_f0, ap_txt_enc_time_expanded, spk_vec_attributes,
                     voiced_mask, out_lens)[:, 0]
@@ -662,8 +671,12 @@ class RADTTS(torch.nn.Module):
 
             if energy_avg is None:
                 n_energy_feature_channels = 2 if self.use_first_order_features else 1
-                z_energy_avg = torch.cuda.FloatTensor(
-                    batch_size, n_energy_feature_channels, max_n_frames).normal_() * sigma_energy
+                if torch.cuda.is_available():
+                    z_energy_avg = torch.cuda.FloatTensor(
+                        batch_size, n_energy_feature_channels, max_n_frames).normal_() * sigma_energy
+                else:
+                    z_energy_avg = torch.FloatTensor(
+                        batch_size, n_energy_feature_channels, max_n_frames).normal_() * sigma_energy
                 energy_avg = self.infer_energy(
                     z_energy_avg, ap_txt_enc_time_expanded, spk_vec, out_lens)[:, 0]
 
@@ -692,14 +705,12 @@ class RADTTS(torch.nn.Module):
                 txt_enc_time_expanded, spk_vec, out_lens, None,
                 None)
 
-        # NOTE (Sam): comment hacky to get to work on cpu
-        # NOTE (Sam): not helpful when available but used.
-        # if torch.cuda.is_available():
-        residual = torch.cuda.FloatTensor(
-            batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
-        # else:
-        # residual = torch.FloatTensor(
-        #     batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        if torch.cuda.is_available():
+            residual = torch.cuda.FloatTensor(
+                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
+        else:
+            residual = torch.FloatTensor(
+                batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size)
             
         residual = residual.normal_() * sigma
 
@@ -797,3 +808,90 @@ class RADTTS(torch.nn.Module):
                 print("Removed wnorm from {}".format(name))
             except:
                 pass
+
+DEFAULTS = {
+ # 'n_speakers': <replace-me>,
+ # 'n_speaker_dim': <replace-me>,
+ 'n_text': 185,
+ 'n_text_dim': 512,
+ 'n_flows': 8,
+ 'n_conv_layers_per_step': 4,
+ 'n_mel_channels': 80,
+ 'n_hidden': 1024,
+ 'mel_encoder_n_hidden': 512,
+ 'dummy_speaker_embedding': False,
+ 'n_early_size': 2,
+ 'n_early_every': 2,
+ 'n_group_size': 2,
+ 'affine_model': 'wavenet',
+ 'include_modules': 'decatndpmvpredapm',
+ 'scaling_fn': 'tanh',
+ 'matrix_decomposition': 'LUS',
+ 'learn_alignments': True,
+ 'use_speaker_emb_for_alignment': False,
+ 'attn_straight_through_estimator': True,
+ 'use_context_lstm': True,
+ 'context_lstm_norm': 'spectral',
+ 'context_lstm_w_f0_and_energy': True,
+ 'text_encoder_lstm_norm': 'spectral',
+ 'n_f0_dims': 1,
+ 'n_energy_avg_dims': 1,
+ 'use_first_order_features': False,
+ 'unvoiced_bias_activation': 'relu',
+ 'decoder_use_partial_padding': True,
+ 'decoder_use_unvoiced_bias': True,
+ 'ap_pred_log_f0': True,
+ 'ap_use_unvoiced_bias': False,
+ 'ap_use_voiced_embeddings': True,
+ 'dur_model_config': {'hparams': {'arch_hparams': {'kernel_size': 3,
+    'n_channels': 256,
+    'n_layers': 2,
+    'out_dim': 1,
+    'p_dropout': 0.25},
+   'bottleneck_hparams': {'in_dim': 512,
+    'non_linearity': 'relu',
+    'norm': 'weightnorm',
+    'reduction_factor': 16},
+   'n_speaker_dim': 16,
+   'take_log_of_input': True},
+  'name': 'dap'},
+ 'energy_model_config': {'hparams': {'arch_hparams': {'kernel_size': 3,
+    'n_channels': 256,
+    'n_layers': 2,
+    'out_dim': 1,
+    'p_dropout': 0.25},
+   'bottleneck_hparams': {'in_dim': 512,
+    'non_linearity': 'relu',
+    'norm': 'weightnorm',
+    'reduction_factor': 16},
+   'n_speaker_dim': 16,
+   'take_log_of_input': False,
+   'use_transformer': False},
+  'name': 'dap'},
+ 'f0_model_config': {'hparams': {'arch_hparams': {'kernel_size': 11,
+    'n_channels': 256,
+    'n_layers': 2,
+    'out_dim': 1,
+    'p_dropout': 0.5},
+   'bottleneck_hparams': {'in_dim': 512,
+    'non_linearity': 'relu',
+    'norm': 'weightnorm',
+    'reduction_factor': 16},
+   'n_speaker_dim': 16,
+   'take_log_of_input': False,
+   'use_transformer': False},
+  'name': 'dap'},
+ 'v_model_config': {'name': 'dap',
+  'hparams': {'n_speaker_dim': 16,
+   'take_log_of_input': False,
+   'bottleneck_hparams': {'in_dim': 512,
+    'reduction_factor': 16,
+    'norm': 'weightnorm',
+    'non_linearity': 'relu'},
+   'arch_hparams': {'out_dim': 1,
+    'n_layers': 2,
+    'n_channels': 256,
+    'kernel_size': 3,
+    'p_dropout': 0.5,
+    'lstm_type': '',
+    'use_linear': 1}}}}
