@@ -93,7 +93,7 @@ class ResNetSpeakerEncoderCallable:
             yield {
                     "audio_embedding": emb
                 }
-            
+
 class DataCollate():
     """ Zero-pads model inputs and targets given number of steps """
     def __init__(self, n_frames_per_step=1):
@@ -511,7 +511,7 @@ def energy_avg_normalize(x):
     if  use_scaled_energy == True:
         x = (x + 20.0) / 20.0
     return x
-    
+
 def get_energy_average(mel):
     energy_avg = mel.mean(0)
     energy_avg = energy_avg_normalize(energy_avg)
@@ -564,7 +564,7 @@ def f0_normalize( x, f0_min):
     # x[~mask] = 0.0
 
     return x
-    
+
 def get_speaker_id(speaker):
 
     return torch.LongTensor([speaker])
@@ -645,7 +645,7 @@ def ray_df_preprocessing(df):
     return collate_input
 
 
-            
+
 
 def get_ray_dataset():
 
@@ -957,13 +957,13 @@ def _train_step(
         # TODO (Sam): adding tf output logging and out of distribution inference
         # TODO (Sam): add logging of ground truth
         images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
-        gt_path = '/usr/src/app/radtts/ground_truth'
-        oos_embs = os.listdir(gt_path)
-        #this doesn't help for reasons described above
-        for oos_name in oos_embs:
-            audio_embedding_oos = torch.load(f"{gt_path}/{oos_name}").cuda()
-            _, audios_oos = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask, oos_name=oos_name, audio_embedding_oos=audio_embedding_oos)
-            audios.update(audios_oos)
+#         gt_path = '/usr/src/app/radtts/ground_truth'
+#         oos_embs = os.listdir(gt_path)
+#         #this doesn't help for reasons described above
+#         for oos_name in oos_embs:
+#             audio_embedding_oos = torch.load(f"{gt_path}/{oos_name}").cuda()
+#             _, audios_oos = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask, oos_name=oos_name, audio_embedding_oos=audio_embedding_oos)
+#             audios.update(audios_oos)
         log(metrics, audios)
         model.train()
     else:
@@ -1085,7 +1085,7 @@ def train_func(config: dict):
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
         iteration = train_epoch(train_dataloader, dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
         # iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
-        
+
 def prepare_dataloaders(data_config, n_gpus, batch_size):
     # Get data, data loaders and collate function ready
     ignore_keys = ['training_files', 'validation_files']
