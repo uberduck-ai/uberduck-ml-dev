@@ -282,7 +282,6 @@ class Decoder(nn.Module):
 
                 decoder_input = teacher_forced_frame
             else:
-
                 # NOTE(zach): we may need to concat these as we go to ensure that
                 # it's easy to retrieve the last n_frames_per_step_init frames.
                 to_concat = (
@@ -405,7 +404,6 @@ class Decoder(nn.Module):
             mel_outputs = mel_outputs.cuda()
         gate_outputs, alignments = [], []
         for i in range(len(attention_map)):
-
             attention = attention_map[i]
             decoder_input = self.prenet(decoder_input)
             mel_output, gate_output, alignment = self.decode(decoder_input, attention)
@@ -440,7 +438,6 @@ class Decoder(nn.Module):
 
         i = 0
         while len(mel_outputs) < decoder_inputs.size(0) - 1:
-
             if i >= mel_start_index and i < mel_stop_index:
                 decoder_input = self.prenet(mel_outputs[len(mel_outputs) - 1])
             else:
@@ -503,7 +500,6 @@ class Decoder(nn.Module):
 
                 decoder_input = teacher_forced_frame
             else:
-
                 decoder_input = self.prenet(
                     mel_outputs[:, -1, -1 * self.n_mel_channels :]
                 )

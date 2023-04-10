@@ -50,7 +50,6 @@ except:
     IN_NOTEBOOK = False
 
 if __name__ == "__main__" and not IN_NOTEBOOK:
-
     args = _parse_args(sys.argv[1:])
     ensure_speaker_table(args.database)
     conn = sqlite3.connect(args.database)

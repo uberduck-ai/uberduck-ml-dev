@@ -27,6 +27,7 @@ from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 F0_MIN = 80
 F0_MAX = 640
 
+
 # NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available).
 # However, functional factorization of this dataloader (e.g. get_mels) and merging classes as needed would be preferable.
 # NOTE (Sam): "load" means load from file. "return" means return to collate. "get" is a functional element.  "has" and "with" are tbd equivalent in trainer/model.
@@ -256,7 +257,6 @@ class Data(Dataset):
             audio_norm = audio_norm.unsqueeze(0)
 
         if self.return_mels:
-
             melspec = self.stft.mel_spectrogram(audio_norm)
             melspec = torch.squeeze(melspec, 0)
             data["mel"] = melspec
@@ -286,7 +286,6 @@ class Data(Dataset):
     def __getitem__(self, idx):
         """Return data for a single data point."""
         try:
-
             if hasattr(self, "audiopaths_and_text"):
                 data = self._get_data(self.audiopaths_and_text[idx])
             # TODO (Sam): accomodate more options as needed.
@@ -301,7 +300,6 @@ class Data(Dataset):
         return data
 
     def __len__(self):
-
         if self.debug and self.debug_dataset_size:
             debug_dataset_size = self.debug_dataset_size
         # TODO (Sam): this is a bit unfinished. Assert equals for separate arguments of text and audio.
@@ -332,7 +330,6 @@ class Data(Dataset):
         f0_min=F0_MIN,
         f0_max=F0_MAX,
     ):
-
         f0, voiced_mask, p_voiced = pyin(
             audio,
             f0_min,

@@ -19,7 +19,6 @@ from typing import Tuple
 
 class PartialConv1d(nn.Conv1d):
     def __init__(self, *args, **kwargs):
-
         self.multi_channel = False
         self.return_mask = False
         super(PartialConv1d, self).__init__(*args, **kwargs)

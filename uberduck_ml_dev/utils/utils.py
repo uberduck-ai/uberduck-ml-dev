@@ -135,7 +135,6 @@ def dynamic_range_decompression(x, C=1):
 
 
 def to_gpu(x):
-
     # print(type(x), x)
     if x is not None:
         # x = x.contiguous()
@@ -148,7 +147,6 @@ def to_gpu(x):
 
 
 def to_gpu_radtts(batch):
-
     output = {k: to_gpu(v) for k, v in batch}
     return output
 

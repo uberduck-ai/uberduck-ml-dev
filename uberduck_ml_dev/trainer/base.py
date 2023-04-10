@@ -39,7 +39,6 @@ def sample(mel, algorithm="griffin-lim"):
 
 # Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class.
 class TTSTrainer:
-
     # Note (Sam): rewriting with explicit hparams for clarity.
     # Note (Sam): should migrate to Lightning.
     def __init__(self, hparams, rank=None, world_size=None, device=None):
@@ -159,7 +158,6 @@ class TTSTrainer:
         return sample(mel, algorithm, **kwargs)
 
     def warm_start(self, model, optimizer, start_epoch=0):
-
         print("Starting warm_start", time.perf_counter())
         checkpoint = self.load_checkpoint()
         # TODO(zach): Once we are no longer using checkpoints of the old format, remove the conditional and use checkpoint["model"] only.

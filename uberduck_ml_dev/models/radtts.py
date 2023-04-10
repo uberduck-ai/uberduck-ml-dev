@@ -97,6 +97,7 @@ class FlowStep(nn.Module):
 #     mask = (ids < lengths.unsqueeze(1)).bool()
 #     return mask
 
+
 class RADTTS(torch.nn.Module):
     def __init__(
         self,
@@ -748,7 +749,9 @@ class RADTTS(torch.nn.Module):
                 z_dur = torch.FloatTensor(batch_size, 1, n_tokens)
             z_dur = z_dur.normal_() * sigma_dur
 
-            dur = self.dur_pred_layer.infer(z_dur, txt_enc, spk_vec_text, lens=text_lengths)
+            dur = self.dur_pred_layer.infer(
+                z_dur, txt_enc, spk_vec_text, lens=text_lengths
+            )
             if dur.shape[-1] < txt_enc.shape[-1]:
                 to_pad = txt_enc.shape[-1] - dur.shape[2]
                 pad_fn = nn.ReplicationPad1d((0, to_pad))
@@ -764,7 +767,8 @@ class RADTTS(torch.nn.Module):
         out_lens = torch.LongTensor(out_lens).to(txt_enc.device)
 
         txt_enc_time_expanded = self.length_regulator(
-            txt_enc.transpose(1, 2), dur).transpose(1, 2)
+            txt_enc.transpose(1, 2), dur
+        ).transpose(1, 2)
         dur_lengths = dur.sum(dim=1)
         if not self.is_attribute_unconditional():
             # if explicitly modeling attributes
@@ -772,8 +776,12 @@ class RADTTS(torch.nn.Module):
                 if self.use_vpred_module:
                     # get logits
                     voiced_mask = self.v_pred_module.infer(
-                        None, txt_enc_time_expanded, spk_vec_attributes, lens=dur_lengths)
-                    voiced_mask = (torch.sigmoid(voiced_mask[:, 0]) > 0.5)
+                        None,
+                        txt_enc_time_expanded,
+                        spk_vec_attributes,
+                        lens=dur_lengths,
+                    )
+                    voiced_mask = torch.sigmoid(voiced_mask[:, 0]) > 0.5
                     voiced_mask = voiced_mask.float()
 
             ap_txt_enc_time_expanded = txt_enc_time_expanded

@@ -15,7 +15,6 @@ def log_sample_utterances(
     speaker_ids: List = [],
     inference_function=lambda text, speaker_id: False,
 ):
-
     wandb.init(
         project=project,
         name=name,

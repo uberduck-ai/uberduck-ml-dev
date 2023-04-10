@@ -43,7 +43,6 @@ class TextProcessing(object):
         add_bos_eos_to_text=False,
         encoding="latin-1",
     ):
-
         if heteronyms_path is not None and heteronyms_path != "":
             self.heteronyms = set(lines_to_list(heteronyms_path))
         else:

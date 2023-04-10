@@ -59,7 +59,6 @@ class TestTacotron2Model:
         assert len(model_output) == 5
 
     def test_stft_seed(self, sample_inference_spectrogram, lj_speech_tacotron2):
-
         torch.random.manual_seed(1234)
         np.random.seed(1234)
         nreps = 1
@@ -118,7 +117,6 @@ class TestTacotron2Model:
         sample_inference_spectrogram,
         sample_inference_tf_spectrogram,
     ):
-
         torch.random.manual_seed(1234)
         np.random.seed(1234)
         tf_index = 111  # NOTE (Sam): this was determined by listening to the output.

@@ -19,6 +19,7 @@ from ...utils.utils import get_mask_from_lengths
 
 from ..common import LinearNorm
 
+
 class PositionalEmbedding(nn.Module):
     def __init__(self, demb):
         super(PositionalEmbedding, self).__init__()

@@ -34,6 +34,5 @@ class Batch(Dict):
         return Batch(**d)
 
     def to_gpu(self) -> "Batch":
-
         batch_gpu = Batch(**{k: to_gpu(v) for k, v in self.items()})
         return batch_gpu

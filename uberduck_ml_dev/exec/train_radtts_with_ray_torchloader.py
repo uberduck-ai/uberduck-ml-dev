@@ -81,7 +81,6 @@ class ResNetSpeakerEncoderCallable:
 
     # NOTE (Sam): might have to accept bytes input for anyscale distributed data loading?
     def __call__(self, audiopaths):
-
         print("calling resnet speaker encoder")
         for audiopath in audiopaths:
             audio_data = read(audiopath)[1]
@@ -246,7 +245,6 @@ class Data(torch.utils.data.Dataset):
         combine_speaker_and_emotion=False,
         **kwargs,
     ):
-
         self.combine_speaker_and_emotion = combine_speaker_and_emotion
         self.max_wav_value = max_wav_value
         self.audio_lmdb_dict = {}  # dictionary of lmdbs for audio data
@@ -300,7 +298,7 @@ class Data(torch.utils.data.Dataset):
 
         print("Number of files", len(self.data))
         if include_speakers is not None:
-            for (speaker_set, include) in include_speakers:
+            for speaker_set, include in include_speakers:
                 self.filter_by_speakers_(speaker_set, include)
             print("Number of files after speaker filtering", len(self.data))
 
@@ -423,7 +421,6 @@ class Data(torch.utils.data.Dataset):
         f0_min=100,
         f0_max=300,
     ):
-
         audio_norm = audio / self.max_wav_value
         f0, voiced_mask, p_voiced = pyin(
             audio_norm,
@@ -609,7 +606,6 @@ def get_f0_pvoiced(
     f0_min=100,
     f0_max=300,
 ):
-
     # NOTE (Sam): is this normalization kosher?
     audio_norm = audio / MAX_WAV_VALUE
     f0, voiced_mask, p_voiced = pyin(
@@ -691,7 +687,6 @@ def f0_normalize(x, f0_min):
 
 
 def get_speaker_id(speaker):
-
     return torch.LongTensor([speaker])
 
 
@@ -784,7 +779,6 @@ def ray_df_preprocessing(df):
 
 
 def get_ray_dataset():
-
     # ctx = ray.data.context.DatasetContext.get_current()
     # ctx.use_streaming_executor = True
     lj_df = pd.read_csv(
@@ -902,7 +896,6 @@ def get_log_audio(
     energy_avg,
     voiced_mask,
 ):
-
     mel = to_gpu(batch_dict["mel"])
     speaker_ids = to_gpu(batch_dict["speaker_ids"])
     attn_prior = to_gpu(batch_dict["attn_prior"])
@@ -1084,7 +1077,6 @@ def _train_step(
     optim.zero_grad()
 
     with autocast(enabled=False):
-
         # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
         batch_dict = batch
         # batch_dict = collate_fn(batch)
@@ -1171,7 +1163,6 @@ def _train_step(
 
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
-
         checkpoint_path = f"/usr/src/app/radtts/outputs/30shuff_sdfixed_dap_test_checkpoint_{iteration}.pt"
         save_checkpoint(model, optim, iteration, checkpoint_path)
 
@@ -1404,7 +1395,6 @@ def load_wav_to_torch(full_path):
 
 # NOTE (Sam): denoiser not used here in contrast with radtts repo
 def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
-
     h = AttrDict(vocoder_config)
     if "gaussian_blur" in vocoder_config:
         vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
@@ -1423,7 +1413,6 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
 
 
 if __name__ == "__main__":
-
     args = parse_args(sys.argv[1:])
     if args.config:
         with open(args.config) as f:

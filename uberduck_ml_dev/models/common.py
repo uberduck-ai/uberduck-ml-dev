@@ -42,6 +42,7 @@ from ..utils.utils import *
 from .transforms import piecewise_rational_quadratic_transform
 from .components.partialconv1d import PartialConv1d as pconv1d
 
+
 class Conv1d(nn.Module):
     def __init__(
         self,
@@ -1062,6 +1063,7 @@ LRELU_SLOPE = 0.1
 
 mel_basis, hann_window = {}, {}
 
+
 def mel_spectrogram_torch(
     y,
     n_fft=FILTER_LENGTH,
@@ -1209,7 +1211,6 @@ def spectrogram_torch(
 
 # TODO (Sam): unite the get_mel methods
 def get_mel(audio, max_wav_value, stft):
-
     # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
     # NOTE (Sam): be carefuly of numerical issues with order of operations here.
     audio = torch.FloatTensor(audio)
