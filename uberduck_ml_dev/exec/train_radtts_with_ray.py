@@ -89,21 +89,12 @@ class ResNetSpeakerEncoderCallable:
             # datum = torch.FloatTensor(audio_data).unsqueeze(-1).t()
             emb = self.model(datum)
             emb = emb.cpu().detach().numpy()
-<<<<<<< HEAD
             yield {
                     "audio_embedding": emb
                 }
 
 class DataCollate():
     """ Zero-pads model inputs and targets given number of steps """
-=======
-            yield {"audio_embedding": emb}
-
-
-class DataCollate:
-    """Zero-pads model inputs and targets given number of steps"""
-
->>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
     def __init__(self, n_frames_per_step=1):
         self.n_frames_per_step = n_frames_per_step
 
@@ -582,10 +573,6 @@ def energy_avg_normalize(x):
         x = (x + 20.0) / 20.0
     return x
 
-<<<<<<< HEAD
-=======
-
->>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 def get_energy_average(mel):
     energy_avg = mel.mean(0)
     energy_avg = energy_avg_normalize(energy_avg)
@@ -640,10 +627,6 @@ def f0_normalize(x, f0_min):
 
     return x
 
-<<<<<<< HEAD
-=======
-
->>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 def get_speaker_id(speaker):
 
     return torch.LongTensor([speaker])
@@ -738,11 +721,6 @@ def ray_df_preprocessing(df):
     return collate_input
 
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 def get_ray_dataset():
 
     lj_df = pd.read_csv(
@@ -1127,16 +1105,6 @@ def _train_step(
         model.eval()
         # TODO (Sam): adding tf output logging and out of distribution inference
         # TODO (Sam): add logging of ground truth
-<<<<<<< HEAD
-        images, audios = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask)
-#         gt_path = '/usr/src/app/radtts/ground_truth'
-#         oos_embs = os.listdir(gt_path)
-#         #this doesn't help for reasons described above
-#         for oos_name in oos_embs:
-#             audio_embedding_oos = torch.load(f"{gt_path}/{oos_name}").cuda()
-#             _, audios_oos = get_log_audio(outputs, batch_dict, train_config, model, speaker_ids, text, f0, energy_avg, voiced_mask, oos_name=oos_name, audio_embedding_oos=audio_embedding_oos)
-#             audios.update(audios_oos)
-=======
         images, audios = get_log_audio(
             outputs,
             batch_dict,
@@ -1167,7 +1135,6 @@ def _train_step(
                 audio_embedding_oos=audio_embedding_oos,
             )
             audios.update(audios_oos)
->>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
         log(metrics, audios)
         model.train()
     else:
@@ -1321,10 +1288,6 @@ def train_func(config: dict):
         )
         # iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> d0ac932ae40a58e39565ad06e9cb5485876f802b
 def prepare_dataloaders(data_config, n_gpus, batch_size):
     # Get data, data loaders and collate function ready
     ignore_keys = ["training_files", "validation_files"]

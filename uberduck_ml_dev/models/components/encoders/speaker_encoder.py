@@ -4,4 +4,4 @@
 def get_speaker_encoding_for_dataset(
     speaker_encoding_path, filelist_path, embedding_dim, speaker_encoder_path
 ):
-    continue
+    pass
