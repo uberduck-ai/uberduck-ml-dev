@@ -2,6 +2,7 @@ import numpy as np
 import torch
 
 try:
+    # NOTE (Sam): I think the redundancy in name between this file and the monotonic_align module causes confusion in VSCode and pydeps.
     from .monotonic_align.core import maximum_path_c
 
     CYTHON = True
