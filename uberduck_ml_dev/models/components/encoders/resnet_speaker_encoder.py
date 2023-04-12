@@ -1,4 +1,5 @@
 from io import BytesIO
+import os
 import requests
 
 import torch
@@ -35,13 +36,12 @@ DEFAULT_AUDIO_CONFIG = {
     "db_level": -27.0,
 }
 
-RESNET_SE_MODEL_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/coqui/resnet_se.pth.tar"
-RESNET_SE_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/coqui/resnet_se_config.json"
 
-
-def get_pretrained_model():
+def get_pretrained_model(config_url=None, model_url=None):
     print("Getting model config...")
-    response = requests.get(RESNET_SE_CONFIG_URL)
+    if config_url is None:
+        config_url = os.environ["RESNET_SE_CONFIG_URL"]
+    response = requests.get(config_url)
     resnet_config = response.json()
     model_params = resnet_config["model_params"]
     if "model_name" in model_params:
@@ -50,14 +50,16 @@ def get_pretrained_model():
     audio_config["sample_rate"] = 22050
     model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
     print("Loading pretrained model...")
-    load_pretrained(model)
+    load_pretrained(model, model_url=model_url)
     print("Got pretrained model...")
     model.eval()
     return model
 
 
-def load_pretrained(model):
-    response = requests.get(RESNET_SE_MODEL_URL, stream=True)
+def load_pretrained(model, model_url=None):
+    if model_url is None:
+        model_url = os.environ["RESNET_SE_MODEL_URL"]
+    response = requests.get(model_url, stream=True)
     bio = BytesIO(response.content)
     loaded = torch.load(bio)
     model.load_state_dict(loaded["model"])
