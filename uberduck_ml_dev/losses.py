@@ -1,8 +1,11 @@
 import torch
 from torch import nn
+import torch
+import torch.nn as nn
+from torch.nn import functional as F
 
 from .data.batch import Batch
-
+from .utils.utils import get_mask_from_lengths
 
 class Tacotron2Loss(nn.Module):
     def __init__(self, pos_weight):
@@ -117,12 +120,7 @@ def feature_loss(fmap_r, fmap_g):
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-import torch
-import torch.nn as nn
-from torch.nn import functional as F
 
-# from common import get_mask_from_lengths
-from .utils.utils import get_mask_from_lengths_radtts as get_mask_from_lengths
 
 
 def compute_flow_loss(
