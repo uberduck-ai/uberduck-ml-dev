@@ -7,13 +7,15 @@ from scipy.io.wavfile import read
 from scipy.ndimage import distance_transform_edt as distance_transform
 import numpy as np
 from librosa import pyin
+import lmdb
+import pickle as pkl
 
 from ..models.common import MelSTFT
 from ..utils.utils import (
     load_filepaths_and_text,
     intersperse,
 )
-from .utils import oversample, _orig_to_dense_speaker_id
+from .utils import oversample, _orig_to_dense_speaker_id, beta_binomial_prior_distribution
 from ..text.utils import text_to_sequence
 from ..models.common import (
     FILTER_LENGTH,
@@ -26,7 +28,6 @@ from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 
 F0_MIN = 80
 F0_MAX = 640
-
 
 # NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available).
 # However, functional factorization of this dataloader (e.g. get_mels) and merging classes as needed would be preferable.
@@ -632,10 +633,10 @@ class DataRADTTS(torch.utils.data.Dataset):
         return attn_prior
 
     def __getitem__(self, index):
+        # TODO (Sam): make this clean.
         my_path = "/usr/src/app/radtts/data/big_data"
 
         data = self.data[index]
-        # print(data['text'])
         audiopath_s3, text = data["audiopath"], data["text"]
         rel_path_folder = audiopath_s3.split("uberduck-audio-files/")[1].split(
             "/resampled_unnormalized.wav"
@@ -643,14 +644,10 @@ class DataRADTTS(torch.utils.data.Dataset):
         sub_path = os.path.join(my_path, rel_path_folder)
         audiopath = f"{sub_path}/resampled_unnormalized.wav"
         audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
-        # audio_emb_path = f"{sub_path}/coqui_resnet_512_pca15_emb.pt"
         f0_path = f"{sub_path}/f0.pt"
         mel_path = f"{sub_path}/spectrogram.pt"
 
         speaker_id = data["speaker"]
-        # audio_emb_path = data['audio_emb_path']
-        # f0_path = data['f0_path']
-        # mel_path = data['mel_path']
         f0, voiced_mask, p_voiced = torch.load(f0_path)
         f0 = self.f0_normalize(f0)
         if self.distance_tx_unvoiced:
@@ -659,20 +656,6 @@ class DataRADTTS(torch.utils.data.Dataset):
             distance_map[distance_map <= 0] = 0.0
             f0 = f0 - distance_map
 
-        # if data['lmdb_key'] is not None:
-        #     data_dict = pkl.loads(
-        #         self.audio_lmdb_dict[data['lmdb_key']].get(
-        #             audiopath.encode('ascii')))
-        #     audio = data_dict['audio']
-        #     sampling_rate = data_dict['sampling_rate']
-        # else:
-        #     audio, sampling_rate = load_wav_to_torch(audiopath)
-
-        # if sampling_rate != self.sampling_rate:
-        #     raise ValueError("{} SR doesn't match target {} SR".format(
-        #         sampling_rate, self.sampling_rate))
-
-        # mel = self.get_mel(audio)
         mel = torch.load(mel_path)
 
         energy_avg = None

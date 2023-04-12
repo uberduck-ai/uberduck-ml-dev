@@ -2,6 +2,7 @@
 
 import re
 import numpy as np
+import torch
 from . import cleaners
 from .cleaners import Cleaner
 from .symbols import get_symbols
@@ -200,4 +201,9 @@ class TextProcessing(object):
             raise Exception(
                 "{} handle_phoneme is not supported".format(self.handle_phoneme)
             )
+        return text
+
+    def get_text(self, text):
+        text = self.encode_text(text)
+        text = torch.LongTensor(text)
         return text

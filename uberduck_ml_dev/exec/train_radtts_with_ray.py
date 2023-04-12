@@ -1,5 +1,4 @@
-import tempfile
-from io import BytesIO
+
 import numpy as np
 import pandas as pd
 import torch
@@ -19,7 +18,7 @@ import os
 
 from scipy.stats import betabinom
 from scipy.io.wavfile import read
-from scipy.ndimage import distance_transform_edt as distance_transform
+
 import ray
 from ray.air import session
 from ray.air.config import ScalingConfig, RunConfig
@@ -32,7 +31,6 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader
 from ray.train.torch import TorchTrainer, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
-from librosa import pyin
 
 from ..models.radtts import RADTTS
 from ..models.components.encoders.resnet_speaker_encoder import ResNetSpeakerEncoderCallable
@@ -56,30 +54,11 @@ HIFI_GAN_GENERATOR_PATH = (
 
 from ..data.collate import DataCollateRADTTS as DataCollate
 from ..data.data import DataRADTTS as Data
+from ..data.utils import beta_binomial_prior_distribution, get_energy_average
 
 
-def energy_avg_normalize(x):
-    use_scaled_energy = True
-    if use_scaled_energy == True:
-        x = (x + 20.0) / 20.0
-    return x
 
-def get_energy_average(mel):
-    energy_avg = mel.mean(0)
-    energy_avg = energy_avg_normalize(energy_avg)
-    return energy_avg
 
-def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.05):
-    P = phoneme_count
-    M = mel_count
-    x = np.arange(0, P)
-    mel_text_probs = []
-    for i in range(1, M + 1):
-        a, b = scaling_factor * i, scaling_factor * (M + 1 - i)
-        rv = betabinom(P - 1, a, b)
-        mel_i_prob = rv.pmf(x)
-        mel_text_probs.append(mel_i_prob)
-    return torch.tensor(np.array(mel_text_probs))
 
 def get_attention_prior(n_tokens, n_frames):
     # cache the entire attn_prior by filename
@@ -107,24 +86,6 @@ def get_attention_prior(n_tokens, n_frames):
     return attn_prior
 
 
-# NOTE (Sam): looks like this was not used in successful training runs
-def f0_normalize(x, f0_min):
-    # if self.use_log_f0:
-    # mask = x >= f0_min
-    # x[mask] = torch.log(x[mask])
-    # x[~mask] = 0.0
-
-    return x
-
-def get_speaker_id(speaker):
-
-    return torch.LongTensor([speaker])
-
-
-def get_text(text):
-    text = tp.encode_text(text)
-    text = torch.LongTensor(text)
-    return text
 
 
 def get_shuffle_indices(levels):
@@ -136,157 +97,6 @@ def get_shuffle_indices(levels):
         new_indices = np.random.permutation(indices)
         output_indices[indices] = new_indices
     return output_indices
-
-
-def ray_df_preprocessing(df):
-    transcripts = df.transcript.tolist()
-    audio_bytes_list = df.audio_bytes.tolist()
-    speaker_ids = df.speaker_id.tolist()
-    paths = df.path.tolist()
-    f0_paths = df.f0_path.tolist()
-    audio_embeddings = df.audio_embedding.tolist()
-    # NOTE (Sam): I'm great at naming things.
-    # shuffle_indices = np.load('/usr/src/app/radtts/30shuffle_sdfixed_indices.pt.npy')[:100]
-    # shuffle_indices = get_shuffle_indices(speaker_ids)
-    # np.save('/usr/src/app/radtts/asdfasdfasdfasdfasdf.pt', shuffle_indices)
-    # audio_embeddings = [audio_embeddings[i] for i in shuffle_indices]
-    # audio_embeddings = audio_embeddings[:100]
-    collate_input = []
-    for transcript, audio_bytes, speaker_id, f0_path, audio_embedding in zip(
-        transcripts, audio_bytes_list, speaker_ids, f0_paths, audio_embeddings
-    ):
-        # print(datetime.now(), 'start')
-        # Audio
-        # print(datetime.now(), 'pre wav read and norm')
-        bio = BytesIO(audio_bytes)
-        sr, wav_data = wavfile.read(bio)
-        audio = torch.FloatTensor(wav_data)
-        # TODO (Sam): fix this for anyscale training
-        audio_norm = audio / (np.abs(audio).max() * 2)
-        # print(datetime.now(), 'pre text embed')
-        text_sequence = get_text(transcript)
-        # print(datetime.now(), 'pre mel compute')
-        mel = get_mel(audio_norm, data_config["max_wav_value"], stft)
-        mel = torch.squeeze(mel, 0)
-        # print(datetime.now(), 'pre f0 load')
-        dikt = torch.load(f0_path)
-        f0 = dikt["f0"]
-        p_voiced = dikt["p_voiced"]
-        voiced_mask = dikt["voiced_mask"]
-        # f0, voiced_mask, p_voiced = get_f0_pvoiced(
-        #     audio.cpu().numpy(), f0_min = data_config['f0_min'], f0_max=data_config["f0_max"], hop_length=data_config['hop_length'], frame_length=data_config['filter_length'], sampling_rate=22050)
-        f0 = f0_normalize(f0, f0_min=data_config["f0_min"])
-        # print(datetime.now(), 'pre energy compute')
-        energy_avg = get_energy_average(mel)
-        # print(datetime.now(), 'pre prior load')
-        prior_path = "{}_{}".format(text_sequence.shape[0], mel.shape[1])
-        prior_path = os.path.join("/usr/src/app/radtts/data_cache", prior_path)
-        prior_path += "_prior.pth"
-        attn_prior = torch.load(prior_path)
-        # attn_prior = get_attention_prior(text_sequence.shape[0], mel.shape[1])
-        speaker_id = get_speaker_id(speaker_id)
-        # datum = torch.FloatTensor(audio_norm).unsqueeze(-1).t().cuda()
-        # audio_embedding = torch.load(emb_path)
-        audio_embedding = torch.FloatTensor(audio_embedding)
-        # audio_embeddings = audio_encoder(datum)
-        # audio_embeddings = None
-        # NOTE (Sam): might be faster to return dictionary arrays of batched inputs instead of list
-        collate_input.append(
-            {
-                "text_encoded": text_sequence,
-                "mel": mel,
-                "speaker_id": speaker_id,
-                "f0": f0,
-                "p_voiced": p_voiced,
-                "voiced_mask": voiced_mask,
-                "energy_avg": energy_avg,
-                "attn_prior": attn_prior,
-                "audiopath": None,
-                "audio_embedding": audio_embedding,
-            }
-        )
-        # print(datetime.now(), 'end')
-
-    return collate_input
-
-
-def get_ray_dataset(filelist_path, config_path, model_path):
-
-    df = pd.read_csv(
-        filelist_path,
-        sep="|",
-        header=None,
-        quoting=3,
-        names=["path", "transcript", "speaker_id", "f0_path", "emb_path"],
-    )
-
-    paths = df.path.tolist()
-    transcripts = df.transcript.tolist()
-    speaker_ids = df.speaker_id.tolist()
-
-    pitches = df.f0_path.tolist()
-    emb_paths = df.emb_path.tolist()
-
-    parallelism_length = 400
-    audio_ds = ray.data.read_binary_files(
-        paths,
-        parallelism=parallelism_length,
-        ray_remote_args={"num_cpus": 1.0},
-    )
-    audio_ds = audio_ds.map_batches(
-        lambda x: x, batch_format="pyarrow", batch_size=None
-    )
-
-    paths_ds = ray.data.from_items(paths, parallelism=parallelism_length)
-    paths_ds = paths_ds.map_batches(
-        lambda x: x, batch_format="pyarrow", batch_size=None
-    )
-
-    transcripts = ray.data.from_items(transcripts, parallelism=parallelism_length)
-    transcripts_ds = transcripts.map_batches(
-        lambda x: x, batch_format="pyarrow", batch_size=None
-    )
-
-    speaker_ids_ds = ray.data.from_items(speaker_ids, parallelism=parallelism_length)
-    speaker_ids_ds = speaker_ids_ds.map_batches(
-        lambda x: x, batch_format="pyarrow", batch_size=None
-    )
-    pitches_ds = ray.data.from_items(pitches, parallelism=parallelism_length)
-    pitches_ds = pitches_ds.map_batches(
-        lambda x: x, batch_format="pyarrow", batch_size=None
-    )
-
-    embs_ds = ray.data.from_items(paths, parallelism=parallelism_length)
-    embs_ds = embs_ds.map_batches(
-        ResNetSpeakerEncoderCallable,
-        fn_kwargs = {"config_path": config_path, "model_path": model_path},
-        num_gpus=1.0,
-        compute="actors",
-    )
-
-    output_dataset = (
-        transcripts_ds.zip(audio_ds)
-        .zip(paths_ds)
-        .zip(speaker_ids_ds)
-        .zip(pitches_ds)
-        .zip(embs_ds)
-    )
-    output_dataset = output_dataset.map_batches(
-        lambda table: table.rename(
-            columns={
-                "value": "transcript",
-                "value_1": "audio_bytes",
-                "value_2": "path",
-                "value_3": "speaker_id",
-                "value_4": "f0_path",
-                "value_5": "emb_path",
-            }
-        )
-    )
-
-    processed_dataset = output_dataset.map_batches(ray_df_preprocessing)
-    return processed_dataset.fully_executed()
-
 
 @torch.no_grad()
 def log(metrics, audios={}):
@@ -599,6 +409,7 @@ def _train_step(
             energy_avg,
             voiced_mask,
         )
+        # TODO (Sam): make this clean
         gt_path = "/usr/src/app/radtts/ground_truth"
         oos_embs = os.listdir(gt_path)
         # this doesn't help for reasons described above
