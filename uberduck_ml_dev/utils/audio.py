@@ -280,14 +280,6 @@ def trim_audio(path, new_path, top_db=20):
     write(new_path, sr, trimmed)
 
 
-def load_wav_to_torch(path):
-    sr, data = read(path)
-    return torch.FloatTensor(data.astype(np.float32)), sr
-
-
-from scipy import signal
-
-
 def overlay_mono(audio1, audio2):
     """
     Will overlay two mono audio np arrays starting at the beginning of both audio files.

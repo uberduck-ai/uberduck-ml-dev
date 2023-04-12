@@ -16,7 +16,7 @@ import json
 from datetime import datetime
 import os
 
-from scipy.stats import betabinom
+
 from scipy.io.wavfile import read
 
 import ray
@@ -40,8 +40,7 @@ from ..utils.utils import (
     to_gpu,
 )
 from ..vocoders.hifigan import AttrDict, Generator
-from ..models.common import get_mel
-from ..data.audio_processing import TacotronSTFT
+from ..models.common import TacotronSTFT
 from ..text.text_processing import TextProcessing
 from ..utils.plot import plot_alignment_to_numpy
 
@@ -54,11 +53,7 @@ HIFI_GAN_GENERATOR_PATH = (
 
 from ..data.collate import DataCollateRADTTS as DataCollate
 from ..data.data import DataRADTTS as Data
-from ..data.utils import beta_binomial_prior_distribution, get_energy_average
-
-
-
-
+from ..data.utils import beta_binomial_prior_distribution
 
 def get_attention_prior(n_tokens, n_frames):
     # cache the entire attn_prior by filename
@@ -88,15 +83,7 @@ def get_attention_prior(n_tokens, n_frames):
 
 
 
-def get_shuffle_indices(levels):
-    levels = np.asarray(levels)
-    levels_unique = np.unique(levels)
-    output_indices = np.zeros(len(levels), dtype=int)
-    for level in levels_unique:
-        indices = np.where(levels == level)[0]
-        new_indices = np.random.permutation(indices)
-        output_indices[indices] = new_indices
-    return output_indices
+
 
 @torch.no_grad()
 def log(metrics, audios={}):
@@ -319,9 +306,9 @@ def _train_step(
 
     with autocast(enabled=False):
 
-        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
-        batch_dict = batch
-        # batch_dict = collate_fn(batch)
+        batch_dict = batch # torch DataLoader
+        # batch_dict = collate_fn(batch) # ray dataset
+        # TODO (Sam): move to batch.go_gpu().
         mel = to_gpu(batch_dict["mel"])
         speaker_ids = to_gpu(batch_dict["speaker_ids"])
         attn_prior = to_gpu(batch_dict["attn_prior"])
@@ -334,16 +321,6 @@ def _train_step(
         energy_avg = to_gpu(batch_dict["energy_avg"])
         audio_embedding = to_gpu(batch_dict["audio_embedding"])
 
-        print(
-            mel.size(),
-            text.size(),
-            attn_prior.size(),
-            f0.size(),
-            energy_avg.size(),
-            audio_embedding.size(),
-        )
-        # import pdb
-        # pdb.set_trace()
         outputs = model(
             mel,
             speaker_ids,
@@ -375,8 +352,7 @@ def _train_step(
         else:
             binarization_loss = torch.zeros_like(loss)
         loss_outputs["binarization_loss"] = (binarization_loss, w_bin)
-    print(datetime.now(), "middle train step:", iteration)
-    grad_clip_val = 1.0  # it is what is is ;)
+    grad_clip_val = 1.0  # TODO (Sam): make this a config option
     print(print_list)
     scaler.scale(loss).backward()
     if grad_clip_val > 0:
@@ -390,7 +366,7 @@ def _train_step(
     for k, (v, w) in loss_outputs.items():
         metrics[k] = v.item()
 
-    print("iteration: ", iteration)
+    print("iteration: ", iteration, datetime.now())
     log_sample = iteration % steps_per_sample == 0
     log_checkpoint = iteration % train_config["iters_per_checkpoint"] == 0
 
@@ -437,9 +413,7 @@ def _train_step(
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
 
-        # checkpoint_path = f'/usr/src/app/radtts/outputs/230k_pca15_decoder_checkpoint_{iteration}.pt'
         checkpoint_path = f"{train_config['output_directory']}/model_{iteration}.pt"
-        # checkpoint_path = f'/usr/src/app/radtts/outputs/230k_test_decoder_emrestart_checkpoint_{iteration}.pt'
         save_checkpoint(model, optim, iteration, checkpoint_path)
 
     print(f"Loss: {loss.item()}")
@@ -619,54 +593,7 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
 
     return train_loader, valset, collate_fn
 
-
-def parse_args(args):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", help="Path to config")
-    args = parser.parse_args(args)
-    return args
-
-
-def load_pretrained(model):
-    # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
-    # bio = BytesIO(response.content)
-    loaded = torch.load(HIFI_GAN_GENERATOR_PATH)
-    model.load_state_dict(loaded["generator"])
-
-
-def get_vocoder():
-    print("Getting vocoder")
-    # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_CONFIG_URL)
-
-    with open(HIFI_GAN_CONFIG_PATH) as f:
-        hifigan_config = json.load(f)
-
-    h = AttrDict(hifigan_config)
-    if "gaussian_blur" in hifigan_config:
-        hifigan_config["gaussian_blur"]["p_blurring"] = 0.0
-    else:
-        hifigan_config["gaussian_blur"] = {"p_blurring": 0.0}
-        h["gaussian_blur"] = {"p_blurring": 0.0}
-    # model_params = hifigan_config["model_params"]
-    model = Generator(h)
-    print("Loading pretrained model...")
-    load_pretrained(model)
-    print("Got pretrained model...")
-    model.eval()
-    return model
-
-
-### pytorch dataloader for debug
-def load_wav_to_torch(full_path):
-    """Loads wavdata into torch array"""
-    sampling_rate, data = read(full_path)
-    data_float = data / np.abs(data).max()
-    data_int = (MAX_WAV_VALUE - 1) * data_float
-    output = torch.from_numpy(np.array(data_int)).float()
-    return output, sampling_rate
-
+from ..vocoders.hifigan import get_vocoder
 
 # NOTE (Sam): denoiser not used here in contrast with radtts repo
 def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
@@ -687,6 +614,7 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
 
     return vocoder
 
+from ..utils import parse_args
 
 if __name__ == "__main__":
 
@@ -757,11 +685,10 @@ if __name__ == "__main__":
             num_workers=2,
             use_gpu=True,
             resources_per_worker=dict(CPU=8, GPU=1)
-            # num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=4, GPU=.8)
         ),
         run_config=RunConfig(
             # NOTE (Sam): uncomment for saving on anyscale
-            # sync_config=SyncConfig(upload_dir="s3://uberduck-anyscale-data/checkpoints")
+            # sync_config=SyncConfig(upload_dir=s3_upload_folder)
             sync_config=SyncConfig()
         ),
         # NOTE (Sam): uncomment for ray dataset training

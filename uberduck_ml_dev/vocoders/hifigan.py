@@ -66,6 +66,35 @@ DEFAULTS = {
 }
 
 
+def get_vocoder(hifi_gan_config_path):
+    print("Getting vocoder")
+    # NOTE (Sam): uncomment for download on anyscale
+    # response = requests.get(hifi_gan_config_path)
+
+    with open(hifi_gan_config_path) as f:
+        hifigan_config = json.load(f)
+
+    h = AttrDict(hifigan_config)
+    if "gaussian_blur" in hifigan_config:
+        hifigan_config["gaussian_blur"]["p_blurring"] = 0.0
+    else:
+        hifigan_config["gaussian_blur"] = {"p_blurring": 0.0}
+        h["gaussian_blur"] = {"p_blurring": 0.0}
+    # model_params = hifigan_config["model_params"]
+    model = Generator(h)
+    print("Loading pretrained model...")
+    load_pretrained(model)
+    print("Got pretrained model...")
+    model.eval()
+    return model
+    
+def load_pretrained(model, hifi_gan_generator_path):
+    # NOTE (Sam): uncomment for download on anyscale
+    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
+    # bio = BytesIO(response.content)
+    loaded = torch.load(hifi_gan_generator_path)
+    model.load_state_dict(loaded["generator"])
+
 class HiFiGanGenerator(nn.Module):
     def __init__(self, config, checkpoint, cudnn_enabled=False):
         super().__init__()

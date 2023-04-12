@@ -1,5 +1,6 @@
 import numpy as np
-
+import torch
+from scipy.stats import betabinom
 
 def oversample(filepaths_text_sid, sid_to_weight):
     assert all([isinstance(sid, str) for sid in sid_to_weight.keys()])
@@ -52,3 +53,13 @@ def f0_normalize(x, f0_min):
     # x[~mask] = 0.0
 
     return x
+
+def get_shuffle_indices(levels):
+    levels = np.asarray(levels)
+    levels_unique = np.unique(levels)
+    output_indices = np.zeros(len(levels), dtype=int)
+    for level in levels_unique:
+        indices = np.where(levels == level)[0]
+        new_indices = np.random.permutation(indices)
+        output_indices[indices] = new_indices
+    return output_indices
