@@ -38,6 +38,7 @@ from TTS.encoder.models.resnet import ResNetSpeakerEncoder
 from librosa import pyin
 
 from ..models.radtts import RADTTS
+from ..models.components.encoders.resnet_speaker_encoder import ResNetSpeakerEncoderCallable
 from ..text.utils import text_to_sequence
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 from ..losses import RADTTSLoss, AttentionBinarizationLoss
@@ -57,41 +58,9 @@ HIFI_GAN_CONFIG_PATH = "/usr/src/app/radtts/models/hifigan_22khz_config.json"
 HIFI_GAN_GENERATOR_PATH = (
     "/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt"
 )
-RESNET_SE_MODEL_PATH = "/usr/src/app/radtts/resnet_se.pth.tar"
-RESNET_SE_CONFIG_PATH = "/usr/src/app/radtts/resnet_se_config.json"
 
 
-class ResNetSpeakerEncoderCallable:
-    def __init__(self):
-        print("initializing resnet speaker encoder")
-        with open(RESNET_SE_CONFIG_PATH) as f:
-            resnet_config = json.load(f)
 
-        state_dict = torch.load(RESNET_SE_MODEL_PATH)["model"]
-        audio_config = dict(resnet_config["audio"])
-        model_params = resnet_config["model_params"]
-        if "model_name" in model_params:
-            del model_params["model_name"]
-
-        self.device = "cuda"
-        self.model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
-        self.model.load_state_dict(state_dict)
-        self.model.eval()
-        self.model.cuda()
-
-    # NOTE (Sam): might have to accept bytes input for anyscale distributed data loading?
-    def __call__(self, audiopaths):
-
-        print("calling resnet speaker encoder")
-        for audiopath in audiopaths:
-            audio_data = read(audiopath)[1]
-            datum = torch.FloatTensor(audio_data).unsqueeze(-1).t().cuda()
-            # datum = torch.FloatTensor(audio_data).unsqueeze(-1).t()
-            emb = self.model(datum)
-            emb = emb.cpu().detach().numpy()
-            yield {
-                    "audio_embedding": emb
-                }
 
 class DataCollate():
     """ Zero-pads model inputs and targets given number of steps """
@@ -721,23 +690,22 @@ def ray_df_preprocessing(df):
     return collate_input
 
 
-def get_ray_dataset():
+def get_ray_dataset(filelist_path, config_path, model_path):
 
-    lj_df = pd.read_csv(
-        # '/usr/src/app/radtts/data/30_small_decoder.txt',
-        "/usr/src/app/radtts/data/30_decoder_pitch.txt",
+    df = pd.read_csv(
+        filelist_path,
         sep="|",
         header=None,
         quoting=3,
         names=["path", "transcript", "speaker_id", "f0_path", "emb_path"],
     )
 
-    paths = lj_df.path.tolist()
-    transcripts = lj_df.transcript.tolist()
-    speaker_ids = lj_df.speaker_id.tolist()
+    paths = df.path.tolist()
+    transcripts = df.transcript.tolist()
+    speaker_ids = df.speaker_id.tolist()
 
-    pitches = lj_df.f0_path.tolist()
-    emb_paths = lj_df.emb_path.tolist()
+    pitches = df.f0_path.tolist()
+    emb_paths = df.emb_path.tolist()
 
     parallelism_length = 400
     audio_ds = ray.data.read_binary_files(
@@ -768,14 +736,10 @@ def get_ray_dataset():
         lambda x: x, batch_format="pyarrow", batch_size=None
     )
 
-    # embs_ds = ray.data.from_items(emb_paths, parallelism=parallelism_length)
-    # embs_ds = embs_ds.map_batches(
-    #     lambda x: x, batch_format="pyarrow", batch_size=None
-    # )
-
     embs_ds = ray.data.from_items(paths, parallelism=parallelism_length)
     embs_ds = embs_ds.map_batches(
         ResNetSpeakerEncoderCallable,
+        fn_kwargs = {"config_path": config_path, "model_path": model_path},
         num_gpus=1.0,
         compute="actors",
     )
@@ -802,7 +766,6 @@ def get_ray_dataset():
 
     processed_dataset = output_dataset.map_batches(ray_df_preprocessing)
     return processed_dataset.fully_executed()
-    # return processed_dataset
 
 
 @torch.no_grad()

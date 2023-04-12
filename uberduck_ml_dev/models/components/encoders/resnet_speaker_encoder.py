@@ -1,6 +1,7 @@
 from io import BytesIO
 import os
 import requests
+import json
 
 import torch
 
@@ -63,3 +64,39 @@ def load_pretrained(model, model_url=None):
     bio = BytesIO(response.content)
     loaded = torch.load(bio)
     model.load_state_dict(loaded["model"])
+
+
+RESNET_SE_MODEL_PATH = "/usr/src/app/radtts/resnet_se.pth.tar"
+RESNET_SE_CONFIG_PATH = "/usr/src/app/radtts/resnet_se_config.json"
+
+class ResNetSpeakerEncoderCallable:
+    def __init__(self, model_path: str, config_path: str):
+        print("initializing resnet speaker encoder")
+        with open(config_path) as f:
+            resnet_config = json.load(f)
+
+        state_dict = torch.load(model_path)["model"]
+        audio_config = dict(resnet_config["audio"])
+        model_params = resnet_config["model_params"]
+        if "model_name" in model_params:
+            del model_params["model_name"]
+
+        self.device = "cuda"
+        self.model = ResNetSpeakerEncoder(**model_params, audio_config=audio_config)
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
+        self.model.cuda()
+
+    # NOTE (Sam): might have to accept bytes input for anyscale distributed data loading?
+    def __call__(self, audiopaths):
+
+        print("calling resnet speaker encoder")
+        for audiopath in audiopaths:
+            audio_data = read(audiopath)[1]
+            datum = torch.FloatTensor(audio_data).unsqueeze(-1).t().cuda()
+            # datum = torch.FloatTensor(audio_data).unsqueeze(-1).t()
+            emb = self.model(datum)
+            emb = emb.cpu().detach().numpy()
+            yield {
+                    "audio_embedding": emb
+                }
