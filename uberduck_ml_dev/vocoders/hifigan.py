@@ -66,6 +66,25 @@ DEFAULTS = {
 }
 
 
+# NOTE (Sam): denoiser not used here in contrast with radtts repo
+def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
+
+    h = AttrDict(vocoder_config)
+    if "gaussian_blur" in vocoder_config:
+        vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
+    else:
+        vocoder_config["gaussian_blur"] = {"p_blurring": 0.0}
+        h["gaussian_blur"] = {"p_blurring": 0.0}
+
+    vocoder = Generator(h)
+    vocoder.load_state_dict(vocoder_state_dict)
+    if to_cuda:
+        vocoder.cuda()
+
+    vocoder.eval()
+
+    return vocoder
+    
 def get_vocoder(hifi_gan_config_path):
     print("Getting vocoder")
     # NOTE (Sam): uncomment for download on anyscale

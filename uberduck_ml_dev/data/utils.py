@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 from scipy.stats import betabinom
@@ -31,6 +33,26 @@ def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.
         mel_i_prob = rv.pmf(x)
         mel_text_probs.append(mel_i_prob)
     return torch.tensor(np.array(mel_text_probs))
+
+def get_attention_prior(n_tokens, n_frames):
+
+    filename = "{}_{}".format(n_tokens, n_frames)
+    betabinom_cache_path = "betabinom_cache"
+    if not os.path.exists(betabinom_cache_path):
+        os.makedirs(betabinom_cache_path, exist_ok=False)
+    prior_path = os.path.join(betabinom_cache_path, filename)
+    prior_path += "_prior.pth"
+
+    if os.path.exists(prior_path):
+        attn_prior = torch.load(prior_path)
+    else:
+        attn_prior = beta_binomial_prior_distribution(
+            n_tokens, n_frames, scaling_factor=1.0  # 0.05
+        )
+        torch.save(attn_prior, prior_path)
+
+
+    return attn_prior
 
 
 def energy_avg_normalize(x):
