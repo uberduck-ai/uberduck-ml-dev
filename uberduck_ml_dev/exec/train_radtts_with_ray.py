@@ -12,12 +12,7 @@ from ..models.common import TacotronSTFT
 from ..text.text_processing import TextProcessing
 
 
-HIFI_GAN_CONFIG_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_22khz_config.json"
-HIFI_GAN_GENERATOR_URL = "https://uberduck-models-us-west-2.s3.us-west-2.amazonaws.com/hifigan_libritts100360_generator0p5.pt"
-HIFI_GAN_CONFIG_PATH = "/usr/src/app/radtts/models/hifigan_22khz_config.json"
-HIFI_GAN_GENERATOR_PATH = (
-    "/usr/src/app/radtts/models/hifigan_libritts100360_generator0p5.pt"
-)
+
 
 from ..utils import parse_args
 
