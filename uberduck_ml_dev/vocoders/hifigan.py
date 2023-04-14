@@ -1,7 +1,5 @@
 __all__ = [
     "HiFiGanGenerator",
-    "ResBlock1",
-    "ResBlock2",
     "Generator",
     "DiscriminatorP",
     "MultiPeriodDiscriminator",
@@ -31,6 +29,8 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
+
+from uberduck_ml_dev.models.common import LRELU_SLOPE, ResBlock1, ResBlock2
 
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
 DEFAULTS = {
@@ -109,201 +109,127 @@ class HiFiGanGenerator(nn.Module):
         return audio
 
 
-LRELU_SLOPE = 0.1
-
-
-class ResBlock1(torch.nn.Module):
-    def __init__(self, h, channels, kernel_size=3, dilation=(1, 3, 5)):
-        super(ResBlock1, self).__init__()
-        self.h = h
-        self.convs1 = nn.ModuleList(
-            [
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[0],
-                        padding=get_padding(kernel_size, dilation[0]),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[1],
-                        padding=get_padding(kernel_size, dilation[1]),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[2],
-                        padding=get_padding(kernel_size, dilation[2]),
-                    )
-                ),
-            ]
-        )
-        self.convs1.apply(init_weights)
-
-        self.convs2 = nn.ModuleList(
-            [
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=1,
-                        padding=get_padding(kernel_size, 1),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=1,
-                        padding=get_padding(kernel_size, 1),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=1,
-                        padding=get_padding(kernel_size, 1),
-                    )
-                ),
-            ]
-        )
-        self.convs2.apply(init_weights)
-
-    def forward(self, x):
-        for c1, c2 in zip(self.convs1, self.convs2):
-            xt = F.leaky_relu(x, LRELU_SLOPE)
-            xt = c1(xt)
-            xt = F.leaky_relu(xt, LRELU_SLOPE)
-            xt = c2(xt)
-            x = xt + x
-        return x
-
-    def remove_weight_norm(self):
-        for l in self.convs1:
-            remove_weight_norm(l)
-        for l in self.convs2:
-            remove_weight_norm(l)
-
-
-class ResBlock2(torch.nn.Module):
-    def __init__(self, h, channels, kernel_size=3, dilation=(1, 3)):
-        super(ResBlock2, self).__init__()
-        self.h = h
-        self.convs = nn.ModuleList(
-            [
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[0],
-                        padding=get_padding(kernel_size, dilation[0]),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[1],
-                        padding=get_padding(kernel_size, dilation[1]),
-                    )
-                ),
-            ]
-        )
-        self.convs.apply(init_weights)
-
-    def forward(self, x):
-        for c in self.convs:
-            xt = F.leaky_relu(x, LRELU_SLOPE)
-            xt = c(xt)
-            x = xt + x
-        return x
-
-    def remove_weight_norm(self):
-        for l in self.convs:
-            remove_weight_norm(l)
-
-
 class Generator(torch.nn.Module):
-    __constants__ = ['lrelu_slope', 'num_kernels', 'num_upsamples', 'p_blur']
-    def __init__(self, h):
-        super(Generator, self).__init__()
-        self.num_kernels = len(h.resblock_kernel_sizes)
-        self.num_upsamples = len(h.upsample_rates)
-        self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
-        self.p_blur = h.gaussian_blur['p_blurring']
+    __constants__ = ["lrelu_slope", "num_kernels", "num_upsamples", "p_blur"]
+
+    def __init__(
+        self,
+        initial_channel,
+        resblock,
+        resblock_kernel_sizes,
+        resblock_dilation_sizes,
+        upsample_rates,
+        upsample_initial_channel,
+        upsample_kernel_sizes,
+        gin_channels=0,
+        gaussian_blur=dict(p_blurring=0),
+        weight_norm_pre_and_post=False,
+        use_f0=False,
+        use_nsf=False,
+        use_noise_convs=False,
+        use_conv_post_bias=False,
+        sampling_rate=None,
+    ):
+        super().__init__()
+        self.use_f0 = use_f0
+        self.use_nsf = use_nsf
+        if self.use_f0:
+            self.f0_upsamp = torch.nn.Upsample(scale_factor=np.prod(upsample_rates))
+        if self.use_nsf:
+            assert sampling_rate is not None
+            self.m_source = SourceModuleHnNSF(sampling_rate, harmonic_num=8)
+        self.num_kernels = len(resblock_kernel_sizes)
+        self.num_upsamples = len(upsample_rates)
+        conv_pre = Conv1d(initial_channel, upsample_initial_channel, 7, 1, padding=3)
+        if weight_norm_pre_and_post:
+            conv_pre = weight_norm(conv_pre)
+        self.conv_pre = conv_pre
+        self.p_blur = gaussian_blur["p_blurring"]
         self.gaussian_blur_fn = None
         if self.p_blur > 0.0:
-            self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
+            raise Exception(
+                "Gaussian blur is not supported in this version of the code."
+            )
+            # self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
         else:
             self.gaussian_blur_fn = nn.Identity()
         self.lrelu_slope = LRELU_SLOPE
 
-        resblock = ResBlock1 if h.resblock == '1' else ResBlock2
+        resblock = ResBlock1 if resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
-        for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
-            self.ups.append(weight_norm(
-                ConvTranspose1d(h.upsample_initial_channel//(2**i), h.upsample_initial_channel//(2**(i+1)),
-                                k, u, padding=(k-u)//2)))
+        if use_noise_convs:
+            self.noise_convs = nn.ModuleList()
+        for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
+            out_channels = upsample_initial_channel // (2 ** (i + 1))
+            self.ups.append(
+                weight_norm(
+                    ConvTranspose1d(
+                        upsample_initial_channel // (2**i),
+                        out_channels,
+                        k,
+                        u,
+                        padding=(k - u) // 2,
+                    )
+                )
+            )
+            if use_noise_convs:
+                if i + 1 < self.num_upsamples:
+                    stride_f0 = np.prod(upsample_rates[i + 1 :])
+                    self.noise_convs.append(
+                        Conv1d(
+                            1,
+                            out_channels,
+                            kernel_size=stride_f0 * 2,
+                            stride=stride_f0,
+                            padding=stride_f0 // 2,
+                        )
+                    )
+                else:
+                    self.noise_convs.append(Conv1d(1, out_channels, kernel_size=1))
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
-            resblock_list = nn.ModuleList()
-            ch = h.upsample_initial_channel//(2**(i+1))
-            for j, (k, d) in enumerate(zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)):
-                resblock_list.append(resblock(h, ch, k, d))
-            self.resblocks.append(resblock_list)
+            # resblock_list = nn.ModuleList()
+            ch = upsample_initial_channel // (2 ** (i + 1))
+            for j, (k, d) in enumerate(
+                zip(resblock_kernel_sizes, resblock_dilation_sizes)
+            ):
+                # resblock_list.append(resblock(ch, k, d))
+                self.resblocks.append(resblock(ch, k, d))
 
-        self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
+        conv_post = Conv1d(ch, 1, 7, 1, padding=3, bias=use_conv_post_bias)
+        if weight_norm_pre_and_post:
+            conv_post = weight_norm(conv_post)
+        self.conv_post = conv_post
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
+        if gin_channels != 0:
+            self.cond = Conv1d(gin_channels, upsample_initial_channel, 1)
 
-    def load_state_dict(self, state_dict):
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            new_k = k
-            if 'resblocks' in k:
-                parts = k.split(".")
-                # only do this is the checkpoint type is older
-                if len(parts) == 5:
-                    layer = int(parts[1])
-                    new_layer = f"{layer//3}.{layer%3}"
-                    new_k = f"resblocks.{new_layer}.{'.'.join(parts[2:])}"
-            new_state_dict[new_k] = v
-        super().load_state_dict(new_state_dict)
-
-    def forward(self, x):
+    def forward(self, x, g=None, f0=None):
+        if f0 is not None:
+            assert self.use_f0
+            f0 = self.f0_upsamp(f0[:, None]).transpose(1, 2)
+            signal_source, noise_source, uv = self.m_source(f0)
+            signal_source = signal_source.transpose(1, 2)
         if self.p_blur > 0.0:
-            x = self.gaussian_blur_fn(x)
+            raise Exception(
+                "Gaussian blur is not supported in this version of the code."
+            )
+            # x = self.gaussian_blur_fn(x)
         x = self.conv_pre(x)
-        for upsample_layer, resblock_group in zip(self.ups, self.resblocks):
+        if g is not None:
+            x = x + self.cond(g)
+        for idx, upsample_layer in enumerate(self.ups):
             x = F.leaky_relu(x, self.lrelu_slope)
             x = upsample_layer(x)
+            if f0 is not None:
+                x_source = self.noise_convs[idx](signal_source)
+                x = x + x_source
             xs = torch.zeros(x.shape, dtype=x.dtype, device=x.device)
-            for resblock in resblock_group:
+            for j in range(self.num_kernels):
+                resblock = self.resblocks[idx * self.num_kernels + j]
                 xs += resblock(x)
             x = xs / self.num_kernels
         x = F.leaky_relu(x)
@@ -313,7 +239,7 @@ class Generator(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        print('Removing weight norm...')
+        print("Removing weight norm...")
         for l in self.ups:
             remove_weight_norm(l)
         for group in self.resblocks:
@@ -321,7 +247,6 @@ class Generator(torch.nn.Module):
                 block.remove_weight_norm()
         remove_weight_norm(self.conv_pre)
         remove_weight_norm(self.conv_post)
-
 
 
 class DiscriminatorP(torch.nn.Module):
@@ -554,3 +479,199 @@ def apply_weight_norm(m):
 
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size * dilation - dilation) / 2)
+
+
+def padDiff(x):
+    return F.pad(
+        F.pad(x, (0, 0, -1, 1), "constant", 0) - x, (0, 0, 0, -1), "constant", 0
+    )
+
+
+class SineGen(torch.nn.Module):
+    """Definition of sine generator
+    SineGen(samp_rate, harmonic_num = 0,
+            sine_amp = 0.1, noise_std = 0.003,
+            voiced_threshold = 0,
+            flag_for_pulse=False)
+    samp_rate: sampling rate in Hz
+    harmonic_num: number of harmonic overtones (default 0)
+    sine_amp: amplitude of sine-wavefrom (default 0.1)
+    noise_std: std of Gaussian noise (default 0.003)
+    voiced_thoreshold: F0 threshold for U/V classification (default 0)
+    flag_for_pulse: this SinGen is used inside PulseGen (default False)
+    Note: when flag_for_pulse is True, the first time step of a voiced
+        segment is always sin(np.pi) or cos(0)
+    """
+
+    def __init__(
+        self,
+        samp_rate,
+        harmonic_num=0,
+        sine_amp=0.1,
+        noise_std=0.003,
+        voiced_threshold=0,
+        flag_for_pulse=False,
+    ):
+        super(SineGen, self).__init__()
+        self.sine_amp = sine_amp
+        self.noise_std = noise_std
+        self.harmonic_num = harmonic_num
+        self.dim = self.harmonic_num + 1
+        self.sampling_rate = samp_rate
+        self.voiced_threshold = voiced_threshold
+        self.flag_for_pulse = flag_for_pulse
+
+    def _f02uv(self, f0):
+        # generate uv signal
+        uv = (f0 > self.voiced_threshold).type(torch.float32)
+        return uv
+
+    def _f02sine(self, f0_values):
+        """f0_values: (batchsize, length, dim)
+        where dim indicates fundamental tone and overtones
+        """
+        # convert to F0 in rad. The interger part n can be ignored
+        # because 2 * np.pi * n doesn't affect phase
+        rad_values = (f0_values / self.sampling_rate) % 1
+
+        # initial phase noise (no noise for fundamental component)
+        rand_ini = torch.rand(
+            f0_values.shape[0], f0_values.shape[2], device=f0_values.device
+        )
+        rand_ini[:, 0] = 0
+        rad_values[:, 0, :] = rad_values[:, 0, :] + rand_ini
+
+        # instantanouse phase sine[t] = sin(2*pi \sum_i=1 ^{t} rad)
+        if not self.flag_for_pulse:
+            # for normal case
+
+            # To prevent torch.cumsum numerical overflow,
+            # it is necessary to add -1 whenever \sum_k=1^n rad_value_k > 1.
+            # Buffer tmp_over_one_idx indicates the time step to add -1.
+            # This will not change F0 of sine because (x-1) * 2*pi = x * 2*pi
+            tmp_over_one = torch.cumsum(rad_values, 1) % 1
+            tmp_over_one_idx = (padDiff(tmp_over_one)) < 0
+            cumsum_shift = torch.zeros_like(rad_values)
+            cumsum_shift[:, 1:, :] = tmp_over_one_idx * -1.0
+
+            sines = torch.sin(
+                torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi
+            )
+        else:
+            # If necessary, make sure that the first time step of every
+            # voiced segments is sin(pi) or cos(0)
+            # This is used for pulse-train generation
+
+            # identify the last time step in unvoiced segments
+            uv = self._f02uv(f0_values)
+            uv_1 = torch.roll(uv, shifts=-1, dims=1)
+            uv_1[:, -1, :] = 1
+            u_loc = (uv < 1) * (uv_1 > 0)
+
+            # get the instantanouse phase
+            tmp_cumsum = torch.cumsum(rad_values, dim=1)
+            # different batch needs to be processed differently
+            for idx in range(f0_values.shape[0]):
+                temp_sum = tmp_cumsum[idx, u_loc[idx, :, 0], :]
+                temp_sum[1:, :] = temp_sum[1:, :] - temp_sum[0:-1, :]
+                # stores the accumulation of i.phase within
+                # each voiced segments
+                tmp_cumsum[idx, :, :] = 0
+                tmp_cumsum[idx, u_loc[idx, :, 0], :] = temp_sum
+
+            # rad_values - tmp_cumsum: remove the accumulation of i.phase
+            # within the previous voiced segment.
+            i_phase = torch.cumsum(rad_values - tmp_cumsum, dim=1)
+
+            # get the sines
+            sines = torch.cos(i_phase * 2 * np.pi)
+        return sines
+
+    def forward(self, f0):
+        """sine_tensor, uv = forward(f0)
+        input F0: tensor(batchsize=1, length, dim=1)
+                  f0 for unvoiced steps should be 0
+        output sine_tensor: tensor(batchsize=1, length, dim)
+        output uv: tensor(batchsize=1, length, 1)
+        """
+        with torch.no_grad():
+            f0_buf = torch.zeros(f0.shape[0], f0.shape[1], self.dim, device=f0.device)
+            # fundamental component
+            fn = torch.multiply(
+                f0, torch.FloatTensor([[range(1, self.harmonic_num + 2)]]).to(f0.device)
+            )
+
+            # generate sine waveforms
+            sine_waves = self._f02sine(fn) * self.sine_amp
+
+            # generate uv signal
+            # uv = torch.ones(f0.shape)
+            # uv = uv * (f0 > self.voiced_threshold)
+            uv = self._f02uv(f0)
+
+            # noise: for unvoiced should be similar to sine_amp
+            #        std = self.sine_amp/3 -> max value ~ self.sine_amp
+            # .       for voiced regions is self.noise_std
+            noise_amp = uv * self.noise_std + (1 - uv) * self.sine_amp / 3
+            noise = noise_amp * torch.randn_like(sine_waves)
+
+            # first: set the unvoiced part to 0 by uv
+            # then: additive noise
+            sine_waves = sine_waves * uv + noise
+        return sine_waves, uv, noise
+
+
+class SourceModuleHnNSF(torch.nn.Module):
+    """SourceModule for hn-nsf
+    SourceModule(sampling_rate, harmonic_num=0, sine_amp=0.1,
+                 add_noise_std=0.003, voiced_threshod=0)
+    sampling_rate: sampling_rate in Hz
+    harmonic_num: number of harmonic above F0 (default: 0)
+    sine_amp: amplitude of sine source signal (default: 0.1)
+    add_noise_std: std of additive Gaussian noise (default: 0.003)
+        note that amplitude of noise in unvoiced is decided
+        by sine_amp
+    voiced_threshold: threhold to set U/V given F0 (default: 0)
+    Sine_source, noise_source = SourceModuleHnNSF(F0_sampled)
+    F0_sampled (batchsize, length, 1)
+    Sine_source (batchsize, length, 1)
+    noise_source (batchsize, length 1)
+    uv (batchsize, length, 1)
+    """
+
+    def __init__(
+        self,
+        sampling_rate,
+        harmonic_num=0,
+        sine_amp=0.1,
+        add_noise_std=0.003,
+        voiced_threshod=0,
+    ):
+        super(SourceModuleHnNSF, self).__init__()
+
+        self.sine_amp = sine_amp
+        self.noise_std = add_noise_std
+
+        # to produce sine waveforms
+        self.l_sin_gen = SineGen(
+            sampling_rate, harmonic_num, sine_amp, add_noise_std, voiced_threshod
+        )
+
+        # to merge source harmonics into a single excitation
+        self.l_linear = torch.nn.Linear(harmonic_num + 1, 1)
+        self.l_tanh = torch.nn.Tanh()
+
+    def forward(self, x):
+        """
+        Sine_source, noise_source = SourceModuleHnNSF(F0_sampled)
+        F0_sampled (batchsize, length, 1)
+        Sine_source (batchsize, length, 1)
+        noise_source (batchsize, length 1)
+        """
+        # source for harmonic branch
+        sine_wavs, uv, _ = self.l_sin_gen(x)
+        sine_merge = self.l_tanh(self.l_linear(sine_wavs))
+
+        # source for noise branch, in the same shape as uv
+        noise = torch.randn_like(uv) * self.sine_amp / 3
+        return sine_merge, noise, uv

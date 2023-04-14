@@ -39,6 +39,7 @@ from librosa.util import pad_center, tiny
 from typing import Tuple
 
 from ..utils.utils import *
+from ..utils.utils import fused_add_tanh_sigmoid_multiply
 from .transforms import piecewise_rational_quadratic_transform
 from .components.partialconv1d import PartialConv1d as pconv1d
 
@@ -516,7 +517,6 @@ class GST(nn.Module):
         return style_embed
 
 
-# Cell
 class LayerNorm(nn.Module):
     def __init__(self, channels, eps=1e-5):
         super().__init__()
@@ -532,7 +532,6 @@ class LayerNorm(nn.Module):
         return x.transpose(1, -1)
 
 
-# Cell
 class Flip(nn.Module):
     def forward(self, x, *args, reverse=False, **kwargs):
         x = torch.flip(x, [1])
@@ -543,7 +542,6 @@ class Flip(nn.Module):
             return x
 
 
-# Cell
 class Log(nn.Module):
     def forward(self, x, x_mask, reverse=False, **kwargs):
         if not reverse:
@@ -555,7 +553,6 @@ class Log(nn.Module):
             return x
 
 
-# Cell
 class ElementwiseAffine(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -574,7 +571,6 @@ class ElementwiseAffine(nn.Module):
             return x
 
 
-# Cell
 class DDSConv(nn.Module):
     """
     Dialted and Depth-Separable Convolution
@@ -685,10 +681,6 @@ class ConvFlow(nn.Module):
             return x
 
 
-# Cell
-from ..utils.utils import fused_add_tanh_sigmoid_multiply
-
-
 class WN(torch.nn.Module):
     def __init__(
         self,
@@ -698,6 +690,7 @@ class WN(torch.nn.Module):
         n_layers,
         gin_channels=0,
         p_dropout=0,
+        local_conditioning_channels=0,
     ):
         super(WN, self).__init__()
         assert kernel_size % 2 == 1
@@ -707,6 +700,7 @@ class WN(torch.nn.Module):
         self.n_layers = n_layers
         self.gin_channels = gin_channels
         self.p_dropout = p_dropout
+        self.local_conditioning_channels = local_conditioning_channels
 
         self.in_layers = torch.nn.ModuleList()
         self.res_skip_layers = torch.nn.ModuleList()
@@ -715,6 +709,13 @@ class WN(torch.nn.Module):
         if gin_channels != 0:
             cond_layer = nn.Conv1d(gin_channels, 2 * hidden_channels * n_layers, 1)
             self.cond_layer = weight_norm(cond_layer, name="weight")
+        if local_conditioning_channels != 0:
+            local_cond_layer = nn.Conv1d(
+                local_conditioning_channels, 2 * hidden_channels * n_layers, 1
+            )
+            self.local_cond_layer = weight_norm(local_cond_layer, name="weight")
+        else:
+            self.local_cond_layer = None
 
         for i in range(n_layers):
             dilation = dilation_rate**i
@@ -739,12 +740,14 @@ class WN(torch.nn.Module):
             res_skip_layer = weight_norm(res_skip_layer, name="weight")
             self.res_skip_layers.append(res_skip_layer)
 
-    def forward(self, x, x_mask, g=None, **kwargs):
+    def forward(self, x, x_mask, g=None, local_conditioning=None, **kwargs):
         output = torch.zeros_like(x)
         n_channels_tensor = torch.IntTensor([self.hidden_channels])
 
         if g is not None:
             g = self.cond_layer(g)
+        if local_conditioning is not None and self.local_cond_layer is not None:
+            l = self.local_cond_layer(local_conditioning)
 
         for i in range(self.n_layers):
             x_in = self.in_layers[i](x)
@@ -753,6 +756,10 @@ class WN(torch.nn.Module):
                 g_l = g[:, cond_offset : cond_offset + 2 * self.hidden_channels, :]
             else:
                 g_l = torch.zeros_like(x_in)
+            if local_conditioning is not None and self.local_cond_layer is not None:
+                g_l = (
+                    g_l + l[:, cond_offset : cond_offset + 2 * self.hidden_channels, :]
+                )
 
             acts = fused_add_tanh_sigmoid_multiply(x_in, g_l, n_channels_tensor)
             acts = self.drop(acts)
@@ -769,6 +776,8 @@ class WN(torch.nn.Module):
     def remove_weight_norm(self):
         if self.gin_channels != 0:
             remove_weight_norm(self.cond_layer)
+        if self.local_conditioning_channels != 0 and self.local_cond_layer is not None:
+            remove_weight_norm(self.local_cond_layer)
         for l in self.in_layers:
             remove_weight_norm(l)
         for l in self.res_skip_layers:
@@ -855,7 +864,7 @@ class WN_RADTTS(torch.nn.Module):
         return output
 
 
-# Cell
+# NOTE(zach): this is like FlowStep in RadTTS
 class ResidualCouplingLayer(nn.Module):
     def __init__(
         self,
@@ -867,6 +876,7 @@ class ResidualCouplingLayer(nn.Module):
         p_dropout=0,
         gin_channels=0,
         mean_only=False,
+        local_conditioning_channels=0,
     ):
         assert channels % 2 == 0, "channels should be divisible by 2"
         super().__init__()
@@ -886,15 +896,16 @@ class ResidualCouplingLayer(nn.Module):
             n_layers,
             p_dropout=p_dropout,
             gin_channels=gin_channels,
+            local_conditioning_channels=local_conditioning_channels,
         )
         self.post = nn.Conv1d(hidden_channels, self.half_channels * (2 - mean_only), 1)
         self.post.weight.data.zero_()
         self.post.bias.data.zero_()
 
-    def forward(self, x, x_mask, g=None, reverse=False):
+    def forward(self, x, x_mask, g=None, reverse=False, local_conditioning=None):
         x0, x1 = torch.split(x, [self.half_channels] * 2, 1)
         h = self.pre(x0) * x_mask
-        h = self.enc(h, x_mask, g=g)
+        h = self.enc(h, x_mask, g=g, local_conditioning=local_conditioning)
         stats = self.post(h) * x_mask
         if not self.mean_only:
             m, logs = torch.split(stats, [self.half_channels] * 2, 1)
@@ -911,9 +922,6 @@ class ResidualCouplingLayer(nn.Module):
             x1 = (x1 - m) * torch.exp(-logs) * x_mask
             x = torch.cat([x0, x1], 1)
             return x
-
-
-# Cell
 
 
 class ResBlock1(torch.nn.Module):
@@ -1118,7 +1126,9 @@ def mel_spectrogram_torch(
         pad_mode="reflect",
         normalized=False,
         onesided=True,
+        return_complex=True,
     )
+    spec = torch.view_as_real(spec)
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
 
@@ -1203,7 +1213,9 @@ def spectrogram_torch(
         pad_mode="reflect",
         normalized=False,
         onesided=True,
+        return_complex=True,
     )
+    spec = torch.view_as_real(spec)
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
@@ -1211,7 +1223,6 @@ def spectrogram_torch(
 
 # TODO (Sam): unite the get_mel methods
 def get_mel(audio, max_wav_value, stft):
-
     # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
     # NOTE (Sam): be carefuly of numerical issues with order of operations here.
     audio = torch.FloatTensor(audio)
