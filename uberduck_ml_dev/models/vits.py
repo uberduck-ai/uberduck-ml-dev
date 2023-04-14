@@ -82,6 +82,26 @@ ENERGY_MODEL_CONFIG = {
     },
 }
 
+SOVITS_MODEL_CONFIG = {
+    "inter_channels": 192,
+    "filter_channels": 768,
+    "n_heads": 2,
+    "n_layers": 6,
+    "kernel_size": 3,
+    "p_dropout": 0.1,
+    "resblock": "1",
+    "resblock_kernel_sizes": [3, 7, 11],
+    "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+    # NOTE(zach): default sovits config hs [8, 8, 2, 2, 2]
+    "upsample_rates": [8, 8, 2, 2, 2],
+    "upsample_initial_channel": 512,
+    # NOTE(zach): default sovits config has [16, 16, 4, 4, 4]
+    "upsample_kernel_sizes": [16, 16, 4, 4, 4],
+    "n_layers_q": 3,
+    "use_spectral_norm": False,
+    "ssl_dim": 256,
+}
+
 
 class SovitsEncoder(nn.Module):
     def __init__(
