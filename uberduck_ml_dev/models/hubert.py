@@ -1,7 +1,11 @@
 import copy
+import os
 import random
 from typing import Optional, Tuple
+import tempfile
+import requests
 
+from fairseq.checkpoint_utils import load_model_ensemble_and_task
 import torch
 import torch.nn as nn
 import torch.nn.functional as t_func
@@ -221,3 +225,14 @@ def hubert_soft(
     hubert.eval()
     return hubert
 
+def get_pretrained_hubert(url: str):
+    response = requests.get(url)
+    with tempfile.NamedTemporaryFile() as f:
+        # with open("hubert_checkpoint_best_legacy_500.pt", "wb") as f:
+        f.write(response.content)
+        file_size = os.path.getsize(f.name)
+        print("FILE SIZE: ", file_size)
+        model, *_ = load_model_ensemble_and_task([f.name], suffix="")
+    hubert_model = model[0]
+    hubert_model.eval()
+    return hubert_model
