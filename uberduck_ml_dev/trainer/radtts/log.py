@@ -1,14 +1,16 @@
 import torch
 import wandb
+
+from ray.air import session
+
 from ...utils.utils import (
     to_gpu,
 )
 from ...utils.plot import plot_alignment_to_numpy
 
 
-
 @torch.no_grad()
-def log(session, metrics, audios={}):
+def log(metrics, audios={}):
     # pass
     wandb_metrics = dict(metrics)
 
@@ -34,11 +36,10 @@ def get_log_audio(
     f0,
     energy_avg,
     voiced_mask,
-    vocoder, # NOTE (Sam): should this be moved on and off gpu?
+    vocoder,  # NOTE (Sam): should this be moved on and off gpu?
     audio_embedding_oos=None,
     oos_name=None,
 ):
-
     # print( audio_embedding_oos, oos_name, bool(audio_embedding_oos is None), bool(oos_name is None))
     assert bool(audio_embedding_oos is None) == bool(
         oos_name is None

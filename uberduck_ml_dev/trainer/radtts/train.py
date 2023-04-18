@@ -22,8 +22,8 @@ def train_func(config: dict):
     model_config = config["model_config"]
     data_config = config["data_config"]
     vocoder = get_vocoder(
-        hifi_gan_config_path=train_config["hifi_gan_config_path"],
-        hifi_gan_checkpoint_path=train_config["hifi_gan_checkpoint_path"],
+        hifi_gan_config_path=train_config["vocoder_config_path"],
+        hifi_gan_checkpoint_path=train_config["vocoder_checkpoint_path"],
     )
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
     epochs = train_config["epochs"]
@@ -31,6 +31,7 @@ def train_func(config: dict):
     sigma = train_config["sigma"]
     kl_loss_start_iter = train_config["kl_loss_start_iter"]
     binarization_start_iter = train_config["binarization_start_iter"]
+
     model = RADTTS(
         **model_config,
     )
@@ -110,7 +111,6 @@ DEFAULTS = {
     "ignore_layers": [],
     "ignore_layers_warmstart": [],
     "steps_per_sample": 10000,
-    "finetune_layers": [],
     "include_layers": [],
     "vocoder_config_path": "hifigan_22khz_config.json",
     "vocoder_checkpoint_path": "hifigan_libritts100360_generator0p5.pt",

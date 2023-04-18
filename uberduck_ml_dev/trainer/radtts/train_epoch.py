@@ -1,5 +1,6 @@
 from .train_step import _train_step
 
+
 # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
 def train_epoch(
     train_dataloader,
@@ -16,6 +17,7 @@ def train_epoch(
     kl_loss_start_iter,
     binarization_start_iter,
     iteration,
+    vocoder,
 ):
     # def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
     # for batch_idx, ray_batch_df in enumerate(

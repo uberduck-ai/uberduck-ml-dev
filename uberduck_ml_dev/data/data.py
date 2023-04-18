@@ -10,7 +10,7 @@ from librosa import pyin
 import lmdb
 import pickle as pkl
 
-import uberduck_ml_dev  # NOTE (Sam): can we get installation path w/o this?
+# import uberduck_ml_dev  # NOTE (Sam): can we get installation path w/o this?
 
 from ..models.common import MelSTFT
 from ..utils.utils import (
@@ -731,8 +731,8 @@ RADTTS_DEFAULTS = {
     "use_scaled_energy": True,
     "symbol_set": "radtts",
     "cleaner_names": ["radtts_cleaners"],
-    "heteronyms_path": f"{os.path.dirname(uberduck_ml_dev.__file__)}/text/heteronyms",
-    "phoneme_dict_path": f"{os.path.dirname(uberduck_ml_dev.__file__)}/text/cmudict-0.7b",
+    "heteronyms_path": "uberduck_ml_dev/text/heteronyms",
+    "phoneme_dict_path": "uberduck_ml_dev/text/cmudict-0.7b",
     "p_phoneme": 1.0,
     "handle_phoneme": "word",
     "handle_phoneme_ambiguous": "ignore",

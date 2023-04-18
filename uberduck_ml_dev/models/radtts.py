@@ -997,8 +997,8 @@ class RADTTS(torch.nn.Module):
 
 
 DEFAULTS = {
-    # 'n_speakers': <replace-me>,
-    # 'n_speaker_dim': <replace-me>,
+    "n_speakers": 30,  # unused in zero shot (could use load_strict = False)
+    "n_speaker_dim": 512,  # for coqui
     "n_text": 185,
     "n_text_dim": 512,
     "n_flows": 8,

@@ -1,5 +1,5 @@
 # NOTE (Sam): for use with ray trainer.
-import datetime
+from datetime import datetime
 import os
 
 import torch
@@ -11,6 +11,7 @@ from .save import save_checkpoint
 from ...utils.utils import (
     to_gpu,
 )
+
 
 # TODO (Sam): it seems like much of this can be made generic for multiple models.
 def _train_step(
@@ -39,8 +40,7 @@ def _train_step(
     optim.zero_grad()
 
     with autocast(enabled=False):
-
-        batch_dict = batch # torch DataLoader?
+        batch_dict = batch  # torch DataLoader?
         # batch_dict = collate_fn(batch) # ray dataset?
         # TODO (Sam): move to batch.go_gpu().
         mel = to_gpu(batch_dict["mel"])
@@ -121,28 +121,28 @@ def _train_step(
             voiced_mask,
             vocoder,
         )
-        # TODO (Sam): make this clean
-        gt_path = "/usr/src/app/radtts/ground_truth"
-        oos_embs = os.listdir(gt_path)
-        # this doesn't help for reasons described above
-        for oos_name in oos_embs:
-            audio_embedding_oos = torch.load(f"{gt_path}/{oos_name}").cuda()
-            _, audios_oos = get_log_audio(
-                outputs,
-                batch_dict,
-                log_decoder_samples,
-                log_attribute_samples,
-                model,
-                speaker_ids,
-                text,
-                f0,
-                energy_avg,
-                voiced_mask,
-                vocoder,
-                oos_name=oos_name,
-                audio_embedding_oos=audio_embedding_oos,
-            )
-            audios.update(audios_oos)
+        # TODO (Sam): make out of sample logging cleaner.
+        # gt_path = "/usr/src/app/radtts/ground_truth"
+        # oos_embs = os.listdir(gt_path)
+        # # this doesn't help for reasons described above
+        # for oos_name in oos_embs:
+        #     audio_embedding_oos = torch.load(f"{gt_path}/{oos_name}").cuda()
+        #     _, audios_oos = get_log_audio(
+        #         outputs,
+        #         batch_dict,
+        #         log_decoder_samples,
+        #         log_attribute_samples,
+        #         model,
+        #         speaker_ids,
+        #         text,
+        #         f0,
+        #         energy_avg,
+        #         voiced_mask,
+        #         vocoder,
+        #         oos_name=oos_name,
+        #         audio_embedding_oos=audio_embedding_oos,
+        #     )
+        #     audios.update(audios_oos)
         log(metrics, audios)
         model.train()
     else:
@@ -150,7 +150,6 @@ def _train_step(
 
     session.report(metrics)
     if log_checkpoint and session.get_world_rank() == 0:
-
         checkpoint_path = f"{output_directory}/model_{iteration}.pt"
         save_checkpoint(model, optim, iteration, checkpoint_path)
 

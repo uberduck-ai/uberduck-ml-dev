@@ -7,17 +7,12 @@ from ray.tune import SyncConfig
 from ray.train.torch import TorchTrainer, TorchTrainer
 from ray.air.config import ScalingConfig, RunConfig
 
-from .train import train_func
-from ..models.common import TacotronSTFT
-from ..text.text_processing import TextProcessing
-
-
-
-
-from ..utils import parse_args
+from uberduck_ml_dev.trainer.radtts.train import train_func
+from uberduck_ml_dev.models.common import TacotronSTFT
+from uberduck_ml_dev.text.text_processing import TextProcessing
+from uberduck_ml_dev.utils.exec import parse_args
 
 if __name__ == "__main__":
-
     args = parse_args(sys.argv[1:])
     if args.config:
         with open(args.config) as f:
@@ -65,14 +60,12 @@ if __name__ == "__main__":
     # NOTE (Sam): uncomment for ray dataset training
     # ray_dataset = get_ray_dataset()
     # ray_dataset.fully_executed()
-    
+
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config=config,
         scaling_config=ScalingConfig(
-            num_workers=2,
-            use_gpu=True,
-            resources_per_worker=dict(CPU=8, GPU=1)
+            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
         ),
         run_config=RunConfig(
             # NOTE (Sam): uncomment for saving on anyscale

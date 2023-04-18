@@ -68,7 +68,6 @@ DEFAULTS = {
 
 # NOTE (Sam): denoiser not used here in contrast with radtts repo
 def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
-
     h = AttrDict(vocoder_config)
     if "gaussian_blur" in vocoder_config:
         vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
@@ -84,8 +83,9 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
     vocoder.eval()
 
     return vocoder
-    
-def get_vocoder(hifi_gan_config_path):
+
+
+def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     print("Getting vocoder")
     # NOTE (Sam): uncomment for download on anyscale
     # response = requests.get(hifi_gan_config_path)
@@ -102,17 +102,19 @@ def get_vocoder(hifi_gan_config_path):
     # model_params = hifigan_config["model_params"]
     model = Generator(h)
     print("Loading pretrained model...")
-    load_pretrained(model)
+    load_pretrained(model, hifi_gan_checkpoint_path)
     print("Got pretrained model...")
     model.eval()
     return model
-    
-def load_pretrained(model, hifi_gan_generator_path):
+
+
+def load_pretrained(model, hifi_gan_checkpoint_path):
     # NOTE (Sam): uncomment for download on anyscale
     # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
     # bio = BytesIO(response.content)
-    loaded = torch.load(hifi_gan_generator_path)
+    loaded = torch.load(hifi_gan_checkpoint_path)
     model.load_state_dict(loaded["generator"])
+
 
 class HiFiGanGenerator(nn.Module):
     def __init__(self, config, checkpoint, cudnn_enabled=False):
