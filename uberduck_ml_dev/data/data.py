@@ -10,24 +10,33 @@ from librosa import pyin
 import lmdb
 import pickle as pkl
 
+import uberduck_ml_dev  # NOTE (Sam): can we get installation path w/o this?
+
 from ..models.common import MelSTFT
 from ..utils.utils import (
     load_filepaths_and_text,
     intersperse,
 )
-from .utils import oversample, _orig_to_dense_speaker_id, beta_binomial_prior_distribution
+from .utils import (
+    oversample,
+    _orig_to_dense_speaker_id,
+    beta_binomial_prior_distribution,
+)
 from ..text.utils import text_to_sequence
+from ..text.text_processing import TextProcessing
 from ..models.common import (
     FILTER_LENGTH,
     HOP_LENGTH,
     WIN_LENGTH,
     SAMPLING_RATE,
     N_MEL_CHANNELS,
+    TacotronSTFT,
 )
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 
 F0_MIN = 80
 F0_MAX = 640
+
 
 # NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available).
 # However, functional factorization of this dataloader (e.g. get_mels) and merging classes as needed would be preferable.
@@ -347,7 +356,6 @@ class Data(Dataset):
         return f0, voiced_mask, p_voiced
 
 
-
 class DataRADTTS(torch.utils.data.Dataset):
     def __init__(
         self,
@@ -388,7 +396,6 @@ class DataRADTTS(torch.utils.data.Dataset):
         combine_speaker_and_emotion=False,
         **kwargs,
     ):
-
         self.combine_speaker_and_emotion = combine_speaker_and_emotion
         self.max_wav_value = max_wav_value
         self.audio_lmdb_dict = {}  # dictionary of lmdbs for audio data
@@ -442,7 +449,7 @@ class DataRADTTS(torch.utils.data.Dataset):
 
         print("Number of files", len(self.data))
         if include_speakers is not None:
-            for (speaker_set, include) in include_speakers:
+            for speaker_set, include in include_speakers:
                 self.filter_by_speakers_(speaker_set, include)
             print("Number of files after speaker filtering", len(self.data))
 
@@ -565,7 +572,6 @@ class DataRADTTS(torch.utils.data.Dataset):
         f0_min=100,
         f0_max=300,
     ):
-
         audio_norm = audio / self.max_wav_value
         f0, voiced_mask, p_voiced = pyin(
             audio_norm,
@@ -634,14 +640,15 @@ class DataRADTTS(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         # TODO (Sam): make this clean.
-        my_path = "/usr/src/app/radtts/data/big_data"
+        # my_path = "/usr/src/app/radtts/data/big_data"
 
         data = self.data[index]
-        audiopath_s3, text = data["audiopath"], data["text"]
-        rel_path_folder = audiopath_s3.split("uberduck-audio-files/")[1].split(
-            "/resampled_unnormalized.wav"
-        )[0]
-        sub_path = os.path.join(my_path, rel_path_folder)
+        sub_path = data["audiopath"]
+        text = data["text"]
+        # rel_path_folder = audiopath_s3.split("uberduck-audio-files/")[1].split(
+        #     "/resampled_unnormalized.wav"
+        # )[0]
+        # sub_path = os.path.join(my_path, rel_path_folder)
         audiopath = f"{sub_path}/resampled_unnormalized.wav"
         audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
         f0_path = f"{sub_path}/f0.pt"
@@ -687,3 +694,57 @@ class DataRADTTS(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.data)
+
+
+RADTTS_DEFAULTS = {
+    "training_files": {
+        "dataset_1": {
+            "basedir": "",
+            "audiodir": "",
+            "filelist": "",
+            "lmdbpath": "",
+        }
+    },
+    "validation_files": {
+        "dataset_1": {
+            "basedir": "",
+            "audiodir": "",
+            "filelist": "",
+            "lmdbpath": "",
+        }
+    },
+    "dur_min": 0.1,
+    "dur_max": 10.2,
+    "sampling_rate": 22050,
+    "filter_length": 1024,
+    "hop_length": 256,
+    "win_length": 1024,
+    "n_mel_channels": 80,
+    "mel_fmin": 0.0,
+    "mel_fmax": 8000.0,
+    "f0_min": 80.0,
+    "f0_max": 640.0,
+    "max_wav_value": 32768.0,
+    "use_f0": True,
+    "use_log_f0": 0,
+    "use_energy_avg": True,
+    "use_scaled_energy": True,
+    "symbol_set": "radtts",
+    "cleaner_names": ["radtts_cleaners"],
+    "heteronyms_path": f"{os.path.dirname(uberduck_ml_dev.__file__)}/text/heteronyms",
+    "phoneme_dict_path": f"{os.path.dirname(uberduck_ml_dev.__file__)}/text/cmudict-0.7b",
+    "p_phoneme": 1.0,
+    "handle_phoneme": "word",
+    "handle_phoneme_ambiguous": "ignore",
+    "include_speakers": None,
+    "n_frames": -1,
+    "betabinom_cache_path": "data_cache/",
+    "lmdb_cache_path": "",
+    "use_attn_prior_masking": True,
+    "prepend_space_to_text": True,
+    "append_space_to_text": True,
+    "add_bos_eos_to_text": False,
+    "betabinom_scaling_factor": 1.0,
+    "distance_tx_unvoiced": False,
+    "mel_noise_scale": 0.0,
+}

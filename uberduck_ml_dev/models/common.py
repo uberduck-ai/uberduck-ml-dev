@@ -33,7 +33,7 @@ from torch.nn import functional as F
 from torch.nn.utils import remove_weight_norm, weight_norm
 from torch.nn import init
 from torch.cuda import amp
-from librosa.filters import mel as librosa_mel , librosa_mel_fn
+from librosa.filters import mel as librosa_mel
 from librosa.util import pad_center, tiny
 from typing import Tuple
 
@@ -1208,8 +1208,6 @@ def spectrogram_torch(
     return spec
 
 
-
-
 class ConvAttention(torch.nn.Module):
     def __init__(
         self, n_mel_channels=80, n_text_channels=512, n_att_channels=80, temperature=1.0
@@ -2095,19 +2093,32 @@ class ConvLSTMLinear(nn.Module):
         x_hat = self.feature_processing.denormalize(x_hat)
         return x_hat
 
+
 # NOTE (Sam): ironically, this is from RADTTS
 class TacotronSTFT(torch.nn.Module):
-    def __init__(self, filter_length=1024, hop_length=256, win_length=1024,
-                 n_mel_channels=80, sampling_rate=22050, mel_fmin=0.0,
-                 mel_fmax=None):
+    def __init__(
+        self,
+        filter_length=1024,
+        hop_length=256,
+        win_length=1024,
+        n_mel_channels=80,
+        sampling_rate=22050,
+        mel_fmin=0.0,
+        mel_fmax=None,
+    ):
         super(TacotronSTFT, self).__init__()
         self.n_mel_channels = n_mel_channels
         self.sampling_rate = sampling_rate
         self.stft_fn = STFT(filter_length, hop_length, win_length)
-        mel_basis = librosa_mel_fn(
-            sr = sampling_rate, n_fft= filter_length, n_mels = n_mel_channels, fmin = mel_fmin, fmax = mel_fmax)
+        mel_basis = librosa_mel(
+            sr=sampling_rate,
+            n_fft=filter_length,
+            n_mels=n_mel_channels,
+            fmin=mel_fmin,
+            fmax=mel_fmax,
+        )
         mel_basis = torch.from_numpy(mel_basis).float()
-        self.register_buffer('mel_basis', mel_basis)
+        self.register_buffer("mel_basis", mel_basis)
 
     def spectral_normalize(self, magnitudes):
         output = dynamic_range_compression(magnitudes)
@@ -2126,8 +2137,8 @@ class TacotronSTFT(torch.nn.Module):
         -------
         mel_output: torch.FloatTensor of shape (B, n_mel_channels, T)
         """
-        assert(torch.min(y.data) >= -1)
-        assert(torch.max(y.data) <= 1)
+        assert torch.min(y.data) >= -1
+        assert torch.max(y.data) <= 1
 
         magnitudes, phases = self.stft_fn.transform(y)
         magnitudes = magnitudes.data
@@ -2140,7 +2151,9 @@ class TacotronSTFT(torch.nn.Module):
         # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
         # NOTE (Sam): be carefuly of numerical issues with order of operations here.
         audio = torch.FloatTensor(audio)
-        audio_norm = ((max_wav_value - 1) / max_wav_value) * (audio / (np.abs(audio).max()))
+        audio_norm = ((max_wav_value - 1) / max_wav_value) * (
+            audio / (np.abs(audio).max())
+        )
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         melspec = self.mel_spectrogram(audio_norm)
