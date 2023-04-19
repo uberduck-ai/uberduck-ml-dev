@@ -2,6 +2,7 @@ import torch
 import wandb
 
 from ray.air import session
+import numpy as np
 
 from ...utils.utils import (
     to_gpu,
@@ -26,7 +27,6 @@ def log(metrics, audios={}):
 # in particular, the out of sample here will probably be worse than inference since the f0 and energy models are not being used.
 @torch.no_grad()
 def get_log_audio(
-    outputs,
     batch_dict,
     log_decoder_samples,
     log_attribute_samples,

@@ -109,7 +109,6 @@ def _train_step(
         # TODO (Sam): adding tf output logging and out of distribution inference
         # TODO (Sam): add logging of ground truth
         images, audios = get_log_audio(
-            outputs,
             batch_dict,
             log_decoder_samples,
             log_attribute_samples,
@@ -121,6 +120,7 @@ def _train_step(
             voiced_mask,
             vocoder,
         )
+        print("audio", audios)
         # TODO (Sam): make out of sample logging cleaner.
         # gt_path = "/usr/src/app/radtts/ground_truth"
         # oos_embs = os.listdir(gt_path)

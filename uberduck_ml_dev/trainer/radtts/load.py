@@ -7,13 +7,16 @@ from torch.utils.data import DataLoader
 from ...data.data import DataRADTTS as Data
 from ...data.collate import DataCollateRADTTS as DataCollate
 
+
 # TODO (Sam): warmstart should load optimizer state as well.
 # load_pretrained should just be the state_dict
 def warmstart(checkpoint_path, model, include_layers=[], ignore_layers_warmstart=[]):
     pretrained_dict = torch.load(checkpoint_path, map_location="cpu")
     pretrained_dict = pretrained_dict["state_dict"]
 
-    is_module = True
+    is_module = False
+    if list(pretrained_dict.keys())[0].startswith("module."):
+        is_module = True
     if is_module:
         new_state_dict = OrderedDict()
         for k, v in pretrained_dict.items():
@@ -23,7 +26,7 @@ def warmstart(checkpoint_path, model, include_layers=[], ignore_layers_warmstart
 
     model_dict = model.state_dict()
     model_dict.update(pretrained_dict)
-    model.load_state_dict(model_dict)
+    model.load_state_dict(model_dict, strict=False)
     print("Warm started from {}".format(checkpoint_path))
     model.train()
     return model

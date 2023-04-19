@@ -1,14 +1,11 @@
 import torch
 from torch.cuda.amp import GradScaler
-from torch.optim.lr_scheduler import ExponentialLR
 from ray.air.integrations.wandb import setup_wandb
-from ray.air import session
 import ray.train as train
 
 from .train_epoch import train_epoch
-from .load import prepare_dataloaders
+from .load import prepare_dataloaders, warmstart
 from ...models.radtts import RADTTS
-from ...trainer.radtts.load import warmstart
 from ...losses import RADTTSLoss, AttentionBinarizationLoss
 from ...optimizers.radam import RAdam
 from ...vocoders.hifigan import get_vocoder
@@ -40,7 +37,6 @@ def train_func(config: dict):
         warmstart(train_config["warmstart_checkpoint_path"], model)
 
     # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
-    # model = train.torch.prepare_model(model)
     model = train.torch.prepare_model(
         model, parallel_strategy_kwargs=dict(find_unused_parameters=True)
     )
@@ -56,12 +52,12 @@ def train_func(config: dict):
         train_config["learning_rate"],
         weight_decay=train_config["weight_decay"],
     )
-    scheduler = ExponentialLR(
-        optim,
-        train_config["weight_decay"],
-        last_epoch=-1,
-    )
-    # dataset_shard = session.get_dataset_shard("train")
+    # TODO (Sam): use this.
+    # scheduler = ExponentialLR(
+    #     optim,
+    #     train_config["weight_decay"],
+    #     last_epoch=-1,
+    # )
     scaler = GradScaler()
 
     criterion = RADTTSLoss(

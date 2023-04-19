@@ -496,19 +496,14 @@ class DataRADTTS(torch.utils.data.Dataset):
                 data = [line.strip().split(split) for line in f]
 
             for d in data:
-                # emotion = 'other' if len(d) == 3 else d[3]
-                # NOTE (Sam): temporary change due to pitch being in filelist (not durations).
-                duration = -1  # if len(d) == 3 else d[4]
+                # NOTE (Sam): BEWARE! change/comment depending on filelist.
+                duration = -1
                 dataset.append(
                     {
                         "audiopath": os.path.join(wav_folder_prefix, d[0]),
-                        #  NOTE (Sam): change/comment depending on filelist
-                        "text": d[2],
-                        "speaker": d[1],  # should be unused
-                        #  'speaker': d[2] + '-' + emotion if self.combine_speaker_and_emotion else d[2],
-                        #  'emotion': emotion,
+                        "text": d[1],
+                        "speaker": d[2],  # should be unused
                         "duration": float(duration),
-                        #  'lmdb_key': audio_lmdb_key
                     }
                 )
         return dataset

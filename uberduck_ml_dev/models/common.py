@@ -40,6 +40,11 @@ from typing import Tuple
 from ..utils.utils import *
 from .transforms import piecewise_rational_quadratic_transform
 from .components.partialconv1d import PartialConv1d as pconv1d
+from .components.splines import (
+    piecewise_linear_transform,
+    piecewise_linear_inverse_transform,
+    unbounded_piecewise_quadratic_transform,
+)
 
 
 class Conv1d(nn.Module):
@@ -1873,13 +1878,6 @@ class DenseLayer(nn.Module):
         return x
 
 
-from .components.splines import (
-    piecewise_linear_transform,
-    piecewise_linear_inverse_transform,
-    unbounded_piecewise_quadratic_transform,
-)
-
-
 class SplineTransformationLayer(torch.nn.Module):
     def __init__(
         self,
@@ -2095,6 +2093,7 @@ class ConvLSTMLinear(nn.Module):
 
 
 # NOTE (Sam): ironically, this is from RADTTS
+# TODO (Sam): combine this and MelSTFT (the class actually from Tacotron)
 class TacotronSTFT(torch.nn.Module):
     def __init__(
         self,
