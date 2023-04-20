@@ -9,7 +9,6 @@ from ..vendor.tfcompat.hparam import HParams
 
 class TTSModel(nn.Module):
     def __init__(self, hparams):
-
         super().__init__()
         self.symbol_set = hparams.symbol_set
         self.n_symbols = len(SYMBOL_SETS[self.symbol_set])
@@ -25,7 +24,6 @@ class TTSModel(nn.Module):
     def from_pretrained(
         self, warm_start_path=None, device="cpu", ignore_layers=None, model_dict=None
     ):
-
         model_dict = model_dict or dict()
         if warm_start_path is None and model_dict is None:
             raise Exception(

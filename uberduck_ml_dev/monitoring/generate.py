@@ -5,7 +5,6 @@ from ..text.utils import prepare_input_sequence
 
 
 def _get_inference(model, vocoder, texts, speaker_ids, symbol_set, arpabet, cpu_run):
-
     text_padded, input_lengths = prepare_input_sequence(
         texts, cpu_run=cpu_run, arpabet=arpabet, symbol_set=symbol_set
     )

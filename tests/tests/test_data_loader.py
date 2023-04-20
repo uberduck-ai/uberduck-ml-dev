@@ -7,7 +7,6 @@ from uberduck_ml_dev.data.collate import Collate
 
 class TestTextMelCollation:
     def test_oversample(self):
-
         mock_fts = [
             ("speaker0/1.wav", "Test one two", "0"),
             ("speaker0/2.wav", "Test one two", "0"),
@@ -35,7 +34,6 @@ class TestTextMelCollation:
             assert len(batch) == 9
 
     def test_batch_dimensions(self):
-
         ds = Data(
             audiopaths_and_text="tests/fixtures/val.txt",
             debug=True,
@@ -55,7 +53,6 @@ class TestTextMelCollation:
             assert len(batch) == 9
 
     def test_batch_dimensions_partial(self):
-
         ds = Data(
             "tests/fixtures/val.txt",
             debug=True,
@@ -66,7 +63,6 @@ class TestTextMelCollation:
         collate_fn = Collate(n_frames_per_step=5)
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-
             assert batch["output_lengths"].item() == 566
             assert (
                 batch["mel_padded"].size(2) == 566

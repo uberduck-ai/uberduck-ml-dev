@@ -7,7 +7,6 @@ from uberduck_ml_dev.trainer.base import DEFAULTS as TRAINER_DEFAULTS
 
 class TestTrainer:
     def test_trainer_base(self):
-
         config = TRAINER_DEFAULTS.values()
 
         params = dict(
@@ -28,11 +27,9 @@ class TestTrainer:
 
 
 class TestTacotron2Trainer:
-
     # NOTE (Sam): this test could be made twice as fast by only running a single epoch,.
     # since as it is, the second gradient step is only useful for evaluating the loss
     def test_gradient_step(self, lj_trainer):
-
         torch.manual_seed(1234)
         lj_trainer.train()
 

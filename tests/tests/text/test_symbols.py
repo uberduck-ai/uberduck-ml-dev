@@ -3,7 +3,6 @@ from uberduck_ml_dev.text.symbols import arpabet_to_sequence, symbols_to_sequenc
 
 class TestSymbols:
     def test_arpabet_to_sequence(self):
-
         # NOTE: arpabet_to_sequence does not properly handle whitespace, it should take single words only.
         assert (
             len(

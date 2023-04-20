@@ -4,7 +4,6 @@ from uberduck_ml_dev.utils.utils import get_mask_from_lengths, sequence_mask
 
 class TestUtils:
     def test_mask_from_lengths(self):
-
         assert (
             get_mask_from_lengths(torch.LongTensor([1, 3, 2, 1]))
             == torch.Tensor(
@@ -18,7 +17,6 @@ class TestUtils:
         ).all()
 
     def test_sequence_mask(self):
-
         assert (
             sequence_mask(torch.tensor([1, 3, 2, 1]))
             == torch.Tensor(

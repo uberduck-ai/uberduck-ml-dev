@@ -1,5 +1,5 @@
 # TODO (Sam): unite the 5 different forward / inference methods in the decoder as well.
-# TODO (Sam): treat "gst" and "speaker_embedding" generically (e.g. x_encoding, y_encoding)
+# TODO (Sam): treat "gst" and "speaker_embedding" generically (e.g. x_encoding, y_encoding) (note we will do this with speechbrain)
 # TODO (Sam): move to Hydra or more organized config
 from torch import nn
 import numpy as np
@@ -7,7 +7,6 @@ import torch
 from torch.nn import functional as F
 from typing import Optional
 
-from speechbrain.pretrained import EncoderClassifier
 
 from ..vendor.tfcompat.hparam import HParams
 from ..utils.utils import get_mask_from_lengths
@@ -177,7 +176,6 @@ class Tacotron2(TTSModel):
     def audio_encoder_init(self, hparams):
         self.audio_encoder = None
         if hparams.audio_encoder_path:
-
             self.audio_encoder_lin = nn.Linear(
                 hparams.audio_encoder_dim, hparams.encoder_embedding_dim
             )
@@ -189,7 +187,6 @@ class Tacotron2(TTSModel):
     def mask_output(
         self, output_lengths, mel_outputs, mel_outputs_postnet, gate_predicted
     ):
-
         if self.mask_padding:
             mask = ~get_mask_from_lengths(output_lengths)
             mask = mask.expand(self.n_mel_channels, mask.size(0), mask.size(1))
@@ -221,7 +218,6 @@ class Tacotron2(TTSModel):
         mel_start_index: Optional[int] = 0,
         mel_stop_index: Optional[int] = 0,
     ):
-
         if speaker_ids is not None:
             if max(speaker_ids) >= self.n_speakers:
                 raise Exception("Speaker id out of range")
@@ -265,7 +261,6 @@ class Tacotron2(TTSModel):
             ) = self.decoder.inference(encoder_outputs, input_lengths)
 
         if mode == DOUBLE_TEACHER_FORCED:
-
             mel_outputs, gate_predicted, alignments = self.decoder.inference_double_tf(
                 memory=encoder_outputs,
                 decoder_inputs=targets,

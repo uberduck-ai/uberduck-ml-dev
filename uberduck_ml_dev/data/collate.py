@@ -25,7 +25,7 @@ class Collate:
 
     # TODO (Sam): don't return None-valued keys at all.
     def __call__(self, batch):
-        """Collate's training batch from normalized text and mel-spectrogram
+        """Collate training batch from normalized text and mel-spectrogram.
         PARAMS
         ------
         """
@@ -111,3 +111,120 @@ class Collate:
         if self.cudnn_enabled:
             output = output.to_gpu()
         return output
+
+
+# TODO (Sam): combine Collate with DataCollateRADTTS
+class DataCollateRADTTS():
+    """ Zero-pads model inputs and targets given number of steps """
+    def __init__(self, n_frames_per_step=1):
+        self.n_frames_per_step = n_frames_per_step
+
+    def __call__(self, batch):
+        """Collate from normalized data"""
+        # Right zero-pad all one-hot text sequences to max input length
+        input_lengths, ids_sorted_decreasing = torch.sort(
+            torch.LongTensor([len(x["text_encoded"]) for x in batch]),
+            dim=0,
+            descending=True,
+        )
+
+        max_input_len = input_lengths[0]
+        text_padded = torch.LongTensor(len(batch), max_input_len)
+        text_padded.zero_()
+
+        for i in range(len(ids_sorted_decreasing)):
+            text = batch[ids_sorted_decreasing[i]]["text_encoded"]
+            text_padded[i, : text.size(0)] = text
+
+        # Right zero-pad mel-spec
+        num_mel_channels = batch[0]["mel"].size(0)
+        max_target_len = max([x["mel"].size(1) for x in batch])
+
+        # include mel padded, gate padded and speaker ids
+        mel_padded = torch.FloatTensor(len(batch), num_mel_channels, max_target_len)
+        mel_padded.zero_()
+        f0_padded = None
+        p_voiced_padded = None
+        voiced_mask_padded = None
+        energy_avg_padded = None
+        if batch[0]["f0"] is not None:
+            f0_padded = torch.FloatTensor(len(batch), max_target_len)
+            f0_padded.zero_()
+
+        if batch[0]["p_voiced"] is not None:
+            p_voiced_padded = torch.FloatTensor(len(batch), max_target_len)
+            p_voiced_padded.zero_()
+
+        if batch[0]["voiced_mask"] is not None:
+            voiced_mask_padded = torch.FloatTensor(len(batch), max_target_len)
+            voiced_mask_padded.zero_()
+
+        if batch[0]["energy_avg"] is not None:
+            energy_avg_padded = torch.FloatTensor(len(batch), max_target_len)
+            energy_avg_padded.zero_()
+
+        if batch[0]["audio_embedding"] is not None:
+            audio_embedding_padded = torch.FloatTensor(
+                len(batch), 512
+            )  # emb size - TODO (Sam): try to reduce this via PCA
+            # audio_embedding_padded = torch.FloatTensor(len(batch), 16) # PCA version
+            audio_embedding_padded.zero_()
+
+        attn_prior_padded = torch.FloatTensor(len(batch), max_target_len, max_input_len)
+        attn_prior_padded.zero_()
+
+        output_lengths = torch.LongTensor(len(batch))
+        speaker_ids = torch.LongTensor(len(batch))
+        audiopaths = []
+        for i in range(len(ids_sorted_decreasing)):
+            mel = batch[ids_sorted_decreasing[i]]["mel"]
+            mel_padded[i, :, : mel.size(1)] = mel
+
+            if batch[ids_sorted_decreasing[i]]["audio_embedding"] is not None:
+                audio_embedding_padded[i, :] = batch[ids_sorted_decreasing[i]][
+                    "audio_embedding"
+                ]
+
+            if batch[ids_sorted_decreasing[i]]["f0"] is not None:
+                f0 = batch[ids_sorted_decreasing[i]]["f0"]
+                f0_padded[i, : len(f0)] = f0
+
+            if batch[ids_sorted_decreasing[i]]["voiced_mask"] is not None:
+                voiced_mask = batch[ids_sorted_decreasing[i]]["voiced_mask"]
+                voiced_mask_padded[i, : len(f0)] = voiced_mask
+
+            if batch[ids_sorted_decreasing[i]]["p_voiced"] is not None:
+                p_voiced = batch[ids_sorted_decreasing[i]]["p_voiced"]
+                p_voiced_padded[i, : len(f0)] = p_voiced
+
+            if batch[ids_sorted_decreasing[i]]["energy_avg"] is not None:
+                energy_avg = batch[ids_sorted_decreasing[i]]["energy_avg"]
+                energy_avg_padded[i, : len(energy_avg)] = energy_avg
+
+            output_lengths[i] = mel.size(1)
+            speaker_ids[i] = batch[ids_sorted_decreasing[i]]["speaker_id"]
+            audiopath = batch[ids_sorted_decreasing[i]]["audiopath"]
+            audiopaths.append(audiopath)
+            cur_attn_prior = batch[ids_sorted_decreasing[i]]["attn_prior"]
+            if cur_attn_prior is None:
+                attn_prior_padded = None
+            else:
+                attn_prior_padded[
+                    i, : cur_attn_prior.size(0), : cur_attn_prior.size(1)
+                ] = cur_attn_prior
+
+        return {
+            "mel": mel_padded,
+            "speaker_ids": speaker_ids,
+            "text": text_padded,
+            "input_lengths": input_lengths,
+            "output_lengths": output_lengths,
+            "audiopaths": audiopaths,
+            "attn_prior": attn_prior_padded,
+            "f0": f0_padded,
+            "p_voiced": p_voiced_padded,
+            "voiced_mask": voiced_mask_padded,
+            "energy_avg": energy_avg_padded,
+            "audio_embedding": audio_embedding_padded,
+        }
+

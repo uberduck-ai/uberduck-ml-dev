@@ -15,6 +15,7 @@ from uberduck_ml_dev.trainer.tacotron2 import (
 )
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 
+
 # NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo.
 def _load_tacotron_uninitialized(overrides=None):
     overrides = overrides or {}
@@ -40,7 +41,6 @@ def lj_speech_tacotron2_file():
 
 @pytest.fixture
 def lj_speech_tacotron2(lj_speech_tacotron2_file):
-
     # NOTE (Sam): this override should no longer be necessary.
     device = "cpu"
     config_overrides = {}
@@ -73,7 +73,6 @@ def sample_inference_tf_spectrogram():
 
 @pytest.fixture()
 def lj_trainer(lj_speech_tacotron2_file):
-
     # NOTE (Sam): It may be nicer to specify trainer here and test-specific parameters (e.g. data) in test itself.
     config = TACOTRON2_TRAINER_DEFAULTS.values()
     params = dict(

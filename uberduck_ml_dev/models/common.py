@@ -25,7 +25,6 @@ __all__ = [
 import math
 
 import numpy as np
-from numpy import finfo
 from scipy.signal import get_window
 import torch
 from torch.autograd import Variable
@@ -41,6 +40,11 @@ from typing import Tuple
 from ..utils.utils import *
 from .transforms import piecewise_rational_quadratic_transform
 from .components.partialconv1d import PartialConv1d as pconv1d
+from .components.splines import (
+    piecewise_linear_transform,
+    piecewise_linear_inverse_transform,
+    unbounded_piecewise_quadratic_transform,
+)
 
 
 class Conv1d(nn.Module):
@@ -1209,30 +1213,6 @@ def spectrogram_torch(
     return spec
 
 
-# TODO (Sam): unite the get_mel methods
-def get_mel(audio, max_wav_value, stft):
-
-    # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
-    # NOTE (Sam): be carefuly of numerical issues with order of operations here.
-    audio = torch.FloatTensor(audio)
-    audio_norm = ((max_wav_value - 1) / max_wav_value) * (audio / (np.abs(audio).max()))
-    # audio_norm = ((max_wav_value - 1) * audio / (np.abs(audio).max())) / max_wav_value
-    audio_norm = audio_norm.unsqueeze(0)
-    audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
-    melspec = stft.mel_spectrogram(audio_norm)
-    melspec = torch.squeeze(melspec, 0)
-    # audio_norm = audio / max_wav_value
-    # audio_norm = audio_norm.unsqueeze(0)
-    # audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
-    # melspec = stft.mel_spectrogram(audio_norm)
-    # melspec = torch.squeeze(melspec, 0)
-    # if self.do_mel_scaling:
-    melspec = (melspec + 5.5) / 2
-    # if self.mel_noise_scale > 0:
-    #     melspec += torch.randn_like(melspec) * self.mel_noise_scale
-    return melspec
-
-
 class ConvAttention(torch.nn.Module):
     def __init__(
         self, n_mel_channels=80, n_text_channels=512, n_att_channels=80, temperature=1.0
@@ -1898,13 +1878,6 @@ class DenseLayer(nn.Module):
         return x
 
 
-from .components.splines import (
-    piecewise_linear_transform,
-    piecewise_linear_inverse_transform,
-    unbounded_piecewise_quadratic_transform,
-)
-
-
 class SplineTransformationLayer(torch.nn.Module):
     def __init__(
         self,
@@ -2117,3 +2090,75 @@ class ConvLSTMLinear(nn.Module):
         x_hat = self.forward(txt_enc, spk_emb)["x_hat"]
         x_hat = self.feature_processing.denormalize(x_hat)
         return x_hat
+
+
+# NOTE (Sam): ironically, this is from RADTTS
+# TODO (Sam): combine this and MelSTFT (the class actually from Tacotron)
+class TacotronSTFT(torch.nn.Module):
+    def __init__(
+        self,
+        filter_length=1024,
+        hop_length=256,
+        win_length=1024,
+        n_mel_channels=80,
+        sampling_rate=22050,
+        mel_fmin=0.0,
+        mel_fmax=None,
+    ):
+        super(TacotronSTFT, self).__init__()
+        self.n_mel_channels = n_mel_channels
+        self.sampling_rate = sampling_rate
+        self.stft_fn = STFT(filter_length, hop_length, win_length)
+        mel_basis = librosa_mel(
+            sr=sampling_rate,
+            n_fft=filter_length,
+            n_mels=n_mel_channels,
+            fmin=mel_fmin,
+            fmax=mel_fmax,
+        )
+        mel_basis = torch.from_numpy(mel_basis).float()
+        self.register_buffer("mel_basis", mel_basis)
+
+    def spectral_normalize(self, magnitudes):
+        output = dynamic_range_compression(magnitudes)
+        return output
+
+    def spectral_de_normalize(self, magnitudes):
+        output = dynamic_range_decompression(magnitudes)
+        return output
+
+    def mel_spectrogram(self, y):
+        """Computes mel-spectrograms from a batch of waves
+        PARAMS
+        ------
+        y: Variable(torch.FloatTensor) with shape (B, T) in range [-1, 1]
+        RETURNS
+        -------
+        mel_output: torch.FloatTensor of shape (B, n_mel_channels, T)
+        """
+        assert torch.min(y.data) >= -1
+        assert torch.max(y.data) <= 1
+
+        magnitudes, phases = self.stft_fn.transform(y)
+        magnitudes = magnitudes.data
+        mel_output = torch.matmul(self.mel_basis, magnitudes)
+        mel_output = self.spectral_normalize(mel_output)
+        return mel_output
+
+    # TODO (Sam): unite the get_mel methods
+    def get_mel(self, audio, max_wav_value):
+        # NOTE (Sam): audio / self.max_wav_value assumes that audio is already normalized to max_wav_value, which is not how we store it.
+        # NOTE (Sam): be carefuly of numerical issues with order of operations here.
+        audio = torch.FloatTensor(audio)
+        audio_norm = ((max_wav_value - 1) / max_wav_value) * (
+            audio / (np.abs(audio).max())
+        )
+        audio_norm = audio_norm.unsqueeze(0)
+        audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
+        melspec = self.mel_spectrogram(audio_norm)
+        melspec = torch.squeeze(melspec, 0)
+        # if self.do_mel_scaling:
+        melspec = (melspec + 5.5) / 2
+        # if self.mel_noise_scale > 0:
+        #     melspec += torch.randn_like(melspec) * self.mel_noise_scale
+        return melspec

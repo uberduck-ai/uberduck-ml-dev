@@ -124,7 +124,6 @@ class SessionState(object):
 
 
 def unique(list1):
-
     # insert the list to the set
     list_set = set(list1)
     # convert the set to the list

@@ -66,6 +66,54 @@ DEFAULTS = {
 }
 
 
+# NOTE (Sam): denoiser not used here in contrast with radtts repo
+def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
+    h = AttrDict(vocoder_config)
+    if "gaussian_blur" in vocoder_config:
+        vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
+    else:
+        vocoder_config["gaussian_blur"] = {"p_blurring": 0.0}
+        h["gaussian_blur"] = {"p_blurring": 0.0}
+
+    vocoder = Generator(h)
+    vocoder.load_state_dict(vocoder_state_dict)
+    if to_cuda:
+        vocoder.cuda()
+
+    vocoder.eval()
+
+    return vocoder
+
+
+# TODO (Sam): combine loading methods
+def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
+    print("Getting vocoder")
+
+    with open(hifi_gan_config_path) as f:
+        hifigan_config = json.load(f)
+
+    h = AttrDict(hifigan_config)
+    if "gaussian_blur" in hifigan_config:
+        hifigan_config["gaussian_blur"]["p_blurring"] = 0.0
+    else:
+        hifigan_config["gaussian_blur"] = {"p_blurring": 0.0}
+        h["gaussian_blur"] = {"p_blurring": 0.0}
+    model = Generator(h)
+    print("Loading pretrained model...")
+    load_pretrained(model, hifi_gan_checkpoint_path)
+    print("Got pretrained model...")
+    model.eval()
+    return model
+
+
+def load_pretrained(model, hifi_gan_checkpoint_path):
+    # NOTE (Sam): uncomment for download on anyscale
+    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
+    # bio = BytesIO(response.content)
+    loaded = torch.load(hifi_gan_checkpoint_path)
+    model.load_state_dict(loaded["generator"])
+
+
 class HiFiGanGenerator(nn.Module):
     def __init__(self, config, checkpoint, cudnn_enabled=False):
         super().__init__()
@@ -247,14 +295,25 @@ class ResBlock2(torch.nn.Module):
 
 
 class Generator(torch.nn.Module):
+    __constants__ = ["lrelu_slope", "num_kernels", "num_upsamples", "p_blur"]
+
     def __init__(self, h):
         super(Generator, self).__init__()
-        self.h = h
         self.num_kernels = len(h.resblock_kernel_sizes)
         self.num_upsamples = len(h.upsample_rates)
         self.conv_pre = weight_norm(
             Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3)
         )
+        self.p_blur = h.gaussian_blur["p_blurring"]
+        self.gaussian_blur_fn = None
+        if self.p_blur > 0.0:
+            self.gaussian_blur_fn = GaussianBlurAugmentation(
+                h.gaussian_blur["kernel_size"], h.gaussian_blur["sigmas"], self.p_blur
+            )
+        else:
+            self.gaussian_blur_fn = nn.Identity()
+        self.lrelu_slope = LRELU_SLOPE
+
         resblock = ResBlock1 if h.resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
@@ -273,27 +332,42 @@ class Generator(torch.nn.Module):
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
+            resblock_list = nn.ModuleList()
             ch = h.upsample_initial_channel // (2 ** (i + 1))
             for j, (k, d) in enumerate(
                 zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
             ):
-                self.resblocks.append(resblock(h, ch, k, d))
+                resblock_list.append(resblock(h, ch, k, d))
+            self.resblocks.append(resblock_list)
 
         self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
+    def load_state_dict(self, state_dict):
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            new_k = k
+            if "resblocks" in k:
+                parts = k.split(".")
+                # only do this is the checkpoint type is older
+                if len(parts) == 5:
+                    layer = int(parts[1])
+                    new_layer = f"{layer//3}.{layer%3}"
+                    new_k = f"resblocks.{new_layer}.{'.'.join(parts[2:])}"
+            new_state_dict[new_k] = v
+        super().load_state_dict(new_state_dict)
+
     def forward(self, x):
+        if self.p_blur > 0.0:
+            x = self.gaussian_blur_fn(x)
         x = self.conv_pre(x)
-        for i in range(self.num_upsamples):
-            x = F.leaky_relu(x, LRELU_SLOPE)
-            x = self.ups[i](x)
-            xs = None
-            for j in range(self.num_kernels):
-                if xs is None:
-                    xs = self.resblocks[i * self.num_kernels + j](x)
-                else:
-                    xs += self.resblocks[i * self.num_kernels + j](x)
+        for upsample_layer, resblock_group in zip(self.ups, self.resblocks):
+            x = F.leaky_relu(x, self.lrelu_slope)
+            x = upsample_layer(x)
+            xs = torch.zeros(x.shape, dtype=x.dtype, device=x.device)
+            for resblock in resblock_group:
+                xs += resblock(x)
             x = xs / self.num_kernels
         x = F.leaky_relu(x)
         x = self.conv_post(x)
@@ -302,10 +376,12 @@ class Generator(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
+        print("Removing weight norm...")
         for l in self.ups:
             remove_weight_norm(l)
-        for l in self.resblocks:
-            l.remove_weight_norm()
+        for group in self.resblocks:
+            for block in group:
+                block.remove_weight_norm()
         remove_weight_norm(self.conv_pre)
         remove_weight_norm(self.conv_post)
 
