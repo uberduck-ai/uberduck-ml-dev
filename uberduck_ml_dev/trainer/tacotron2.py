@@ -7,7 +7,6 @@ import torch
 
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-# from speechbrain.pretrained import EncoderClassifier
 
 from ..data.collate import Collate
 from ..models.tacotron2 import Tacotron2
@@ -34,7 +33,6 @@ from ..data.data import Data
 
 
 class Tacotron2Trainer(TTSTrainer):
-
     # NOTE (Sam): make arguments explicit incl. self.hparams arguments added in super().__init__.
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -104,7 +102,6 @@ class Tacotron2Trainer(TTSTrainer):
 
         # TODO (Sam): datapoint specific encoder is really unused as of now.
         if self.has_audio_encoder:
-
             self.audio_encoder_model = EncoderClassifier.from_hparams(
                 source=self.hparams.audio_encoder_path
             )
@@ -422,7 +419,6 @@ class Tacotron2Trainer(TTSTrainer):
         interrupt_action=lambda: None,
         save_function=lambda epoch: None,
     ):
-
         train_start_time = time.perf_counter()
         print("start train", train_start_time)
         train_set, val_set, train_loader, sampler, collate_fn = self.initialize_loader()
@@ -586,7 +582,6 @@ class Tacotron2Trainer(TTSTrainer):
             )
             # TODO (Sam): train loop should be in base trainer.
             for step_counter, batch in enumerate(val_loader):
-
                 # TODO (Sam): Could call subsets directly in function arguments since model_input is only reused in logging.
                 model_input = batch.subset(
                     [
@@ -665,7 +660,6 @@ class Tacotron2Trainer(TTSTrainer):
 
     @property
     def val_dataset_args(self):
-
         args = dict(**self.training_dataset_args)
         args["audiopaths_and_text"] = self.val_audiopaths_and_text
         return args

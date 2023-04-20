@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from uberduck_ml_dev.utils.utils import get_mask_from_lengths
+from ...utils.utils import get_mask_from_lengths
 
 from ..common import LinearNorm
 

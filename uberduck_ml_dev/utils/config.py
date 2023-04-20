@@ -2,7 +2,6 @@ from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS
 
 
 def tacotron2_training_to_model_config(training_config):
-
     shared_keys = set(TACOTRON2_DEFAULTS.values().keys()).intersection(
         training_config.keys()
     )

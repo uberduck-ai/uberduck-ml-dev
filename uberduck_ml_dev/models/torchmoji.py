@@ -386,7 +386,6 @@ def AutogradRNN(
     dropout_state=None,
     flat_weight=None,
 ):
-
     cell = LSTMCell
 
     if batch_sizes is None:
@@ -520,7 +519,6 @@ def VariableRecurrentReverse(batch_sizes, inner):
 
 
 def StackedRNN(inners, num_layers, lstm=False, dropout=0, train=True):
-
     num_directions = len(inners)
     total_layers = num_layers * num_directions
 
@@ -888,7 +886,6 @@ class MasterVocab:
     """Combines vocabularies."""
 
     def __init__(self):
-
         # initialize custom tokens
         self.master_vocab = {}
 
@@ -1271,7 +1268,6 @@ class SentenceTokenizer:
             and all(isinstance(x, list) for x in split_parameter)
             and len(split_parameter) == 3
         ):
-
             # Helper function to verify provided indices are numbers in range
             def verify_indices(inds):
                 return list(
@@ -3452,7 +3448,6 @@ class TweetWordGenerator(WordGenerator):
         ignore_url_tweets=True,
         ignore_mention_tweets=False,
     ):
-
         self.wanted_emojis = wanted_emojis
         self.english_words = english_words
         self.non_english_user_set = non_english_user_set

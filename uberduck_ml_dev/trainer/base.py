@@ -16,9 +16,29 @@ from ..vocoders.hifigan import HiFiGanGenerator
 from ..models.base import DEFAULTS as MODEL_DEFAULTS
 from ..vendor.tfcompat.hparam import HParams
 
+
+def sample(mel, algorithm="griffin-lim"):
+    if algorithm == "griffin-lim":
+        mel_stft = MelSTFT()
+        audio = mel_stft.griffin_lim(mel)
+    elif algorithm == "hifigan":
+        assert kwargs["hifigan_config"], "hifigan_config must be set"
+        assert kwargs["hifigan_checkpoint"], "hifigan_checkpoint must be set"
+        cudnn_enabled = bool(kwargs["cudnn_enabled"])
+        hifigan = HiFiGanGenerator(
+            config=kwargs["hifigan_config"],
+            checkpoint=kwargs["hifigan_checkpoint"],
+            cudnn_enabled=cudnn_enabled,
+        )
+        audio = hifigan.infer(mel)
+        audio = audio / np.max(audio)
+    else:
+        raise NotImplemented
+    return audio
+
+
 # Note (Sam): keeping TTS specific parameters out of here actually -this shall be the pure trainer class.
 class TTSTrainer:
-
     # Note (Sam): rewriting with explicit hparams for clarity.
     # Note (Sam): should migrate to Lightning.
     def __init__(self, hparams, rank=None, world_size=None, device=None):
@@ -135,26 +155,9 @@ class TTSTrainer:
         """
         if self.rank is not None and self.rank != 0:
             return
-        if algorithm == "griffin-lim":
-            mel_stft = MelSTFT()
-            audio = mel_stft.griffin_lim(mel)
-        elif algorithm == "hifigan":
-            assert kwargs["hifigan_config"], "hifigan_config must be set"
-            assert kwargs["hifigan_checkpoint"], "hifigan_checkpoint must be set"
-            cudnn_enabled = bool(kwargs["cudnn_enabled"])
-            hifigan = HiFiGanGenerator(
-                config=kwargs["hifigan_config"],
-                checkpoint=kwargs["hifigan_checkpoint"],
-                cudnn_enabled=cudnn_enabled,
-            )
-            audio = hifigan.infer(mel)
-            audio = audio / np.max(audio)
-        else:
-            raise NotImplemented
-        return audio
+        return sample(mel, algorithm, **kwargs)
 
     def warm_start(self, model, optimizer, start_epoch=0):
-
         print("Starting warm_start", time.perf_counter())
         checkpoint = self.load_checkpoint()
         # TODO(zach): Once we are no longer using checkpoints of the old format, remove the conditional and use checkpoint["model"] only.

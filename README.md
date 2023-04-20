@@ -1,22 +1,16 @@
 # 🦆 Uberduck Text-to-Speech ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
 
-[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with neural text-to-speech. This repository will get you creating your own speech synthesis models. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks, and the [**Wiki**](https://github.com/uberduck-ai/uberduck-ml-dev/wiki).
+[**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with neural text-to-speech. This repository will get you creating your own speech synthesis models. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks. Please reach out for help and contribute!
 
 ## Overview
 
-The main "Tacotron2" model in this repository is based on the NVIDIA Mellotron.  The main reasons to use this repository instead are
+The models in this repository used in production are the Tacotron2, SO-VITS-SVC, zero-shot RADTTS, and HiFi-GAN.  Training code is included for Tacotron2, RADTTS, and HiFi-GAN.  Other goodies include fill-populating inference, additional languages, and Torchmoji emotional encoding. 
 
-- simple fill-populating and rhythm predicting inference
-- vocoders!
-- more languages
-- improved performance in fine tuning using additive covariates
-- improved tensorboard logging
-- all types of categorical covariates either supported or in progress (multispeaker, torchmoji, signal-to-noise ration, zero shot, pitch support)
-- sensibly refactored, production tested code
+![Summary](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/details.png)
 
 ## Usage
 
-The notebooks are the easiest ways to try us out.
+Download models to fine-tune from [**here**](https://huggingface.co/Uberduck).  The notebooks are the easiest ways to try these out.
 
 ### Installation
 

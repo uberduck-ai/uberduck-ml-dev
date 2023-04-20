@@ -1,0 +1,2525 @@
+{
+    "PIL": {
+        "bacon": 2,
+        "imported_by": [
+            "PIL",
+            "PIL.Image",
+            "PIL.ImageOps",
+            "uberduck_ml_dev.data.statistics"
+        ],
+        "imports": [
+            "PIL"
+        ],
+        "name": "PIL",
+        "path": "/opt/conda/lib/python3.8/site-packages/PIL/__init__.py"
+    },
+    "PIL.Image": {
+        "bacon": 2,
+        "imported_by": [
+            "PIL.ImageOps",
+            "uberduck_ml_dev.data.statistics"
+        ],
+        "imports": [
+            "PIL",
+            "numpy"
+        ],
+        "name": "PIL.Image",
+        "path": "/opt/conda/lib/python3.8/site-packages/PIL/Image.py"
+    },
+    "PIL.ImageOps": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.data.statistics"
+        ],
+        "imports": [
+            "PIL",
+            "PIL.Image"
+        ],
+        "name": "PIL.ImageOps",
+        "path": "/opt/conda/lib/python3.8/site-packages/PIL/ImageOps.py"
+    },
+    "TTS": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder"
+        ],
+        "name": "TTS",
+        "path": "/opt/conda/lib/python3.8/site-packages/TTS/__init__.py"
+    },
+    "TTS.encoder": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder"
+        ],
+        "name": "TTS.encoder",
+        "path": "/opt/conda/lib/python3.8/site-packages/TTS/encoder/__init__.py"
+    },
+    "__main__": {
+        "bacon": 0,
+        "imports": [
+            "uberduck_ml_dev",
+            "uberduck_ml_dev.applications",
+            "uberduck_ml_dev.applications.streamlit",
+            "uberduck_ml_dev.data",
+            "uberduck_ml_dev.data.batch",
+            "uberduck_ml_dev.data.collate",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.data.utils",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.exec",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.exec.normalize_audio",
+            "uberduck_ml_dev.exec.split_train_val",
+            "uberduck_ml_dev.exec.train_radtts_with_ray",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components",
+            "uberduck_ml_dev.models.components.alignment",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.attribute_prediction_model",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
+            "uberduck_ml_dev.models.components.decoders",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.encoders",
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder",
+            "uberduck_ml_dev.models.components.encoders.speaker_encoder",
+            "uberduck_ml_dev.models.components.encoders.tacotron2",
+            "uberduck_ml_dev.models.components.partialconv1d",
+            "uberduck_ml_dev.models.components.postnet",
+            "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.models.components.splines",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.models.transforms",
+            "uberduck_ml_dev.monitoring",
+            "uberduck_ml_dev.monitoring.generate",
+            "uberduck_ml_dev.monitoring.statistics",
+            "uberduck_ml_dev.monitoring.streamlit",
+            "uberduck_ml_dev.monitoring.wandb",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.abbreviations",
+            "uberduck_ml_dev.text.acronyms",
+            "uberduck_ml_dev.text.cleaners",
+            "uberduck_ml_dev.text.cmudict",
+            "uberduck_ml_dev.text.datestime",
+            "uberduck_ml_dev.text.grapheme_dictionary",
+            "uberduck_ml_dev.text.letters_and_numbers",
+            "uberduck_ml_dev.text.numerical",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.text.text_processing",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.trainer",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.config",
+            "uberduck_ml_dev.utils.denoiser",
+            "uberduck_ml_dev.utils.exec",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.utils.plot",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam",
+            "uberduck_ml_dev.vocoders",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "name": "__main__",
+        "path": null
+    },
+    "einops": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.models.components.decoders.tacotron2"
+        ],
+        "name": "einops",
+        "path": "/opt/conda/lib/python3.8/site-packages/einops/__init__.py"
+    },
+    "emoji": {
+        "bacon": 2,
+        "imported_by": [
+            "emoji",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "emoji"
+        ],
+        "name": "emoji",
+        "path": "/opt/conda/lib/python3.8/site-packages/emoji/__init__.py"
+    },
+    "g2p_en": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.text.utils"
+        ],
+        "name": "g2p_en",
+        "path": "/opt/conda/lib/python3.8/site-packages/g2p_en/__init__.py"
+    },
+    "inflect": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.text.numerical",
+            "uberduck_ml_dev.text.utils"
+        ],
+        "name": "inflect",
+        "path": "/opt/conda/lib/python3.8/site-packages/inflect/__init__.py"
+    },
+    "librosa": {
+        "bacon": 2,
+        "imported_by": [
+            "librosa.filters",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "librosa",
+        "path": "/opt/conda/lib/python3.8/site-packages/librosa/__init__.py"
+    },
+    "librosa.filters": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.models.common"
+        ],
+        "imports": [
+            "librosa",
+            "librosa.util",
+            "numba",
+            "numpy",
+            "scipy",
+            "scipy.ndimage",
+            "scipy.signal"
+        ],
+        "name": "librosa.filters",
+        "path": "/opt/conda/lib/python3.8/site-packages/librosa/filters.py"
+    },
+    "librosa.util": {
+        "bacon": 2,
+        "imported_by": [
+            "librosa.filters",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "librosa.util",
+        "path": "/opt/conda/lib/python3.8/site-packages/librosa/util/__init__.py"
+    },
+    "lmdb": {
+        "bacon": 2,
+        "imported_by": [
+            "lmdb",
+            "uberduck_ml_dev.data.data"
+        ],
+        "imports": [
+            "lmdb"
+        ],
+        "name": "lmdb",
+        "path": "/opt/conda/lib/python3.8/site-packages/lmdb/__init__.py"
+    },
+    "matplotlib": {
+        "bacon": 2,
+        "imported_by": [
+            "matplotlib",
+            "matplotlib.pylab",
+            "matplotlib.pyplot",
+            "seaborn",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.models.components.alignment",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.utils.plot"
+        ],
+        "imports": [
+            "matplotlib",
+            "matplotlib.pyplot",
+            "numpy"
+        ],
+        "name": "matplotlib",
+        "path": "/opt/conda/lib/python3.8/site-packages/matplotlib/__init__.py"
+    },
+    "matplotlib.pylab": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.models.components.alignment",
+            "uberduck_ml_dev.utils.hifiutils"
+        ],
+        "imports": [
+            "matplotlib",
+            "matplotlib.pyplot",
+            "numpy"
+        ],
+        "name": "matplotlib.pylab",
+        "path": "/opt/conda/lib/python3.8/site-packages/matplotlib/pylab.py"
+    },
+    "matplotlib.pyplot": {
+        "bacon": 2,
+        "imported_by": [
+            "matplotlib",
+            "matplotlib.pylab",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.utils.plot"
+        ],
+        "imports": [
+            "matplotlib",
+            "numpy"
+        ],
+        "name": "matplotlib.pyplot",
+        "path": "/opt/conda/lib/python3.8/site-packages/matplotlib/pyplot.py"
+    },
+    "mdutils": {
+        "bacon": 2,
+        "imported_by": [
+            "mdutils",
+            "mdutils.mdutils",
+            "uberduck_ml_dev.exec.dataset_statistics"
+        ],
+        "imports": [
+            "mdutils",
+            "mdutils.mdutils"
+        ],
+        "name": "mdutils",
+        "path": "/opt/conda/lib/python3.8/site-packages/mdutils/__init__.py"
+    },
+    "mdutils.mdutils": {
+        "bacon": 2,
+        "imported_by": [
+            "mdutils",
+            "uberduck_ml_dev.exec.dataset_statistics"
+        ],
+        "imports": [
+            "mdutils"
+        ],
+        "name": "mdutils.mdutils",
+        "path": "/opt/conda/lib/python3.8/site-packages/mdutils/mdutils.py"
+    },
+    "numba": {
+        "bacon": 2,
+        "imported_by": [
+            "librosa.filters",
+            "numba",
+            "uberduck_ml_dev.models.components.alignment"
+        ],
+        "imports": [
+            "numba",
+            "scipy"
+        ],
+        "name": "numba",
+        "path": "/opt/conda/lib/python3.8/site-packages/numba/__init__.py"
+    },
+    "numpy": {
+        "bacon": 2,
+        "imported_by": [
+            "PIL.Image",
+            "librosa.filters",
+            "matplotlib",
+            "matplotlib.pylab",
+            "matplotlib.pyplot",
+            "numpy",
+            "pandas",
+            "scipy",
+            "scipy.io.wavfile",
+            "sklearn",
+            "soundfile",
+            "speechmetrics",
+            "uberduck_ml_dev.data.collate",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.data.utils",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.exec.split_train_val",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.alignment",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.models.transforms",
+            "uberduck_ml_dev.text.text_processing",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.plot",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "numpy"
+        ],
+        "name": "numpy",
+        "path": "/opt/conda/lib/python3.8/site-packages/numpy/__init__.py"
+    },
+    "pandas": {
+        "bacon": 2,
+        "imported_by": [
+            "pandas",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "imports": [
+            "numpy",
+            "pandas"
+        ],
+        "name": "pandas",
+        "path": "/opt/conda/lib/python3.8/site-packages/pandas/__init__.py"
+    },
+    "phonemizer": {
+        "bacon": 2,
+        "imported_by": [
+            "phonemizer.phonemize",
+            "uberduck_ml_dev.text.utils"
+        ],
+        "imports": [
+            "phonemizer.phonemize"
+        ],
+        "name": "phonemizer",
+        "path": "/opt/conda/lib/python3.8/site-packages/phonemizer/__init__.py"
+    },
+    "phonemizer.phonemize": {
+        "bacon": 2,
+        "imported_by": [
+            "phonemizer",
+            "uberduck_ml_dev.text.utils"
+        ],
+        "imports": [
+            "phonemizer"
+        ],
+        "name": "phonemizer.phonemize",
+        "path": "/opt/conda/lib/python3.8/site-packages/phonemizer/phonemize.py"
+    },
+    "pydub": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.utils.audio"
+        ],
+        "name": "pydub",
+        "path": "/opt/conda/lib/python3.8/site-packages/pydub/__init__.py"
+    },
+    "pydub.silence": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.utils.audio"
+        ],
+        "imports": [
+            "pydub.utils"
+        ],
+        "name": "pydub.silence",
+        "path": "/opt/conda/lib/python3.8/site-packages/pydub/silence.py"
+    },
+    "pydub.utils": {
+        "bacon": 2,
+        "imported_by": [
+            "pydub.silence",
+            "uberduck_ml_dev.data.statistics"
+        ],
+        "name": "pydub.utils",
+        "path": "/opt/conda/lib/python3.8/site-packages/pydub/utils.py"
+    },
+    "ray": {
+        "bacon": 2,
+        "imported_by": [
+            "ray",
+            "ray.air",
+            "ray.air.config",
+            "ray.train",
+            "ray.train.torch",
+            "ray.tune",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "imports": [
+            "ray"
+        ],
+        "name": "ray",
+        "path": "/opt/conda/lib/python3.8/site-packages/ray/__init__.py"
+    },
+    "ray.air": {
+        "bacon": 2,
+        "imported_by": [
+            "ray.air",
+            "ray.air.config",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "imports": [
+            "ray",
+            "ray.air",
+            "ray.air.config"
+        ],
+        "name": "ray.air",
+        "path": "/opt/conda/lib/python3.8/site-packages/ray/air/__init__.py"
+    },
+    "ray.air.config": {
+        "bacon": 2,
+        "imported_by": [
+            "ray.air",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "imports": [
+            "ray",
+            "ray.air",
+            "ray.tune"
+        ],
+        "name": "ray.air.config",
+        "path": "/opt/conda/lib/python3.8/site-packages/ray/air/config.py"
+    },
+    "ray.train": {
+        "bacon": 2,
+        "imported_by": [
+            "ray.train",
+            "ray.train.torch",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "imports": [
+            "ray",
+            "ray.train"
+        ],
+        "name": "ray.train",
+        "path": "/opt/conda/lib/python3.8/site-packages/ray/train/__init__.py"
+    },
+    "ray.train.torch": {
+        "bacon": 2,
+        "imported_by": [
+            "ray.train.torch",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "imports": [
+            "ray",
+            "ray.train",
+            "ray.train.torch",
+            "torch"
+        ],
+        "name": "ray.train.torch",
+        "path": "/opt/conda/lib/python3.8/site-packages/ray/train/torch/__init__.py"
+    },
+    "ray.tune": {
+        "bacon": 2,
+        "imported_by": [
+            "ray.air.config",
+            "ray.tune",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "imports": [
+            "ray",
+            "ray.tune"
+        ],
+        "name": "ray.tune",
+        "path": "/opt/conda/lib/python3.8/site-packages/ray/tune/__init__.py"
+    },
+    "requests": {
+        "bacon": 2,
+        "imported_by": [
+            "requests",
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder"
+        ],
+        "imports": [
+            "requests"
+        ],
+        "name": "requests",
+        "path": "/opt/conda/lib/python3.8/site-packages/requests/__init__.py"
+    },
+    "scipy": {
+        "bacon": 2,
+        "imported_by": [
+            "librosa.filters",
+            "numba",
+            "scipy",
+            "scipy.io",
+            "scipy.ndimage",
+            "scipy.signal",
+            "scipy.stats",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.data.utils",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "numpy",
+            "scipy"
+        ],
+        "name": "scipy",
+        "path": "/opt/conda/lib/python3.8/site-packages/scipy/__init__.py"
+    },
+    "scipy.io": {
+        "bacon": 2,
+        "imported_by": [
+            "scipy.io",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile"
+        ],
+        "name": "scipy.io",
+        "path": "/opt/conda/lib/python3.8/site-packages/scipy/io/__init__.py"
+    },
+    "scipy.io.wavfile": {
+        "bacon": 2,
+        "imported_by": [
+            "scipy.io",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "numpy"
+        ],
+        "name": "scipy.io.wavfile",
+        "path": "/opt/conda/lib/python3.8/site-packages/scipy/io/wavfile.py"
+    },
+    "scipy.ndimage": {
+        "bacon": 2,
+        "imported_by": [
+            "librosa.filters",
+            "scipy.ndimage",
+            "uberduck_ml_dev.data.data"
+        ],
+        "imports": [
+            "scipy",
+            "scipy.ndimage"
+        ],
+        "name": "scipy.ndimage",
+        "path": "/opt/conda/lib/python3.8/site-packages/scipy/ndimage/__init__.py"
+    },
+    "scipy.signal": {
+        "bacon": 2,
+        "imported_by": [
+            "librosa.filters",
+            "scipy.signal",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vocoders.avocodo"
+        ],
+        "imports": [
+            "scipy",
+            "scipy.signal"
+        ],
+        "name": "scipy.signal",
+        "path": "/opt/conda/lib/python3.8/site-packages/scipy/signal/__init__.py"
+    },
+    "scipy.stats": {
+        "bacon": 2,
+        "imported_by": [
+            "scipy.stats",
+            "uberduck_ml_dev.data.utils"
+        ],
+        "imports": [
+            "scipy",
+            "scipy.stats"
+        ],
+        "name": "scipy.stats",
+        "path": "/opt/conda/lib/python3.8/site-packages/scipy/stats/__init__.py"
+    },
+    "seaborn": {
+        "bacon": 2,
+        "imported_by": [
+            "seaborn",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.exec.dataset_statistics"
+        ],
+        "imports": [
+            "matplotlib",
+            "seaborn"
+        ],
+        "name": "seaborn",
+        "path": "/opt/conda/lib/python3.8/site-packages/seaborn/__init__.py"
+    },
+    "six": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.vendor.tfcompat.hparam"
+        ],
+        "name": "six",
+        "path": null
+    },
+    "sklearn": {
+        "bacon": 2,
+        "imported_by": [
+            "sklearn",
+            "sklearn.metrics",
+            "uberduck_ml_dev.exec.split_train_val",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "numpy",
+            "sklearn"
+        ],
+        "name": "sklearn",
+        "path": "/opt/conda/lib/python3.8/site-packages/sklearn/__init__.py"
+    },
+    "sklearn.metrics": {
+        "bacon": 2,
+        "imported_by": [
+            "sklearn.metrics",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "sklearn",
+            "sklearn.metrics"
+        ],
+        "name": "sklearn.metrics",
+        "path": "/opt/conda/lib/python3.8/site-packages/sklearn/metrics/__init__.py"
+    },
+    "sklearn.model_selection": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.exec.split_train_val",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "name": "sklearn.model_selection",
+        "path": "/opt/conda/lib/python3.8/site-packages/sklearn/model_selection/__init__.py"
+    },
+    "soundfile": {
+        "bacon": 2,
+        "imported_by": [
+            "speechmetrics",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "imports": [
+            "numpy"
+        ],
+        "name": "soundfile",
+        "path": "/opt/conda/lib/python3.8/site-packages/soundfile.py"
+    },
+    "speechmetrics": {
+        "bacon": 2,
+        "imported_by": [
+            "speechmetrics",
+            "uberduck_ml_dev.data.statistics"
+        ],
+        "imports": [
+            "numpy",
+            "soundfile",
+            "speechmetrics"
+        ],
+        "name": "speechmetrics",
+        "path": "/opt/conda/lib/python3.8/site-packages/speechmetrics/__init__.py"
+    },
+    "tensorboardX": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.trainer.base"
+        ],
+        "name": "tensorboardX",
+        "path": "/opt/conda/lib/python3.8/site-packages/tensorboardX/__init__.py"
+    },
+    "text_unidecode": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "name": "text_unidecode",
+        "path": "/opt/conda/lib/python3.8/site-packages/text_unidecode/__init__.py"
+    },
+    "torch": {
+        "bacon": 2,
+        "imported_by": [
+            "ray.train.torch",
+            "torch",
+            "torch.autograd",
+            "torch.cuda",
+            "torch.distributed",
+            "torch.multiprocessing",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.init",
+            "torch.nn.parameter",
+            "torch.nn.utils",
+            "torch.nn.utils.rnn",
+            "torch.nn.utils.spectral_norm",
+            "torch.nn.utils.weight_norm",
+            "torch.optim",
+            "torch.utils.data",
+            "torch.utils.data.distributed",
+            "torch.utils.data.sampler",
+            "uberduck_ml_dev.data.collate",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.data.utils",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.attribute_prediction_model",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder",
+            "uberduck_ml_dev.models.components.encoders.tacotron2",
+            "uberduck_ml_dev.models.components.partialconv1d",
+            "uberduck_ml_dev.models.components.postnet",
+            "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.models.components.splines",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.models.transforms",
+            "uberduck_ml_dev.monitoring.statistics",
+            "uberduck_ml_dev.monitoring.wandb",
+            "uberduck_ml_dev.text.text_processing",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.denoiser",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "torch",
+            "torch.autograd",
+            "torch.cuda",
+            "torch.multiprocessing",
+            "torch.nn",
+            "torch.optim",
+            "torch.utils",
+            "torch.utils.data"
+        ],
+        "name": "torch",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/__init__.py"
+    },
+    "torch.autograd": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "torch.autograd",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "torch",
+            "torch.autograd"
+        ],
+        "name": "torch.autograd",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/autograd/__init__.py"
+    },
+    "torch.cuda": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "torch.cuda",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.decoders.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.cuda",
+            "torch.cuda.amp"
+        ],
+        "name": "torch.cuda",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/cuda/__init__.py"
+    },
+    "torch.cuda.amp": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.cuda",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.decoders.tacotron2"
+        ],
+        "name": "torch.cuda.amp",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/cuda/amp/__init__.py"
+    },
+    "torch.distributed": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.utils.data.distributed",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "imports": [
+            "torch"
+        ],
+        "name": "torch.distributed",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/distributed/__init__.py"
+    },
+    "torch.multiprocessing": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "imports": [
+            "torch"
+        ],
+        "name": "torch.multiprocessing",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/multiprocessing/__init__.py"
+    },
+    "torch.nn": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.utils",
+            "torch.nn.utils.spectral_norm",
+            "torch.nn.utils.weight_norm",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.attribute_prediction_model",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.encoders.tacotron2",
+            "uberduck_ml_dev.models.components.partialconv1d",
+            "uberduck_ml_dev.models.components.postnet",
+            "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.models.components.splines",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.models.transforms",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.init",
+            "torch.nn.parallel",
+            "torch.nn.parameter",
+            "torch.nn.utils"
+        ],
+        "name": "torch.nn",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/__init__.py"
+    },
+    "torch.nn.functional": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn",
+            "torch.nn.utils.spectral_norm",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.encoders.tacotron2",
+            "uberduck_ml_dev.models.components.partialconv1d",
+            "uberduck_ml_dev.models.components.postnet",
+            "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.models.components.splines",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.models.transforms",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn"
+        ],
+        "name": "torch.nn.functional",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/functional.py"
+    },
+    "torch.nn.init": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn",
+            "uberduck_ml_dev.models.common"
+        ],
+        "imports": [
+            "torch"
+        ],
+        "name": "torch.nn.init",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/init.py"
+    },
+    "torch.nn.parallel": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn",
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "name": "torch.nn.parallel",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/parallel/__init__.py"
+    },
+    "torch.nn.parameter": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn",
+            "torch.nn.utils.weight_norm",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "torch"
+        ],
+        "name": "torch.nn.parameter",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/parameter.py"
+    },
+    "torch.nn.utils": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn",
+            "torch.nn.utils",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.utils",
+            "torch.nn.utils.rnn",
+            "torch.nn.utils.spectral_norm",
+            "torch.nn.utils.weight_norm"
+        ],
+        "name": "torch.nn.utils",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/utils/__init__.py"
+    },
+    "torch.nn.utils.rnn": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn.utils",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "torch"
+        ],
+        "name": "torch.nn.utils.rnn",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/utils/rnn.py"
+    },
+    "torch.nn.utils.spectral_norm": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn.utils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional"
+        ],
+        "name": "torch.nn.utils.spectral_norm",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/utils/spectral_norm.py"
+    },
+    "torch.nn.utils.weight_norm": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.nn.utils",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.vocoders.avocodo",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.parameter"
+        ],
+        "name": "torch.nn.utils.weight_norm",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/nn/utils/weight_norm.py"
+    },
+    "torch.optim": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "torch.optim",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "torch",
+            "torch.optim"
+        ],
+        "name": "torch.optim",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/optim/__init__.py"
+    },
+    "torch.utils": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "torch.utils.data",
+            "torch.utils.data.distributed",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "torch.utils",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/utils/__init__.py"
+    },
+    "torch.utils.data": {
+        "bacon": 2,
+        "imported_by": [
+            "torch",
+            "torch.utils.data",
+            "torch.utils.data.distributed",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.utils",
+            "torch.utils.data",
+            "torch.utils.data.distributed",
+            "torch.utils.data.sampler"
+        ],
+        "name": "torch.utils.data",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/utils/data/__init__.py"
+    },
+    "torch.utils.data.distributed": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.utils.data",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.distributed",
+            "torch.utils",
+            "torch.utils.data"
+        ],
+        "name": "torch.utils.data.distributed",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/utils/data/distributed.py"
+    },
+    "torch.utils.data.sampler": {
+        "bacon": 2,
+        "imported_by": [
+            "torch.utils.data",
+            "uberduck_ml_dev.models.torchmoji"
+        ],
+        "imports": [
+            "torch"
+        ],
+        "name": "torch.utils.data.sampler",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/utils/data/sampler.py"
+    },
+    "torch.utils.tensorboard": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "name": "torch.utils.tensorboard",
+        "path": "/opt/conda/lib/python3.8/site-packages/torch/utils/tensorboard/__init__.py"
+    },
+    "tqdm": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.monitoring.wandb"
+        ],
+        "name": "tqdm",
+        "path": "/opt/conda/lib/python3.8/site-packages/tqdm/__init__.py"
+    },
+    "uberduck_ml_dev": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.applications.streamlit",
+            "uberduck_ml_dev.exec.train_radtts_with_ray",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.text.text_processing"
+        ],
+        "name": "uberduck_ml_dev",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/__init__.py"
+    },
+    "uberduck_ml_dev.applications": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "name": "uberduck_ml_dev.applications",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/applications/__init__.py"
+    },
+    "uberduck_ml_dev.applications.streamlit": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "uberduck_ml_dev",
+            "uberduck_ml_dev.monitoring",
+            "uberduck_ml_dev.monitoring.generate"
+        ],
+        "name": "uberduck_ml_dev.applications.streamlit",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/applications/streamlit.py"
+    },
+    "uberduck_ml_dev.data": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.collate",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.data",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/__init__.py"
+    },
+    "uberduck_ml_dev.data.batch": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.collate",
+            "uberduck_ml_dev.losses"
+        ],
+        "imports": [
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.data.batch",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/batch.py"
+    },
+    "uberduck_ml_dev.data.collate": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "numpy",
+            "torch",
+            "uberduck_ml_dev.data",
+            "uberduck_ml_dev.data.batch"
+        ],
+        "name": "uberduck_ml_dev.data.collate",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/collate.py"
+    },
+    "uberduck_ml_dev.data.data": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "einops",
+            "librosa",
+            "lmdb",
+            "numpy",
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile",
+            "scipy.ndimage",
+            "torch",
+            "torch.utils",
+            "torch.utils.data",
+            "uberduck_ml_dev.data.utils",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.text.text_processing",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.data.data",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/data.py"
+    },
+    "uberduck_ml_dev.data.hifigan": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "imports": [
+            "librosa",
+            "librosa.filters",
+            "librosa.util",
+            "numpy",
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile",
+            "torch",
+            "torch.utils",
+            "torch.utils.data"
+        ],
+        "name": "uberduck_ml_dev.data.hifigan",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/hifigan.py"
+    },
+    "uberduck_ml_dev.data.ray": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "numpy",
+            "pandas",
+            "ray",
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile",
+            "torch",
+            "uberduck_ml_dev.data.utils",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.components",
+            "uberduck_ml_dev.models.components.encoders"
+        ],
+        "name": "uberduck_ml_dev.data.ray",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/ray.py"
+    },
+    "uberduck_ml_dev.data.statistics": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.dataset_statistics"
+        ],
+        "imports": [
+            "PIL",
+            "PIL.Image",
+            "PIL.ImageOps",
+            "librosa",
+            "matplotlib",
+            "matplotlib.pyplot",
+            "numpy",
+            "pydub",
+            "pydub.utils",
+            "seaborn",
+            "speechmetrics",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.utils",
+            "wordcloud",
+            "wordfreq"
+        ],
+        "name": "uberduck_ml_dev.data.statistics",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/statistics.py"
+    },
+    "uberduck_ml_dev.data.utils": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.ray"
+        ],
+        "imports": [
+            "numpy",
+            "scipy",
+            "scipy.stats",
+            "torch"
+        ],
+        "name": "uberduck_ml_dev.data.utils",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/data/utils.py"
+    },
+    "uberduck_ml_dev.e2e": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "torch",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.vocoders",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "name": "uberduck_ml_dev.e2e",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/e2e.py"
+    },
+    "uberduck_ml_dev.exec": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "name": "uberduck_ml_dev.exec",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/__init__.py"
+    },
+    "uberduck_ml_dev.exec.dataset_statistics": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "g2p_en",
+            "librosa",
+            "matplotlib",
+            "matplotlib.pyplot",
+            "mdutils",
+            "mdutils.mdutils",
+            "numpy",
+            "pydub",
+            "pydub.silence",
+            "seaborn",
+            "tqdm",
+            "uberduck_ml_dev.data",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.audio"
+        ],
+        "name": "uberduck_ml_dev.exec.dataset_statistics",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/dataset_statistics.py"
+    },
+    "uberduck_ml_dev.exec.normalize_audio": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.audio"
+        ],
+        "name": "uberduck_ml_dev.exec.normalize_audio",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/normalize_audio.py"
+    },
+    "uberduck_ml_dev.exec.split_train_val": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "numpy",
+            "sklearn",
+            "sklearn.model_selection"
+        ],
+        "name": "uberduck_ml_dev.exec.split_train_val",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/split_train_val.py"
+    },
+    "uberduck_ml_dev.exec.train_radtts_with_ray": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "ray",
+            "ray.air",
+            "ray.air.config",
+            "ray.train",
+            "ray.train.torch",
+            "ray.tune",
+            "uberduck_ml_dev",
+            "uberduck_ml_dev.trainer",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.exec"
+        ],
+        "name": "uberduck_ml_dev.exec.train_radtts_with_ray",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/train_radtts_with_ray.py"
+    },
+    "uberduck_ml_dev.exec.train_tacotron2": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "torch",
+            "torch.multiprocessing",
+            "uberduck_ml_dev.trainer",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam"
+        ],
+        "name": "uberduck_ml_dev.exec.train_tacotron2",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/train_tacotron2.py"
+    },
+    "uberduck_ml_dev.exec.train_vits": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "librosa",
+            "torch",
+            "torch.multiprocessing",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.trainer",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam"
+        ],
+        "name": "uberduck_ml_dev.exec.train_vits",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/exec/train_vits.py"
+    },
+    "uberduck_ml_dev.losses": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.data",
+            "uberduck_ml_dev.data.batch",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.losses",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/losses.py"
+    },
+    "uberduck_ml_dev.models": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.config",
+            "uberduck_ml_dev.utils.denoiser"
+        ],
+        "name": "uberduck_ml_dev.models",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/__init__.py"
+    },
+    "uberduck_ml_dev.models.base": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.base"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam"
+        ],
+        "name": "uberduck_ml_dev.models.base",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/base.py"
+    },
+    "uberduck_ml_dev.models.common": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.attribute_prediction_model",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.encoders.tacotron2",
+            "uberduck_ml_dev.models.components.postnet",
+            "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.utils.audio",
+            "uberduck_ml_dev.utils.denoiser"
+        ],
+        "imports": [
+            "librosa",
+            "librosa.filters",
+            "librosa.util",
+            "numpy",
+            "scipy",
+            "scipy.signal",
+            "torch",
+            "torch.autograd",
+            "torch.cuda",
+            "torch.cuda.amp",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.init",
+            "torch.nn.utils",
+            "torch.nn.utils.weight_norm",
+            "uberduck_ml_dev.models.components",
+            "uberduck_ml_dev.models.components.partialconv1d",
+            "uberduck_ml_dev.models.components.splines",
+            "uberduck_ml_dev.models.transforms",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.models.common",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/common.py"
+    },
+    "uberduck_ml_dev.models.components": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.models.components",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/__init__.py"
+    },
+    "uberduck_ml_dev.models.components.alignment": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.radtts"
+        ],
+        "imports": [
+            "matplotlib",
+            "matplotlib.pylab",
+            "numba",
+            "numpy"
+        ],
+        "name": "uberduck_ml_dev.models.components.alignment",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/alignment.py"
+    },
+    "uberduck_ml_dev.models.components.attention": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.components.decoders.tacotron2"
+        ],
+        "imports": [
+            "numpy",
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.models.components.attention",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/attention.py"
+    },
+    "uberduck_ml_dev.models.components.attribute_prediction_model": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.radtts"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.autoregressive_flow",
+            "uberduck_ml_dev.models.components.transformer"
+        ],
+        "name": "uberduck_ml_dev.models.components.attribute_prediction_model",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/attribute_prediction_model.py"
+    },
+    "uberduck_ml_dev.models.components.autoregressive_flow": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.components.attribute_prediction_model"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.models.components.autoregressive_flow",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/autoregressive_flow.py"
+    },
+    "uberduck_ml_dev.models.components.decoders": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.models.components.decoders",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/decoders/__init__.py"
+    },
+    "uberduck_ml_dev.models.components.decoders.tacotron2": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.tacotron2"
+        ],
+        "imports": [
+            "einops",
+            "numpy",
+            "torch",
+            "torch.cuda",
+            "torch.cuda.amp",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.attention",
+            "uberduck_ml_dev.models.components.prenet",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.models.components.decoders.tacotron2",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/decoders/tacotron2.py"
+    },
+    "uberduck_ml_dev.models.components.encoders": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.ray",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.models.components.encoders",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/encoders/__init__.py"
+    },
+    "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "TTS",
+            "TTS.encoder",
+            "requests",
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile",
+            "torch"
+        ],
+        "name": "uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/encoders/resnet_speaker_encoder.py"
+    },
+    "uberduck_ml_dev.models.components.encoders.speaker_encoder": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.models.components.encoders.speaker_encoder",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/encoders/speaker_encoder.py"
+    },
+    "uberduck_ml_dev.models.components.encoders.tacotron2": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.models.components.encoders.tacotron2",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/encoders/tacotron2.py"
+    },
+    "uberduck_ml_dev.models.components.partialconv1d": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.common"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional"
+        ],
+        "name": "uberduck_ml_dev.models.components.partialconv1d",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/partialconv1d.py"
+    },
+    "uberduck_ml_dev.models.components.postnet": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.models.components.postnet",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/postnet.py"
+    },
+    "uberduck_ml_dev.models.components.prenet": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.components.decoders.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.models.components.prenet",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/prenet.py"
+    },
+    "uberduck_ml_dev.models.components.splines": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.common"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional"
+        ],
+        "name": "uberduck_ml_dev.models.components.splines",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/splines.py"
+    },
+    "uberduck_ml_dev.models.components.transformer": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.components.attribute_prediction_model"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.models.components.transformer",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/components/transformer.py"
+    },
+    "uberduck_ml_dev.models.radtts": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "torch",
+            "torch.nn",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components",
+            "uberduck_ml_dev.models.components.alignment",
+            "uberduck_ml_dev.models.components.attribute_prediction_model",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.models.radtts",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/radtts.py"
+    },
+    "uberduck_ml_dev.models.tacotron2": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.utils.config"
+        ],
+        "imports": [
+            "numpy",
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components",
+            "uberduck_ml_dev.models.components.decoders",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.encoders",
+            "uberduck_ml_dev.models.components.encoders.tacotron2",
+            "uberduck_ml_dev.models.components.postnet",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam"
+        ],
+        "name": "uberduck_ml_dev.models.tacotron2",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/tacotron2.py"
+    },
+    "uberduck_ml_dev.models.torchmoji": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "emoji",
+            "numpy",
+            "sklearn",
+            "sklearn.metrics",
+            "sklearn.model_selection",
+            "text_unidecode",
+            "torch",
+            "torch.autograd",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.parameter",
+            "torch.nn.utils",
+            "torch.nn.utils.rnn",
+            "torch.optim",
+            "torch.utils",
+            "torch.utils.data",
+            "torch.utils.data.sampler"
+        ],
+        "name": "uberduck_ml_dev.models.torchmoji",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/torchmoji.py"
+    },
+    "uberduck_ml_dev.models.transforms": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.models.common"
+        ],
+        "imports": [
+            "numpy",
+            "torch",
+            "torch.nn",
+            "torch.nn.functional"
+        ],
+        "name": "uberduck_ml_dev.models.transforms",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/models/transforms.py"
+    },
+    "uberduck_ml_dev.monitoring": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.applications.streamlit",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.monitoring",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/monitoring/__init__.py"
+    },
+    "uberduck_ml_dev.monitoring.generate": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.applications.streamlit",
+            "uberduck_ml_dev.monitoring.streamlit"
+        ],
+        "imports": [
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.utils"
+        ],
+        "name": "uberduck_ml_dev.monitoring.generate",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/monitoring/generate.py"
+    },
+    "uberduck_ml_dev.monitoring.statistics": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "torch",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.utils"
+        ],
+        "name": "uberduck_ml_dev.monitoring.statistics",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/monitoring/statistics.py"
+    },
+    "uberduck_ml_dev.monitoring.streamlit": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "uberduck_ml_dev.monitoring.generate"
+        ],
+        "name": "uberduck_ml_dev.monitoring.streamlit",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/monitoring/streamlit.py"
+    },
+    "uberduck_ml_dev.monitoring.wandb": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "torch",
+            "tqdm",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.utils",
+            "wandb"
+        ],
+        "name": "uberduck_ml_dev.monitoring.wandb",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/monitoring/wandb.py"
+    },
+    "uberduck_ml_dev.text": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.monitoring.generate",
+            "uberduck_ml_dev.monitoring.wandb",
+            "uberduck_ml_dev.text.symbols",
+            "uberduck_ml_dev.text.text_processing",
+            "uberduck_ml_dev.trainer.tacotron2",
+            "uberduck_ml_dev.utils.plot"
+        ],
+        "name": "uberduck_ml_dev.text",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/__init__.py"
+    },
+    "uberduck_ml_dev.text.abbreviations": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.cleaners"
+        ],
+        "name": "uberduck_ml_dev.text.abbreviations",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/abbreviations.py"
+    },
+    "uberduck_ml_dev.text.acronyms": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.cleaners"
+        ],
+        "imports": [
+            "uberduck_ml_dev.text.cmudict"
+        ],
+        "name": "uberduck_ml_dev.text.acronyms",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/acronyms.py"
+    },
+    "uberduck_ml_dev.text.cleaners": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.text_processing"
+        ],
+        "imports": [
+            "uberduck_ml_dev.text.abbreviations",
+            "uberduck_ml_dev.text.acronyms",
+            "uberduck_ml_dev.text.datestime",
+            "uberduck_ml_dev.text.letters_and_numbers",
+            "uberduck_ml_dev.text.numerical",
+            "unidecode"
+        ],
+        "name": "uberduck_ml_dev.text.cleaners",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/cleaners.py"
+    },
+    "uberduck_ml_dev.text.cmudict": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.acronyms",
+            "uberduck_ml_dev.text.symbols"
+        ],
+        "name": "uberduck_ml_dev.text.cmudict",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/cmudict.py"
+    },
+    "uberduck_ml_dev.text.datestime": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.cleaners"
+        ],
+        "name": "uberduck_ml_dev.text.datestime",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/datestime.py"
+    },
+    "uberduck_ml_dev.text.grapheme_dictionary": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.text_processing"
+        ],
+        "name": "uberduck_ml_dev.text.grapheme_dictionary",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/grapheme_dictionary.py"
+    },
+    "uberduck_ml_dev.text.letters_and_numbers": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.cleaners"
+        ],
+        "name": "uberduck_ml_dev.text.letters_and_numbers",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/letters_and_numbers.py"
+    },
+    "uberduck_ml_dev.text.numerical": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.text.cleaners"
+        ],
+        "imports": [
+            "inflect"
+        ],
+        "name": "uberduck_ml_dev.text.numerical",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/numerical.py"
+    },
+    "uberduck_ml_dev.text.symbols": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.text.text_processing",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.utils.plot"
+        ],
+        "imports": [
+            "uberduck_ml_dev",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.cmudict"
+        ],
+        "name": "uberduck_ml_dev.text.symbols",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/symbols.py"
+    },
+    "uberduck_ml_dev.text.text_processing": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data"
+        ],
+        "imports": [
+            "numpy",
+            "torch",
+            "uberduck_ml_dev",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.cleaners",
+            "uberduck_ml_dev.text.grapheme_dictionary",
+            "uberduck_ml_dev.text.symbols"
+        ],
+        "name": "uberduck_ml_dev.text.text_processing",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/text_processing.py"
+    },
+    "uberduck_ml_dev.text.utils": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.data.statistics",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.monitoring.generate",
+            "uberduck_ml_dev.monitoring.wandb",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "g2p_en",
+            "inflect",
+            "phonemizer",
+            "phonemizer.phonemize",
+            "torch",
+            "uberduck_ml_dev.text.symbols",
+            "unidecode"
+        ],
+        "name": "uberduck_ml_dev.text.utils",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/utils.py"
+    },
+    "uberduck_ml_dev.trainer": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.train_radtts_with_ray",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits"
+        ],
+        "name": "uberduck_ml_dev.trainer",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/trainer/__init__.py"
+    },
+    "uberduck_ml_dev.trainer.base": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "numpy",
+            "tensorboardX",
+            "torch",
+            "torch.distributed",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam",
+            "uberduck_ml_dev.vocoders",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "name": "uberduck_ml_dev.trainer.base",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/trainer/base.py"
+    },
+    "uberduck_ml_dev.trainer.hifigan": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "torch",
+            "torch.distributed",
+            "torch.multiprocessing",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.parallel",
+            "torch.utils",
+            "torch.utils.data",
+            "torch.utils.tensorboard",
+            "uberduck_ml_dev.data",
+            "uberduck_ml_dev.data.hifigan",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.hifiutils",
+            "uberduck_ml_dev.vocoders",
+            "uberduck_ml_dev.vocoders.hifigan"
+        ],
+        "name": "uberduck_ml_dev.trainer.hifigan",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/trainer/hifigan.py"
+    },
+    "uberduck_ml_dev.trainer.tacotron2": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.train_tacotron2"
+        ],
+        "imports": [
+            "numpy",
+            "torch",
+            "torch.utils",
+            "torch.utils.data",
+            "torch.utils.data.distributed",
+            "uberduck_ml_dev.data",
+            "uberduck_ml_dev.data.collate",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.components",
+            "uberduck_ml_dev.models.components.encoders",
+            "uberduck_ml_dev.models.components.encoders.speaker_encoder",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.models.torchmoji",
+            "uberduck_ml_dev.monitoring",
+            "uberduck_ml_dev.monitoring.statistics",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.utils",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.utils",
+            "uberduck_ml_dev.utils.plot",
+            "uberduck_ml_dev.utils.utils",
+            "uberduck_ml_dev.vendor",
+            "uberduck_ml_dev.vendor.tfcompat",
+            "uberduck_ml_dev.vendor.tfcompat.hparam"
+        ],
+        "name": "uberduck_ml_dev.trainer.tacotron2",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/trainer/tacotron2.py"
+    },
+    "uberduck_ml_dev.utils": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.batch",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.exec.normalize_audio",
+            "uberduck_ml_dev.exec.train_radtts_with_ray",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.monitoring.statistics",
+            "uberduck_ml_dev.trainer.hifigan",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.utils",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/__init__.py"
+    },
+    "uberduck_ml_dev.utils.audio": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.dataset_statistics",
+            "uberduck_ml_dev.exec.normalize_audio"
+        ],
+        "imports": [
+            "librosa",
+            "numpy",
+            "pydub",
+            "pydub.silence",
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile",
+            "torch",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.utils.audio",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/audio.py"
+    },
+    "uberduck_ml_dev.utils.config": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.utils.config",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/config.py"
+    },
+    "uberduck_ml_dev.utils.denoiser": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "torch",
+            "uberduck_ml_dev.models",
+            "uberduck_ml_dev.models.common"
+        ],
+        "name": "uberduck_ml_dev.utils.denoiser",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/denoiser.py"
+    },
+    "uberduck_ml_dev.utils.exec": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.train_radtts_with_ray"
+        ],
+        "name": "uberduck_ml_dev.utils.exec",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/exec.py"
+    },
+    "uberduck_ml_dev.utils.hifiutils": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "imports": [
+            "matplotlib",
+            "matplotlib.pylab",
+            "torch",
+            "torch.nn",
+            "torch.nn.utils",
+            "torch.nn.utils.weight_norm"
+        ],
+        "name": "uberduck_ml_dev.utils.hifiutils",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/hifiutils.py"
+    },
+    "uberduck_ml_dev.utils.plot": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "matplotlib",
+            "matplotlib.pyplot",
+            "numpy",
+            "uberduck_ml_dev.text",
+            "uberduck_ml_dev.text.symbols"
+        ],
+        "name": "uberduck_ml_dev.utils.plot",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/plot.py"
+    },
+    "uberduck_ml_dev.utils.utils": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.data.batch",
+            "uberduck_ml_dev.data.data",
+            "uberduck_ml_dev.losses",
+            "uberduck_ml_dev.models.common",
+            "uberduck_ml_dev.models.components.decoders.tacotron2",
+            "uberduck_ml_dev.models.components.transformer",
+            "uberduck_ml_dev.models.radtts",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.monitoring.statistics",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "librosa",
+            "librosa.util",
+            "numpy",
+            "pandas",
+            "scipy",
+            "scipy.signal",
+            "soundfile",
+            "torch",
+            "torch.distributed",
+            "torch.nn",
+            "torch.nn.functional"
+        ],
+        "name": "uberduck_ml_dev.utils.utils",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/utils/utils.py"
+    },
+    "uberduck_ml_dev.vendor": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.vendor",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/vendor/__init__.py"
+    },
+    "uberduck_ml_dev.vendor.tfcompat": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "name": "uberduck_ml_dev.vendor.tfcompat",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/vendor/tfcompat/__init__.py"
+    },
+    "uberduck_ml_dev.vendor.tfcompat.hparam": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.exec.train_tacotron2",
+            "uberduck_ml_dev.exec.train_vits",
+            "uberduck_ml_dev.models.base",
+            "uberduck_ml_dev.models.tacotron2",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.tacotron2"
+        ],
+        "imports": [
+            "six"
+        ],
+        "name": "uberduck_ml_dev.vendor.tfcompat.hparam",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/vendor/tfcompat/hparam.py"
+    },
+    "uberduck_ml_dev.vocoders": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "name": "uberduck_ml_dev.vocoders",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/vocoders/__init__.py"
+    },
+    "uberduck_ml_dev.vocoders.avocodo": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__"
+        ],
+        "imports": [
+            "numpy",
+            "scipy",
+            "scipy.signal",
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.utils",
+            "torch.nn.utils.spectral_norm",
+            "torch.nn.utils.weight_norm"
+        ],
+        "name": "uberduck_ml_dev.vocoders.avocodo",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/vocoders/avocodo.py"
+    },
+    "uberduck_ml_dev.vocoders.hifigan": {
+        "bacon": 1,
+        "imported_by": [
+            "__main__",
+            "uberduck_ml_dev.e2e",
+            "uberduck_ml_dev.trainer.base",
+            "uberduck_ml_dev.trainer.hifigan"
+        ],
+        "imports": [
+            "numpy",
+            "scipy",
+            "scipy.io",
+            "scipy.io.wavfile",
+            "torch",
+            "torch.nn",
+            "torch.nn.functional",
+            "torch.nn.utils",
+            "torch.nn.utils.spectral_norm",
+            "torch.nn.utils.weight_norm"
+        ],
+        "name": "uberduck_ml_dev.vocoders.hifigan",
+        "path": "/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/vocoders/hifigan.py"
+    },
+    "unidecode": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.text.cleaners",
+            "uberduck_ml_dev.text.utils"
+        ],
+        "name": "unidecode",
+        "path": "/opt/conda/lib/python3.8/site-packages/unidecode/__init__.py"
+    },
+    "wandb": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.monitoring.wandb",
+            "wandb"
+        ],
+        "imports": [
+            "wandb"
+        ],
+        "name": "wandb",
+        "path": "/opt/conda/lib/python3.8/site-packages/wandb/__init__.py"
+    },
+    "wordcloud": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.data.statistics"
+        ],
+        "name": "wordcloud",
+        "path": "/opt/conda/lib/python3.8/site-packages/wordcloud/__init__.py"
+    },
+    "wordfreq": {
+        "bacon": 2,
+        "imported_by": [
+            "uberduck_ml_dev.data.statistics",
+            "wordfreq"
+        ],
+        "imports": [
+            "wordfreq"
+        ],
+        "name": "wordfreq",
+        "path": "/opt/conda/lib/python3.8/site-packages/wordfreq/__init__.py"
+    }
+}

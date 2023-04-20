@@ -255,7 +255,6 @@ class Generator(torch.nn.Module):
         )
 
     def forward(self, x):
-
         x1 = None
         x2 = None
         x = self.conv_pre(x)
@@ -541,7 +540,6 @@ class MultiSubBandDiscriminator(torch.nn.Module):
         m,
         freq_init_ch,
     ):
-
         super(MultiSubBandDiscriminator, self).__init__()
 
         self.fsbd = SubBandDiscriminator(
