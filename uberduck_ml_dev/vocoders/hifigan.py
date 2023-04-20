@@ -85,10 +85,9 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
     return vocoder
 
 
+# TODO (Sam): combine loading methods
 def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     print("Getting vocoder")
-    # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(hifi_gan_config_path)
 
     with open(hifi_gan_config_path) as f:
         hifigan_config = json.load(f)
@@ -99,7 +98,6 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     else:
         hifigan_config["gaussian_blur"] = {"p_blurring": 0.0}
         h["gaussian_blur"] = {"p_blurring": 0.0}
-    # model_params = hifigan_config["model_params"]
     model = Generator(h)
     print("Loading pretrained model...")
     load_pretrained(model, hifi_gan_checkpoint_path)
