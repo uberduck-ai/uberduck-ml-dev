@@ -72,7 +72,6 @@ def train_func(config: dict):
     attention_kl_loss = AttentionBinarizationLoss()
     iteration = 0
     for epoch in range(start_epoch, start_epoch + epochs):
-        # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
         iteration = train_epoch(
             train_dataloader,
             train_config["log_decoder_samples"],
@@ -90,7 +89,6 @@ def train_func(config: dict):
             iteration,
             vocoder,
         )
-        # iteration = train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration)
 
 
 DEFAULTS = {
