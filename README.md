@@ -4,7 +4,7 @@
 
 ## Overview
 
-The models in this repository used in production are the Tacotron2, SO-VITS-SVC, zero-shot RADTTS, and HiFi-GAN.  Training code is included for Tacotron2, RADTTS, and HiFi-GAN.  Other goodies include fill-populating inference, additional languages, and Torchmoji emotional encoding.  Please reach out for help or to contribute!
+The models in this repository used in production are the Tacotron2, SO-VITS-SVC, zero-shot RADTTS, and HiFi-GAN.  Training code is included for Tacotron2, RADTTS, and HiFi-GAN.  Other goodies include fill-populating inference, additional languages, and Torchmoji emotional encoding.  Download models to fine-tune from at [**training**](https://huggingface.co/Uberduck).  Please reach out for help or to contribute!
 
 ![Summary](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/details.png)
 
