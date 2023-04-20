@@ -190,12 +190,10 @@ class Generator(torch.nn.Module):
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
-            # resblock_list = nn.ModuleList()
             ch = upsample_initial_channel // (2 ** (i + 1))
             for j, (k, d) in enumerate(
                 zip(resblock_kernel_sizes, resblock_dilation_sizes)
             ):
-                # resblock_list.append(resblock(ch, k, d))
                 self.resblocks.append(resblock(ch, k, d))
 
         conv_post = Conv1d(ch, 1, 7, 1, padding=3, bias=use_conv_post_bias)
