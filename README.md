@@ -10,7 +10,7 @@ The models in this repository used in production are the Tacotron2, SO-VITS-SVC,
 
 ## Usage
 
-Download models to fine-tune from [**here**](https://huggingface.co/Uberduck).  The notebooks are the easiest ways to try these out.
+Download models to fine-tune from [**here**](https://huggingface.co/Uberduck).  The [**notebooks**](https://app.uberduck.ai/) are the easiest ways to try these out.
 
 ### Installation
 
