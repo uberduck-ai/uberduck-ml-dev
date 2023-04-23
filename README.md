@@ -18,8 +18,6 @@ Download models to fine-tune from [**here**](https://huggingface.co/Uberduck).  
 If you want to install on your own machine, create a virtual environment and install like 
 
 ```bash
-conda create -n 'uberduck-ml-dev' python=3.8
-source activate uberduck-ml-dev
 pip install git+https://github.com/uberduck-ai/uberduck-ml-dev.git
 ```
 
