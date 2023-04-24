@@ -633,16 +633,9 @@ class DataRADTTS(torch.utils.data.Dataset):
         return attn_prior
 
     def __getitem__(self, index):
-        # TODO (Sam): make this clean.
-        # my_path = "/usr/src/app/radtts/data/big_data"
-
         data = self.data[index]
         sub_path = data["audiopath"]
         text = data["text"]
-        # rel_path_folder = audiopath_s3.split("uberduck-audio-files/")[1].split(
-        #     "/resampled_unnormalized.wav"
-        # )[0]
-        # sub_path = os.path.join(my_path, rel_path_folder)
         audiopath = f"{sub_path}/resampled_unnormalized.wav"
         audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
         f0_path = f"{sub_path}/f0.pt"
@@ -688,6 +681,156 @@ class DataRADTTS(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.data)
+
+
+class DataMel(Dataset):
+    def __init__(
+        self,
+        data_config,
+        audiopaths: Optional[List[str]] = None,
+    ):
+        self.audiopaths = audiopaths
+        stft = TacotronSTFT(
+            filter_length=data_config["filter_length"],
+            hop_length=data_config["hop_length"],
+            win_length=data_config["win_length"],
+            sampling_rate=22050,
+            n_mel_channels=data_config["n_mel_channels"],
+            mel_fmin=data_config["mel_fmin"],
+            mel_fmax=data_config["mel_fmax"],
+        )
+        self.stft = stft
+
+    def _get_data(self, audiopath: str):
+        rate, audio = read(audiopath)
+        sub_path = audiopath.split("resampled_unnormalized.wav")[0]
+        audio = np.asarray(audio / (np.abs(audio).max() * 2))
+        audio_norm = torch.tensor(audio, dtype=torch.float32)
+        audio_norm = audio_norm.unsqueeze(0)
+        melspec = self.stft.mel_spectrogram(audio_norm)
+        melspec = torch.squeeze(melspec, 0)
+        melspec = (melspec + 5.5) / 2
+        spec_path_local = f"{sub_path}/spectrogram.pt"
+        torch.save(melspec.detach(), spec_path_local)
+
+    def __getitem__(self, idx):
+        try:
+            self._get_data(audiopath=self.audiopaths[idx])
+
+        except Exception as e:
+            print(f"Error while getting data: index = {idx}")
+            print(e)
+            raise
+        return None
+
+    def __len__(self):
+        nfiles = len(self.audiopaths)
+
+        return nfiles
+
+
+# NOTE (Sam): this is the radtts preprocessing.
+# TODO (Sam): synthesize with other dataloaders using functional arguments.
+from uberduck_ml_dev.models.tacotron2 import MAX_WAV_VALUE
+from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
+    get_pretrained_model,
+)
+
+
+class DataEmbedding:
+    def __init__(self, resnet_se_model_path, resnet_se_config_path, audiopaths):
+        self.model = get_pretrained_model(
+            model_path=resnet_se_model_path, config_path=resnet_se_config_path
+        )
+        self.audiopaths = audiopaths
+
+    def _get_data(self, audiopath):
+        rate, data = read(audiopath)
+        data = torch.FloatTensor(data.astype("float32") / MAX_WAV_VALUE).unsqueeze(0)
+        sub_path = audiopath[:41]
+        embedding = self.model(data).squeeze()
+        emb_path_local = f"{sub_path}/coqui_resnet_512_emb.pt"
+        torch.save(embedding.detach(), emb_path_local)
+
+    def __getitem__(self, idx):
+        try:
+            self._get_data(audiopath=self.audiopaths[idx])
+
+        except Exception as e:
+            print(f"Error while getting data: index = {idx}")
+            print(e)
+            raise
+        return None
+
+    def __len__(self):
+        nfiles = len(self.audiopaths)
+
+        return nfiles
+
+
+def get_f0_pvoiced(
+    audio,
+    sampling_rate=22050,
+    frame_length=1024,
+    hop_length=256,
+    f0_min=100,
+    f0_max=300,
+):
+    # NOTE (Sam): is this normalization kosher?
+    MAX_WAV_VALUE = 32768.0
+    audio_norm = audio / MAX_WAV_VALUE
+    f0, voiced_mask, p_voiced = pyin(
+        y=audio_norm,
+        fmin=f0_min,
+        fmax=f0_max,
+        sr=sampling_rate,
+        frame_length=frame_length,
+        win_length=frame_length // 2,
+        hop_length=hop_length,
+    )
+    f0[~voiced_mask] = 0.0
+    f0 = torch.FloatTensor(f0)
+    p_voiced = torch.FloatTensor(p_voiced)
+    voiced_mask = torch.FloatTensor(voiced_mask)
+    return f0, voiced_mask, p_voiced
+
+
+class DataPitch:
+    def __init__(self, data_config, audiopaths):
+        self.hop_length = data_config["hop_length"]
+        self.f0_min = data_config["f0_min"]
+        self.f0_max = data_config["f0_max"]
+        self.frame_length = data_config["filter_length"]
+        self.audiopaths = audiopaths
+
+    def _get_data(self, audiopath):
+        rate, data = read(audiopath)
+        sub_path = audiopath[:41]
+        pitch = get_f0_pvoiced(
+            data,
+            f0_min=self.f0_min,
+            f0_max=self.f0_max,
+            hop_length=self.hop_length,
+            frame_length=self.frame_length,
+            sampling_rate=22050,
+        )
+        pitch_path_local = f"{sub_path}/f0.pt"
+        torch.save(pitch, pitch_path_local)
+
+    def __getitem__(self, idx):
+        try:
+            self._get_data(audiopath=self.audiopaths[idx])
+
+        except Exception as e:
+            print(f"Error while getting data: index = {idx}")
+            print(e)
+            raise
+        return None
+
+    def __len__(self):
+        nfiles = len(self.audiopaths)
+
+        return nfiles
 
 
 RADTTS_DEFAULTS = {
