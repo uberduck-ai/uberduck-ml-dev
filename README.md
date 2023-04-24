@@ -1,5 +1,9 @@
-# 🦆 Uberduck Synthetic Speech
-![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev) ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev) ![](https://github.com/uberduck-ai/uberduck-ml-dev/actions/workflows/main.yml/badge.svg)
+## 🦆 Uberduck Synthetic Speech
+![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev)
+![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev)
+![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
+![GithubActions](https://github.com/uberduck-ai/uberduck-ml-dev/actions/workflows/main.yml/badge.svg)
+[![Discord](https://img.shields.io/discord/1037326658807533628?color=%239B59B6&label=chat%20on%20discord)](https://discord.com/invite/ATYWnMu)
 
 [**Uberduck**](https://uberduck.ai/) is a tool for fun and creativity with neural text-to-speech. This repository will get you creating your own speech synthesis models. Please see our [**training**](https://colab.research.google.com/drive/1jF-Otw2_ssEcus4ISaIZu3QDmtifUvyY) and [**synthesis**](https://colab.research.google.com/drive/1wXWuhnw2pdfFy1L-pUzHfopW10W2GiJS) notebooks. Please reach out for help and contribute!
 
