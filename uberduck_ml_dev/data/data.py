@@ -701,6 +701,8 @@ class DataMel(Dataset):
         )
         self.stft = stft
 
+    # NOTE (Sam): assumes data is in a directory structure like:
+    # /tmp/{uuid}/resampled_unnormalized.wav
     def _get_data(self, audiopath: str):
         rate, audio = read(audiopath)
         sub_path = audiopath.split("resampled_unnormalized.wav")[0]
@@ -738,16 +740,25 @@ from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
 
 
 class DataEmbedding:
-    def __init__(self, resnet_se_model_path, resnet_se_config_path, audiopaths):
+    # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
+    # /tmp/{uuid}/resampled_unnormalized.wav
+    def __init__(
+        self,
+        resnet_se_model_path,
+        resnet_se_config_path,
+        audiopaths,
+        subpath_truncation=41,
+    ):
         self.model = get_pretrained_model(
             model_path=resnet_se_model_path, config_path=resnet_se_config_path
         )
         self.audiopaths = audiopaths
+        self.subpath_truncation = subpath_truncation
 
     def _get_data(self, audiopath):
         rate, data = read(audiopath)
         data = torch.FloatTensor(data.astype("float32") / MAX_WAV_VALUE).unsqueeze(0)
-        sub_path = audiopath[:41]
+        sub_path = audiopath[: self.subpath_truncation]
         embedding = self.model(data).squeeze()
         emb_path_local = f"{sub_path}/coqui_resnet_512_emb.pt"
         torch.save(embedding.detach(), emb_path_local)
@@ -796,16 +807,19 @@ def get_f0_pvoiced(
 
 
 class DataPitch:
-    def __init__(self, data_config, audiopaths):
+    # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
+    # /tmp/{uuid}/resampled_unnormalized.wav
+    def __init__(self, data_config, audiopaths, subpath_truncation=41):
         self.hop_length = data_config["hop_length"]
         self.f0_min = data_config["f0_min"]
         self.f0_max = data_config["f0_max"]
         self.frame_length = data_config["filter_length"]
         self.audiopaths = audiopaths
+        self.subpath_truncation = subpath_truncation
 
     def _get_data(self, audiopath):
         rate, data = read(audiopath)
-        sub_path = audiopath[:41]
+        sub_path = audiopath[: self.subpath_truncation]
         pitch = get_f0_pvoiced(
             data,
             f0_min=self.f0_min,
