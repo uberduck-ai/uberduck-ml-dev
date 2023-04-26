@@ -114,8 +114,9 @@ class Collate:
 
 
 # TODO (Sam): combine Collate with DataCollateRADTTS
-class DataCollateRADTTS():
-    """ Zero-pads model inputs and targets given number of steps """
+class DataCollateRADTTS:
+    """Zero-pads model inputs and targets given number of steps"""
+
     def __init__(self, n_frames_per_step=1):
         self.n_frames_per_step = n_frames_per_step
 
@@ -228,3 +229,15 @@ class DataCollateRADTTS():
             "audio_embedding": audio_embedding_padded,
         }
 
+
+# NOTE (Sam): this is a dummy collate function for torch-based parallel processing.
+# This appears faster than ray data or multiprocessing parallel processing.
+# I'm not 100% sure.
+class CollateBlank:
+    def __init__(
+        self,
+    ):
+        2 + 2
+
+    def __call__(self, batch):
+        return None
