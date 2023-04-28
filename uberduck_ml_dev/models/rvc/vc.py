@@ -128,7 +128,9 @@ class VC(object):
                 + (1 - index_rate) * feats
             )
 
-        feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
+        feats = F.interpolate(
+            feats.permute(0, 2, 1), 2  # scale_factor=(index_rate) ** (-1)  # 2
+        ).permute(0, 2, 1)
         t1 = ttime()
         p_len = audio0.shape[0] // self.window
         if feats.shape[1] < p_len:
