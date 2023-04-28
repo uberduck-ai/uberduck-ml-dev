@@ -3,7 +3,6 @@ import torch
 
 try:
     from .monotonic_align.core import maximum_path_c
-
     CYTHON = True
 except ModuleNotFoundError:
     CYTHON = False
@@ -13,7 +12,6 @@ def maximum_path(neg_cent, mask):
     if CYTHON:
         return maximum_path_cython(neg_cent, mask)
     return maximum_path_numpy(neg_cent, mask)
-
 
 def maximum_path_cython(neg_cent, mask):
     """Cython optimized version.
@@ -52,9 +50,7 @@ def maximum_path_numpy(value, mask, max_neg_val=None):
     v = np.zeros((b, t_x), dtype=np.float32)
     x_range = np.arange(t_x, dtype=np.float32).reshape(1, -1)
     for j in range(t_y):
-        v0 = np.pad(v, [[0, 0], [1, 0]], mode="constant", constant_values=max_neg_val)[
-            :, :-1
-        ]
+        v0 = np.pad(v, [[0, 0], [1, 0]], mode="constant", constant_values=max_neg_val)[:, :-1]
         v1 = v
         max_mask = v1 >= v0
         v_max = np.where(max_mask, v1, v0)

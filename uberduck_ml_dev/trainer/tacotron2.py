@@ -8,7 +8,6 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-
 from ..data.collate import Collate
 from ..models.tacotron2 import Tacotron2
 from ..utils.plot import save_figure_to_numpy
