@@ -129,7 +129,8 @@ class VC(object):
             )
 
         feats = F.interpolate(
-            feats.permute(0, 2, 1), 2  # scale_factor=(index_rate) ** (-1)  # 2
+            feats.permute(0, 2, 1),
+            scale_factor=2,  # (index_rate) ** (-1)  # NOTE (Sam): why do we assume upsampling is 2x if input to Hubert is 16000 and default target rate is 40000?
         ).permute(0, 2, 1)
         t1 = ttime()
         p_len = audio0.shape[0] // self.window
