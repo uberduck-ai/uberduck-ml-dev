@@ -16,10 +16,6 @@ jobs:
       - name: Install the library
         run: |
           pip install -e .
-      - name: Build monotonic_align
-        run: |
-          cd monotonic_align
-          python setup.py build_ext --inplace
       - name: Run tests
         run: |
           python -m pytest
