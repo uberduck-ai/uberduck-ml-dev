@@ -160,7 +160,6 @@ def get_mask_from_lengths(lengths: torch.Tensor, max_len: int = 0):
     return mask
 
 
-
 def reduce_tensor(tensor, n_gpus):
     rt = tensor.clone()
     dist.all_reduce(rt, op=dist.ReduceOp.SUM)

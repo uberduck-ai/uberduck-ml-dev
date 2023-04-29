@@ -4,8 +4,8 @@ import numpy as np
 from torch import nn
 from torch.nn import functional as F
 
-from torch.nn import Conv1d,  Conv2d
-from torch.nn.utils import weight_norm,  spectral_norm
+from torch.nn import Conv1d, Conv2d
+from torch.nn.utils import weight_norm, spectral_norm
 
 from uberduck_ml_dev.models import common
 from uberduck_ml_dev.models.components.attribute_prediction_model import (

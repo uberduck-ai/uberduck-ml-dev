@@ -1,5 +1,6 @@
 import torch
 
+
 def save_checkpoint(model, optimizer, iteration, filepath):
     print(
         "Saving model and optimizer state at iteration {} to {}".format(
