@@ -11,6 +11,7 @@ import pandas as pd
 from .utils import get_energy_average, f0_normalize
 from ..models.components.encoders import ResNetSpeakerEncoderCallable
 
+
 # NOTE (Sam): the ray dataset code runs mod cleanup but is seemingly slower than torch dataloader (not 100p sure if this is still true).
 def ray_df_preprocessing(df, data_config, tp, stft):
     transcripts = df.transcript.tolist()
@@ -64,7 +65,6 @@ def ray_df_preprocessing(df, data_config, tp, stft):
 
 
 def get_ray_dataset(filelist_path, config_path, model_path):
-
     df = pd.read_csv(
         filelist_path,
         sep="|",
@@ -111,7 +111,7 @@ def get_ray_dataset(filelist_path, config_path, model_path):
     embs_ds = ray.data.from_items(paths, parallelism=parallelism_length)
     embs_ds = embs_ds.map_batches(
         ResNetSpeakerEncoderCallable,
-        fn_kwargs = {"config_path": config_path, "model_path": model_path},
+        fn_kwargs={"config_path": config_path, "model_path": model_path},
         num_gpus=1.0,
         compute="actors",
     )

@@ -1,12 +1,11 @@
-import copy
 import math
 import torch
 import numpy as np
 from torch import nn
 from torch.nn import functional as F
 
-from torch.nn import Conv1d, ConvTranspose1d, Conv2d
-from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
+from torch.nn import Conv1d, Conv2d
+from torch.nn.utils import weight_norm, spectral_norm
 
 from uberduck_ml_dev.models import common
 from uberduck_ml_dev.models.components.attribute_prediction_model import (
@@ -18,13 +17,9 @@ from uberduck_ml_dev.models.components.encoders.duration import (
     DurationPredictor,
 )
 from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
-    ResNetSpeakerEncoder,
-    DEFAULT_AUDIO_CONFIG as RESNET_SE_AUDIO_CONFIG,
-    load_pretrained,
     get_pretrained_model,
 )
 from uberduck_ml_dev.utils.utils import (
-    init_weights,
     get_padding,
     rand_slice_segments,
     sequence_mask,

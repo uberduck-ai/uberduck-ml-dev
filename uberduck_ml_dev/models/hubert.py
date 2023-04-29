@@ -40,7 +40,7 @@ class Hubert(nn.Module):
         return x, mask
 
     def encode(
-            self, x: torch.Tensor, layer: Optional[int] = None
+        self, x: torch.Tensor, layer: Optional[int] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.feature_extractor(x)
         x = self.feature_projection(x.transpose(1, 2))
@@ -133,7 +133,7 @@ class PositionalConvEmbedding(nn.Module):
 
 class TransformerEncoder(nn.Module):
     def __init__(
-            self, encoder_layer: nn.TransformerEncoderLayer, num_layers: int
+        self, encoder_layer: nn.TransformerEncoderLayer, num_layers: int
     ) -> None:
         super(TransformerEncoder, self).__init__()
         self.layers = nn.ModuleList(
@@ -142,11 +142,11 @@ class TransformerEncoder(nn.Module):
         self.num_layers = num_layers
 
     def forward(
-            self,
-            src: torch.Tensor,
-            mask: torch.Tensor = None,
-            src_key_padding_mask: torch.Tensor = None,
-            output_layer: Optional[int] = None,
+        self,
+        src: torch.Tensor,
+        mask: torch.Tensor = None,
+        src_key_padding_mask: torch.Tensor = None,
+        output_layer: Optional[int] = None,
     ) -> torch.Tensor:
         output = src
         for layer in self.layers[:output_layer]:
@@ -157,11 +157,11 @@ class TransformerEncoder(nn.Module):
 
 
 def _compute_mask(
-        shape: Tuple[int, int],
-        mask_prob: float,
-        mask_length: int,
-        device: torch.device,
-        min_masks: int = 0,
+    shape: Tuple[int, int],
+    mask_prob: float,
+    mask_length: int,
+    device: torch.device,
+    min_masks: int = 0,
 ) -> torch.Tensor:
     batch_size, sequence_length = shape
 
@@ -212,7 +212,7 @@ def _compute_mask(
 
 
 def hubert_soft(
-        path: str,
+    path: str,
 ) -> HubertSoft:
     r"""HuBERT-Soft from `"A Comparison of Discrete and Soft Speech Units for Improved Voice Conversion"`.
     Args:
@@ -225,14 +225,19 @@ def hubert_soft(
     hubert.eval()
     return hubert
 
-def get_pretrained_hubert(url: str):
-    response = requests.get(url)
-    with tempfile.NamedTemporaryFile() as f:
-        # with open("hubert_checkpoint_best_legacy_500.pt", "wb") as f:
-        f.write(response.content)
-        file_size = os.path.getsize(f.name)
-        print("FILE SIZE: ", file_size)
-        model, *_ = load_model_ensemble_and_task([f.name], suffix="")
-    hubert_model = model[0]
+
+def get_pretrained_hubert(url: Optional[str] = None, path: Optional[str] = None):
+    if path is not None:
+        model, *_ = load_model_ensemble_and_task([path], suffix="")
+        hubert_model = model[0]
+    else:
+        response = requests.get(url)
+        with tempfile.NamedTemporaryFile() as f:
+            # with open("hubert_checkpoint_best_legacy_500.pt", "wb") as f:
+            f.write(response.content)
+            file_size = os.path.getsize(f.name)
+            print("FILE SIZE: ", file_size)
+            model, *_ = load_model_ensemble_and_task([f.name], suffix="")
+        hubert_model = model[0]
     hubert_model.eval()
     return hubert_model

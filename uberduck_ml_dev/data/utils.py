@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from scipy.stats import betabinom
 
+
 def oversample(filepaths_text_sid, sid_to_weight):
     assert all([isinstance(sid, str) for sid in sid_to_weight.keys()])
     output = []
@@ -22,6 +23,7 @@ def _orig_to_dense_speaker_id(speaker_ids):
     }
     return output
 
+
 def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.05):
     P = phoneme_count
     M = mel_count
@@ -34,8 +36,8 @@ def beta_binomial_prior_distribution(phoneme_count, mel_count, scaling_factor=0.
         mel_text_probs.append(mel_i_prob)
     return torch.tensor(np.array(mel_text_probs))
 
-def get_attention_prior(n_tokens, n_frames):
 
+def get_attention_prior(n_tokens, n_frames):
     filename = "{}_{}".format(n_tokens, n_frames)
     betabinom_cache_path = "betabinom_cache"
     if not os.path.exists(betabinom_cache_path):
@@ -51,7 +53,6 @@ def get_attention_prior(n_tokens, n_frames):
         )
         torch.save(attn_prior, prior_path)
 
-
     return attn_prior
 
 
@@ -60,6 +61,7 @@ def energy_avg_normalize(x):
     if use_scaled_energy == True:
         x = (x + 20.0) / 20.0
     return x
+
 
 def get_energy_average(mel):
     energy_avg = mel.mean(0)
@@ -75,6 +77,7 @@ def f0_normalize(x, f0_min):
     # x[~mask] = 0.0
 
     return x
+
 
 def get_shuffle_indices(levels):
     levels = np.asarray(levels)
