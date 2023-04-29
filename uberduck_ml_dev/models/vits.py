@@ -17,11 +17,9 @@ from uberduck_ml_dev.models.components.encoders.duration import (
     DurationPredictor,
 )
 from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
-
     get_pretrained_model,
 )
 from uberduck_ml_dev.utils.utils import (
-
     get_padding,
     rand_slice_segments,
     sequence_mask,
