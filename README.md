@@ -1,4 +1,4 @@
-## 🦆 Uberduck Synthetic Speech
+# 🦆 Uberduck Synthetic Speech
 ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev)
 ![](https://img.shields.io/github/stars/uberduck-ai/uberduck-ml-dev)
 ![](https://img.shields.io/github/issues/uberduck-ai/uberduck-ml-dev)
