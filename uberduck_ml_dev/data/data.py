@@ -863,7 +863,7 @@ class DataPitch:
     def _get_data(self, audiopath):
         rate, data = read(audiopath)
         sub_path = audiopath[: self.subpath_truncation]
-        # print('sub_path', sub_path)
+        print('sub_path', sub_path, 'what')
         if self.method == "radtts":
             pitch = get_f0_pvoiced(
                 data,
