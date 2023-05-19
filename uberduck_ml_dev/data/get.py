@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
 from uberduck_ml_dev.data.collate import CollateBlank
 
-def get_pitchesf(paths, data_config, subpath_truncation=41):
+def get_pitchesf(paths, data_config = None, subpath_truncation=41):
     data = DataPitch(
         audiopaths=paths, data_config=data_config, subpath_truncation=subpath_truncation, method = 'rvc'
     )

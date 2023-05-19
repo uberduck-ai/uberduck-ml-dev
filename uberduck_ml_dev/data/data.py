@@ -805,8 +805,9 @@ def get_f0_pvoiced(
     voiced_mask = torch.FloatTensor(voiced_mask)
     return f0, voiced_mask, p_voiced
 
+# NOTE (Sam): for some reason the RVC data processing using pyworld why we use parselmouth for inference.
 import pyworld
-import signal
+import scipy.signal as signal
 def get_f0_rvc(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
     x_pad = 1
     f0_min = 50
@@ -849,11 +850,12 @@ class DataPitch:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
     # NOTE (Sam): method here reflects the model type this was actually used for and is not the actual pitch method.
-    def __init__(self, data_config, audiopaths, subpath_truncation=41, method = 'radtts'):
-        self.hop_length = data_config["hop_length"]
-        self.f0_min = data_config["f0_min"]
-        self.f0_max = data_config["f0_max"]
-        self.frame_length = data_config["filter_length"]
+    def __init__(self, data_config = None, audiopaths = None, subpath_truncation=41, method = 'radtts'):
+        if method == 'radtts':
+            self.hop_length = data_config["hop_length"]
+            self.f0_min = data_config["f0_min"]
+            self.f0_max = data_config["f0_max"]
+            self.frame_length = data_config["filter_length"]
         self.audiopaths = audiopaths
         self.subpath_truncation = subpath_truncation
         self.method = method
@@ -861,6 +863,7 @@ class DataPitch:
     def _get_data(self, audiopath):
         rate, data = read(audiopath)
         sub_path = audiopath[: self.subpath_truncation]
+        # print('sub_path', sub_path)
         if self.method == "radtts":
             pitch = get_f0_pvoiced(
                 data,
