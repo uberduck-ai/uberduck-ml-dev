@@ -1,3 +1,4 @@
+# TODO (Sam): move this to models and training params to trainer
 __all__ = [
     "HiFiGanGenerator",
     "Generator",
