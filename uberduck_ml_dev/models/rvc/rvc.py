@@ -697,3 +697,23 @@ class DiscriminatorP(torch.nn.Module):
         x = torch.flatten(x, 1, -1)
 
         return x, fmap
+
+
+DEFAULTS = {
+    "inter_channels": 192,
+    "hidden_channels": 192,
+    "filter_channels": 768,
+    "n_heads": 2,
+    "n_layers": 6,
+    "kernel_size": 3,
+    "p_dropout": 0,
+    "resblock": "1",
+    "resblock_kernel_sizes": [3,7,11],
+    "resblock_dilation_sizes": [[1,3,5], [1,3,5], [1,3,5]],
+    "upsample_rates": [10,10,2,2],
+    "upsample_initial_channel": 512,
+    "upsample_kernel_sizes": [16,16,4,4],
+    "use_spectral_norm": False,
+    "gin_channels": 256,
+    "spk_embed_dim": 109
+  }
