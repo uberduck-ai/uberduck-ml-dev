@@ -1,19 +1,22 @@
+# TODO (Sam): add config arguments to model / optimization / logging and remove.
 from .train_step import _train_step
 
 
 def train_epoch(
-    train_dataloader,
-    logging_parameters,
-    model,
+    dataloader,
+    config,
+    models,
     optimization_parameters,
+    logging_parameters,
     iteration,
 ):
-    for batch in train_dataloader:
+    for batch in dataloader:
         _train_step(
             batch,
-            logging_parameters,
-            model,
+            config,
+            models
             optimization_parameters,
+            logging_parameters,
             iteration,
         )
         iteration += 1

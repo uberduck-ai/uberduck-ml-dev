@@ -5,17 +5,14 @@ import ray.train as train
 
 from .train_epoch import train_epoch
 from .load import prepare_dataloaders, warmstart
-from ...losses import AttentionBinarizationLoss
 
 
-def train_func(model, optim, criterion, project: str, config: dict):
+def train_func(model, optim, criteria, project: str, config: dict):
     setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
-    train_config = config["train_config"]
-    data_config = config["data_config"]
+    train_config = config["train"]
+    data_config = config["data"]
 
     print("CUDA AVAILABLE: ", torch.cuda.is_available())
-    
-
     if train_config["warmstart_checkpoint_path"] != "":
         warmstart(train_config["warmstart_checkpoint_path"], model)
 
