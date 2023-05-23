@@ -1,9 +1,13 @@
 from torch.cuda.amp import autocast
+from ray.air import session
+
 from uberduck_ml_dev.models.rvc.commons import clip_grad_value_, slice_segments
 from uberduck_ml_dev.data.utils import mel_spectrogram_torch, spec_to_mel_torch
 from ...utils.utils import (
     to_gpu,
 )
+from ..log import log
+from .save import save_checkpoint
 
 # TODO (Sam): add config arguments to model / optimization / logging and remove.
 # NOTE (Sam): passing dict arguments to functions is a bit of a code smell.
@@ -112,6 +116,7 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
         loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config['c_kl']
         loss_fm = feature_loss(fmap_r, fmap_g)
         loss_gen, losses_gen = generator_loss(y_d_hat_g)
+        # TODO (Sam): put these in a loss_outputs dict like radtts
         loss_gen_all = loss_gen * generator_loss_weight + loss_fm * feature_loss_weight + loss_mel * l1_loss_weight + loss_kl * kl_loss_weight
     generator_optimizer.zero_grad()
     scaler.scale(loss_gen_all).backward()
@@ -119,3 +124,26 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     grad_norm_g = clip_grad_value_(generator.parameters(), None)
     scaler.step(generator_optimizer)
     scaler.update()
+
+    metrics = {"generator loss": loss_gen_all}
+
+    from datetime import datetime
+    print("iteration: ", iteration, datetime.now())
+    log_sample = iteration % train_config['steps_per_sample'] == 0
+    log_checkpoint = iteration % train_config['iters_per_checkpoint'] == 0
+
+    # if log_sample and session.get_world_rank() == 0:
+    #     generator.eval()
+    #     # TODO (Sam): add sample logging
+    #     images, audios = get_log_audio(
+    #         batch,
+    #         generator,
+    #     )
+    #     log(metrics, audios)
+    #     generator.train()
+    # else:
+    log(metrics)
+
+    if log_checkpoint and session.get_world_rank() == 0:
+        checkpoint_path = f"{train_config['output_directory']}/model_{iteration}.pt"
+        save_checkpoint(generator, generator_optimizer, discriminator, discriminator_optimizer, iteration, checkpoint_path)

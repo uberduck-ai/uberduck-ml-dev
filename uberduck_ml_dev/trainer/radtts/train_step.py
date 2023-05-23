@@ -1,12 +1,12 @@
 # NOTE (Sam): for use with ray trainer.
 from datetime import datetime
-import os
 
 import torch
 from torch.cuda.amp import autocast
 from ray.air import session
 
-from .log import get_log_audio, log
+from .log import get_log_audio
+from ..log import log
 from .save import save_checkpoint
 from ...utils.utils import (
     to_gpu,
@@ -119,8 +119,8 @@ def _train_step(
             voiced_mask,
             vocoder,
         )
-        print("audio", audios)
         # TODO (Sam): make out of sample logging cleaner.
+        # NOTE (Sam): right now this requires precomputation of embeddings and isn't out of sample zero shot.
         # gt_path = "/usr/src/app/radtts/ground_truth"
         # oos_embs = os.listdir(gt_path)
         # # this doesn't help for reasons described above
@@ -147,7 +147,7 @@ def _train_step(
     else:
         log(metrics)
 
-    session.report(metrics)
+    # session.report(metrics) # NOTE (Sam): this is for ray trainer.
     if log_checkpoint and session.get_world_rank() == 0:
         checkpoint_path = f"{output_directory}/model_{iteration}.pt"
         save_checkpoint(model, optim, iteration, checkpoint_path)

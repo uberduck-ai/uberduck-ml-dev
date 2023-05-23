@@ -10,17 +10,6 @@ from ...utils.utils import (
 from ...utils.plot import plot_alignment_to_numpy
 
 
-@torch.no_grad()
-def log(metrics, audios={}):
-    # pass
-    wandb_metrics = dict(metrics)
-
-    for k, v in audios.items():
-        wandb_metrics[k] = wandb.Audio(v, sample_rate=22050)
-
-    # session.report(metrics)
-    if session.get_world_rank() == 0:
-        wandb.log(wandb_metrics)
 
 
 # want to test out of sample but can only do proper inference with zero shot dap so lets just look at zero shot decoder samples
