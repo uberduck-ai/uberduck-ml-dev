@@ -548,7 +548,9 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         # print(-1,pitchf.shape,ids_slice,self.segment_size,self.hop_length,self.segment_size//self.hop_length)
         pitchf = commons.slice_segments2(pitchf, ids_slice, self.segment_size)
         # print(-2,pitchf.shape,z_slice.shape)
+        print(z_slice.shape, pitchf.shape, self.segment_size, 'decoder inputs')
         o = self.dec(z_slice, pitchf, g=g)
+        print(o.shape, 'decoder outputs')
         return o, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
     def infer(self, phone, phone_lengths, pitch, nsff0, sid, max_len=None):
@@ -556,7 +558,9 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths)
         z_p = (m_p + torch.exp(logs_p) * torch.randn_like(m_p) * 0.66666) * x_mask
         z = self.flow(z_p, x_mask, g=g, reverse=True)
+        print(z.shape, nsff0.shape, 'decoder inputs')
         o = self.dec((z * x_mask)[:, :, :max_len], nsff0, g=g)
+        print(o.shape, 'decoder outputs')
         return o, x_mask, (z, z_p, m_p, logs_p)
 
 

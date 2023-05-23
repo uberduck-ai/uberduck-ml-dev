@@ -12,17 +12,17 @@ def train_func(model, optim, criteria, project: str, config: dict):
     train_config = config["train"]
     data_config = config["data"]
 
-    print("CUDA AVAILABLE: ", torch.cuda.is_available())
-    if train_config["warmstart_checkpoint_path"] != "":
-        warmstart(train_config["warmstart_checkpoint_path"], model)
+    # print("CUDA AVAILABLE: ", torch.cuda.is_available())
+    # if train_config["warmstart_checkpoint_path"] != "":
+    #     warmstart(train_config["warmstart_checkpoint_path"], model)
 
-    # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
-    model = train.torch.prepare_model(
-        model, parallel_strategy_kwargs=dict(find_unused_parameters=True)
-    )
+    # # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
+    # model = train.torch.prepare_model(
+    #     model, parallel_strategy_kwargs=dict(find_unused_parameters=True)
+    # )
 
-    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-    train_dataloader = train.torch.prepare_data_loader(train_loader)
+    # # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    # # train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     logging_parameters = [
         train_config["log_decoder_samples"],

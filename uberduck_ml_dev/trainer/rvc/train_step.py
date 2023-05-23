@@ -55,6 +55,7 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     wave_lengths = to_gpu(wave_lengths)
     sid = to_gpu(sid)
     
+    print(phone.shape, phone_lengths, pitch.shape, pitchf.shape, spec.shape, spec_lengths)
     (
         y_hat,
         ids_slice,
@@ -62,6 +63,13 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
         z_mask,
         (z, z_p, m_p, logs_p, m_q, logs_q),
     ) = generator(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
+
+    # NOTE (Sam): I think we only train on a portion of the audio determined by the segment_size
+    wave = slice_segments(
+        wave, ids_slice * data_config['hop_length'], train_config['segment_size']
+    )  # slice
+
+    print(y_hat.shape, wave.shape ,'look here see \n\n\n\n')
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(wave, y_hat.detach())
     with autocast(enabled=False):
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
@@ -73,6 +81,7 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     grad_norm_d = clip_grad_value_(discriminator.parameters(), None)
     scaler.step(discriminator_optimizer)
 
+    # TODO (Sam): just compute mels directly in precompute like for RADTTS
     mel = spec_to_mel_torch(
         spec,
         data_config['filter_length'],
@@ -98,14 +107,14 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     if train_config['fp16_run'] == True:
         y_hat_mel = y_hat_mel.half()
     with autocast(enabled=train_config['fp16_run']):
-        # Generator
         y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(wave, y_hat)
-        with autocast(enabled=False):
-            loss_mel = l1_loss(y_mel, y_hat_mel) * train_config['c_mel']
-            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config['c_kl']
-            loss_fm = feature_loss(fmap_r, fmap_g)
-            loss_gen, losses_gen = generator_loss(y_d_hat_g)
-            loss_gen_all = loss_gen * generator_loss_weight + loss_fm * feature_loss_weight + loss_mel * l1_loss_weight + loss_kl * kl_loss_weight
+        # NOTE (Sam): autocasting being on twice feels wrong.
+        # with autocast(enabled=False):
+        loss_mel = l1_loss(y_mel, y_hat_mel) * train_config['c_mel']
+        loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config['c_kl']
+        loss_fm = feature_loss(fmap_r, fmap_g)
+        loss_gen, losses_gen = generator_loss(y_d_hat_g)
+        loss_gen_all = loss_gen * generator_loss_weight + loss_fm * feature_loss_weight + loss_mel * l1_loss_weight + loss_kl * kl_loss_weight
     generator_optimizer.zero_grad()
     scaler.scale(loss_gen_all).backward()
     scaler.unscale_(generator_optimizer)
