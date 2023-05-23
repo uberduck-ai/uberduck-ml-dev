@@ -1014,10 +1014,8 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
 
         len_phone = phone.size()[0]
         len_spec = spec.size()[-1]
-        # print(123,phone.shape,pitch.shape,spec.shape)
         if len_phone != len_spec:
             len_min = min(len_phone, len_spec)
-            # amor
             len_wav = len_min * self.hop_length
 
             spec = spec[:, :len_min]
@@ -1060,7 +1058,6 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         audio_norm = audio
 
         audio_norm = audio_norm.unsqueeze(0)
-        print(audio_norm.shape, 'audio_shape')
         spec = spectrogram_torch(
                 audio_norm,
                 self.filter_length,
@@ -1069,10 +1066,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
                 self.win_length,
                 center=False,
             )
-        print(spec.shape, 'spec_shape')
         spec = torch.squeeze(spec, 0)
-        print(spec.shape)
-            # torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
         return spec, audio_norm
 
     def __getitem__(self, index):

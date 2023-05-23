@@ -55,7 +55,6 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     wave_lengths = to_gpu(wave_lengths)
     sid = to_gpu(sid)
     
-    print(phone.shape, phone_lengths, pitch.shape, pitchf.shape, spec.shape, spec_lengths)
     (
         y_hat,
         ids_slice,
@@ -69,7 +68,6 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
         wave, ids_slice * data_config['hop_length'], train_config['segment_size']
     )  # slice
 
-    print(y_hat.shape, wave.shape ,'look here see \n\n\n\n')
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(wave, y_hat.detach())
     with autocast(enabled=False):
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
