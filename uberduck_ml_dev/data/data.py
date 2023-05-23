@@ -1030,12 +1030,15 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return (spec, wav, phone, pitch, pitchf, dv)
 
     def get_labels(self, phone, pitch, pitchf):
-        phone = np.load(phone)
-        phone = np.repeat(phone, 2, axis=0)
-        pitch = np.load(pitch)
-        pitchf = np.load(pitchf)
+        phone = np.asarray(torch.load(phone))
+        phone = np.repeat(phone, 2, axis=0) # janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
+        pitch = torch.load(pitch)
+        pitchf = torch.load(pitchf)
+        # phone = np.load(phone)
+        # phone = np.repeat(phone, 2, axis=0)
+        # pitch = np.load(pitch)
+        # pitchf = np.load(pitchf)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
-        # print(234,phone.shape,pitch.shape)
         phone = phone[:n_num, :]
         pitch = pitch[:n_num]
         pitchf = pitchf[:n_num]
@@ -1045,7 +1048,9 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
-        audio, sampling_rate = load_wav_to_torch(filename)
+        # audio, sampling_rate = load_wav_to_torch(filename)
+        sampling_rate = 40000 # necessary in RVC world
+        audio, _ = load_wav_to_torch(filename, sampling_rate) 
         if sampling_rate != self.sampling_rate:
             raise ValueError(
                 "{} SR doesn't match target {} SR".format(

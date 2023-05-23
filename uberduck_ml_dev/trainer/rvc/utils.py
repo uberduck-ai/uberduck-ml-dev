@@ -264,9 +264,10 @@ def plot_alignment_to_numpy(alignment, info=None):
     plt.close()
     return data
 
-
-def load_wav_to_torch(full_path):
-    sampling_rate, data = read(full_path)
+import librosa
+def load_wav_to_torch(full_path, sr = 22050):
+    # sampling_rate, data = read(full_path)
+    data, sampling_rate = librosa.load(full_path, sr=sr)
     return torch.FloatTensor(data.astype(np.float32)), sampling_rate
 
 
