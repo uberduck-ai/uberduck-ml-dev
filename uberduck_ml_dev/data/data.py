@@ -824,7 +824,6 @@ def get_f0_rvc(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
     f0 = pyworld.stonemask(x.astype(np.double), f0, t, sr)
     f0 = signal.medfilt(f0, 3)
     f0 *= pow(2, f0_up_key / 12)
-    # with open("test.txt","w")as f:f.write("\n".join([str(i)for i in f0.tolist()]))
     tf0 = sr // window  # 每秒f0点数
     if inp_f0 is not None:
         delta_t = np.round(
@@ -835,7 +834,6 @@ def get_f0_rvc(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
         )
         shape = f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)].shape[0]
         f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
-    # with open("test_opt.txt","w")as f:f.write("\n".join([str(i)for i in f0.tolist()]))
     f0bak = f0.copy()
     f0_mel = 1127 * np.log(1 + f0 / 700)
     f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (

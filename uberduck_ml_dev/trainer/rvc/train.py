@@ -67,6 +67,6 @@ DEFAULTS = {
     "c_mel": 45,
     "c_kl": 1.0,
     "steps_per_sample": 100,
-    "iters_per_checkpoint": 1000,
+    "iters_per_checkpoint": 100,
     "output_directory": "/tmp"
   }
