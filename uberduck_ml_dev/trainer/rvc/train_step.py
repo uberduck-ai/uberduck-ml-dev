@@ -1,6 +1,9 @@
 from torch.cuda.amp import autocast
 from uberduck_ml_dev.models.rvc.commons import clip_grad_value_, slice_segments
 from uberduck_ml_dev.data.utils import mel_spectrogram_torch, spec_to_mel_torch
+from ...utils.utils import (
+    to_gpu,
+)
 
 # TODO (Sam): add config arguments to model / optimization / logging and remove.
 # NOTE (Sam): passing dict arguments to functions is a bit of a code smell.
@@ -14,7 +17,7 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     discriminator_optimizer = optimization_parameters["optimizers"]["discriminator"]
     generator_optimizer = optimization_parameters["optimizers"]["generator"]
     scaler = optimization_parameters["scaler"]
-    discriminator_loss = optimization_parameters["losses"]["discriminator"]
+    discriminator_loss = optimization_parameters["losses"]["discriminator"]['loss']
     # NOTE (Sam): losses like l1_loss are quite generic outside of the arguments passed.
     # The reason to pass the loss as a parameter rather than import it is to reuse the _train_step function for different losses.
     # However, explicit assignments render that goal currently only half attained.
@@ -29,6 +32,8 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     kl_loss = optimization_parameters["losses"]["kl"]['loss']
     kl_loss_weight = optimization_parameters["losses"]["kl"]['weight']
 
+
+    # TODO (Sam): make this a dict or better-yet a batch class.
     (phone,
     phone_lengths,
     pitch,
@@ -38,6 +43,18 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     wave,
     wave_lengths,
     sid) = batch
+
+    # TODO (Sam): move to batch.go_gpu().
+    phone = to_gpu(phone)
+    phone_lengths = to_gpu(phone_lengths)
+    pitch = to_gpu(pitch)
+    pitchf = to_gpu(pitchf)
+    spec = to_gpu(spec)
+    spec_lengths = to_gpu(spec_lengths)
+    wave = to_gpu(wave)
+    wave_lengths = to_gpu(wave_lengths)
+    sid = to_gpu(sid)
+    
     (
         y_hat,
         ids_slice,
@@ -80,7 +97,7 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
         )
     if train_config['fp16_run'] == True:
         y_hat_mel = y_hat_mel.half()
-    with autocast(enabled=optimization_parameters['fp16_run']):
+    with autocast(enabled=train_config['fp16_run']):
         # Generator
         y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(wave, y_hat)
         with autocast(enabled=False):

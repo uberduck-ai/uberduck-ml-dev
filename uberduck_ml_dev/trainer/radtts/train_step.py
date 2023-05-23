@@ -41,7 +41,6 @@ def _train_step(
 
     with autocast(enabled=False):
         batch_dict = batch  # torch DataLoader?
-        # batch_dict = collate_fn(batch) # ray dataset?
         # TODO (Sam): move to batch.go_gpu().
         mel = to_gpu(batch_dict["mel"])
         speaker_ids = to_gpu(batch_dict["speaker_ids"])

@@ -10,9 +10,7 @@ def train_epoch(
     logging_parameters,
     iteration,
 ):
-    print(2+2)
     for batch in dataloader:
-        print('batch', batch)
         _train_step(
             batch,
             config,

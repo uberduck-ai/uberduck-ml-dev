@@ -108,6 +108,7 @@ class Collate:
             gst=embedded_gsts,
             f0=f0_padded,
         )
+        # NOTE (Sam): don't think we can always call cuda here due to "forked subprocess" error.
         if self.cudnn_enabled:
             output = output.to_gpu()
         return output
@@ -251,6 +252,7 @@ class TextAudioCollateMultiNSFsid:
 
     def __init__(self, return_ids=False):
         self.return_ids = return_ids
+        self.cudnn_enabled = True
 
     def __call__(self, batch):
         """Collate's training batch from normalized text and aduio
@@ -307,6 +309,18 @@ class TextAudioCollateMultiNSFsid:
 
             # dv[i] = row[5]
             sid[i] = row[5]
+
+        # forked subprocess
+        # if self.cudnn_enabled:
+        #     phone_padded = phone_padded.cuda()
+        #     phone_lengths = phone_lengths.cuda()
+        #     pitch_padded = pitch_padded.cuda()
+        #     pitchf_padded = pitchf_padded.cuda()
+        #     spec_padded = spec_padded.cuda()
+        #     spec_lengths = spec_lengths.cuda()
+        #     wave_padded = wave_padded.cuda()
+        #     wave_lengths = wave_lengths.cuda()
+        #     sid=sid.cuda()
 
         return (
             phone_padded,
