@@ -805,10 +805,13 @@ def get_f0_pvoiced(
     voiced_mask = torch.FloatTensor(voiced_mask)
     return f0, voiced_mask, p_voiced
 
-# NOTE (Sam): for some reason the RVC data processing using pyworld why we use parselmouth for inference.
+# NOTE (Sam): I believed that the RVC data processing using pyworld why we use parselmouth for inference.
+# On second thought this might not be true.
+# I'm going to add parselmouth.
+# Results seem discongruent in pitch and time scaling, while parselmouth also seems cleaner.
 import pyworld
 import scipy.signal as signal
-def get_f0_rvc(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
+def get_f0_pyworld(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
     x_pad = 1
     f0_min = 50
     f0_max = 1100
@@ -844,13 +847,77 @@ def get_f0_rvc(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
     f0_coarse = np.rint(f0_mel).astype(np.int)
     return f0_coarse, f0bak  # 1-0
 
+import librosa
+import parselmouth
+def get_f0_parselmouth(x, hop_length, f0_up_key=0):
+    p_len = x.shape[0] // hop_length
+    time_step = 160 / 16000 * 1000
+    f0_min = 50
+    f0_max = 1100
+    f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+    f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+
+    f0 = (
+        parselmouth.Sound(x, 16000)
+        .to_pitch_ac(
+            time_step=time_step / 1000,
+            voicing_threshold=0.6,
+            pitch_floor=f0_min,
+            pitch_ceiling=f0_max,
+        )
+        .selected_array["frequency"]
+    )
+
+    pad_size = (p_len - len(f0) + 1) // 2
+    if pad_size > 0 or p_len - len(f0) - pad_size > 0:
+        f0 = np.pad(f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant")
+    f0 *= pow(2, f0_up_key / 12)
+    f0bak = f0.copy()
+
+    f0_mel = 1127 * np.log(1 + f0 / 700)
+    f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
+        f0_mel_max - f0_mel_min
+    ) + 1
+    f0_mel[f0_mel <= 1] = 1
+    f0_mel[f0_mel > 255] = 255
+    # f0_mel[f0_mel > 188] = 188
+    f0_coarse = np.rint(f0_mel).astype(np.int)
+    # NOTE (Sam): I think this is pitch, pitchf
+    return f0_coarse, f0bak
+
+# def get_f0_parselmouth(path, hop):
+#     x, sr = librosa.load(path, 16000)  # , res_type='soxr_vhq'
+#     p_len = x.shape[0] // hop
+#     time_step = 160 / 16000 * 1000
+#     f0_min = 50
+#     f0_max = 1100
+#     f0 = (
+#         parselmouth.Sound(x, sr)
+#         .to_pitch_ac(
+#             time_step=time_step / 1000,
+#             voicing_threshold=0.6,
+#             pitch_floor=f0_min,
+#             pitch_ceiling=f0_max,
+#         )
+#         .selected_array["frequency"]
+#     )
+#     pad_size = (p_len - len(f0) + 1) // 2
+#     if pad_size > 0 or p_len - len(f0) - pad_size > 0:
+#         f0 = np.pad(
+#             f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
+#         )
+#     return f0
+
 class DataPitch:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
-    # NOTE (Sam): method here reflects the model type this was actually used for and is not the actual pitch method.
+    # NOTE (Sam): method here was supposed to reflect the model type this was actually used for and is not the actual pitch method.
+    # TODO (Sam): but now I'm adding parselmouth from rvc so it should be changed to reflect that.
     def __init__(self, data_config = None, audiopaths = None, subpath_truncation=41, method = 'radtts'):
+
+        self.hop_length = data_config["hop_length"]
         if method == 'radtts':
-            self.hop_length = data_config["hop_length"]
+            
             self.f0_min = data_config["f0_min"]
             self.f0_max = data_config["f0_max"]
             self.frame_length = data_config["filter_length"]
@@ -873,7 +940,8 @@ class DataPitch:
             )
 
         if self.method == 'rvc':
-            pitch, pitchf  = get_f0_rvc(data, f0_up_key = 0 )
+            
+            pitch, pitchf  = get_f0_pyworld(data, f0_up_key = 0 )
             torch.save(pitchf, f"{sub_path}/f0f.pt")
             # sample_lower = chunk_idx * 16000
             # sample_upper = (chunk_idx + CHUNK_SIZE_SECONDS) * 16000
@@ -882,6 +950,10 @@ class DataPitch:
             # p_len = audio_pad.shape[0] // vc.window_size
             # pitch, pitchf = vc.get_f0(data, p_len, f0_up_key, 'pm', None)
 
+        if self.method == "parselmouth":
+            pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
+            torch.save(pitchf, f"{sub_path}/f0f.pt")
+            
         pitch_path_local = f"{sub_path}/f0.pt"
         torch.save(pitch, pitch_path_local)
 
