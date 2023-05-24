@@ -913,7 +913,7 @@ class DataPitch:
     # /tmp/{uuid}/resampled_unnormalized.wav
     # NOTE (Sam): method here was supposed to reflect the model type this was actually used for and is not the actual pitch method.
     # TODO (Sam): but now I'm adding parselmouth from rvc so it should be changed to reflect that.
-    def __init__(self, data_config = None, audiopaths = None, subpath_truncation=41, method = 'radtts'):
+    def __init__(self, data_config = None, audiopaths = None, subpath_truncation=41, method = 'radtts', sample_rate = None):
 
         self.hop_length = data_config["hop_length"]
         if method == 'radtts':
@@ -924,11 +924,16 @@ class DataPitch:
         self.audiopaths = audiopaths
         self.subpath_truncation = subpath_truncation
         self.method = method
+        self.sample_rate = sample_rate
 
-    def _get_data(self, audiopath):
-        rate, data = read(audiopath)
+    def _get_data(self, audiopath, sample_rate = None):
+        # rate, data = read(audiopath)
+        if sample_rate is not None:
+            data, rate = librosa.load(audiopath, sr=sample_rate)
+        else:
+            rate, data = read(audiopath) 
         sub_path = audiopath[: self.subpath_truncation]
-        print('sub_path', sub_path, 'what')
+        print('sub_path', sub_path)
         if self.method == "radtts":
             pitch = get_f0_pvoiced(
                 data,
@@ -953,13 +958,13 @@ class DataPitch:
         if self.method == "parselmouth":
             pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
             torch.save(pitchf, f"{sub_path}/f0f.pt")
-            
+
         pitch_path_local = f"{sub_path}/f0.pt"
         torch.save(pitch, pitch_path_local)
 
     def __getitem__(self, idx):
         try:
-            self._get_data(audiopath=self.audiopaths[idx])
+            self._get_data(audiopath=self.audiopaths[idx], sample_rate=self.sample_rate)
 
         except Exception as e:
             print(f"Error while getting data: index = {idx}")

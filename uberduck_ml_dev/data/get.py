@@ -3,9 +3,12 @@ from torch.utils.data import DataLoader
 from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
 from uberduck_ml_dev.data.collate import CollateBlank
 
-def get_pitchesf(paths, data_config = None, subpath_truncation=41):
+# NOTE (Sam): this is a horrible name for a function thats borrowed from a bad name from rvc and yet somehow now even worse
+# since it gets "pitch" and "pitchf" (which are terms we should remove since they are unclear).
+# TODO (Sam): rename this to get_pitches
+def get_pitchesf(paths, data_config = None, subpath_truncation=41, method = 'parselmouth', sample_rate = 16000):
     data = DataPitch(
-        audiopaths=paths, data_config=data_config, subpath_truncation=subpath_truncation, method = 'rvc'
+        audiopaths=paths, data_config=data_config, subpath_truncation=subpath_truncation, method = method, sample_rate = sample_rate
     )
     get_parallel_torch(data)
 
