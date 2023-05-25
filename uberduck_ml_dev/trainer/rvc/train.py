@@ -1,53 +1,101 @@
 import torch
 from torch.cuda.amp import GradScaler
 from ray.air.integrations.wandb import setup_wandb
-import ray.train as train
+from torch.utils.data import DataLoader
+from torch.nn import functional as F
 
 from .train_epoch import train_epoch
-# from .load import prepare_dataloaders, warmstart
+from uberduck_ml_dev.models.rvc.rvc import SynthesizerTrnMs256NSFsid, MultiPeriodDiscriminator
+from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
+from uberduck_ml_dev.data.data import TextAudioLoaderMultiNSFsid, DistributedBucketSampler
+from uberduck_ml_dev.data.collate import TextAudioCollateMultiNSFsid
+from uberduck_ml_dev.losses_rvc import generator_loss, discriminator_loss, feature_loss, kl_loss
+from uberduck_ml_dev.trainer.rvc.train_epoch import train_epoch
 
 
-# def train_func(model, optim, criteria, project: str, config: dict):
-#     setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
-#     train_config = config["train"]
-#     data_config = config["data"]
+def train_func(config: dict, project: str = 'rvc'):
 
-#     # print("CUDA AVAILABLE: ", torch.cuda.is_available())
-#     # if train_config["warmstart_checkpoint_path"] != "":
-#     #     warmstart(train_config["warmstart_checkpoint_path"], model)
+    setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
+    train_config = config["train"]
+    model_config = config["model"]
+    data_config = config["data"]    
 
-#     # # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
-#     # model = train.torch.prepare_model(
-#     #     model, parallel_strategy_kwargs=dict(find_unused_parameters=True)
-#     # )
+    generator = SynthesizerTrnMs256NSFsid(
+        data_config['filter_length'] // 2 + 1,
+        train_config['segment_size'] // data_config['hop_length'],
+        **model_config,
+        is_half=train_config['fp16_run'],
+        sr=data_config['sampling_rate'],
+    )
 
-#     # # train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
-#     # # train_dataloader = train.torch.prepare_data_loader(train_loader)
+    discriminator = MultiPeriodDiscriminator(model_config['use_spectral_norm'])
+    generator_optimizer = torch.optim.AdamW(
+        generator.parameters(),
+        train_config['learning_rate'],
+        betas=train_config['betas'],
+        eps=train_config['eps'],
+    )
 
-#     logging_parameters = [
-#         train_config["log_decoder_samples"],
-#         train_config["log_attribute_samples"],
-#         train_config["iters_per_checkpoint"],
-#         train_config["output_directory"],
-#         train_config["steps_per_sample"],
-#     ]
-#     optimization_parameters = [
-#         optim,
-#         GradScaler(),
-#         criterion,
-#         train_config["kl_loss_start_iter"],
-#         train_config["binarization_start_iter"],
-#     ]
-#     iteration = 0
-#     start_epoch = 0
-#     for epoch in range(start_epoch, start_epoch + train_config["epochs"]):
-#         iteration = train_epoch(
-#             train_dataloader,
-#             logging_parameters,
-#             model,
-#             optimization_parameters,
-#             iteration,
-#         )
+    discriminator_optimizer = torch.optim.AdamW(
+        discriminator.parameters(),
+        train_config['learning_rate'],
+        betas=train_config['betas'],
+        eps=train_config['eps'],
+    )
+
+    # TODO (Sam): move to "warmstart" or "load_checkpoint" functions
+    generator_checkpoint = torch.load(train_config['warmstart_G_checkpoint_path'])['weight']
+    discriminator_checkpoint = torch.load(train_config['warmstart_D_checkpoint_path'])['model']
+    discriminator.load_state_dict(discriminator_checkpoint)    
+    generator.load_state_dict(generator_checkpoint, strict = False) # NOTE (Sam): a handful of "enc_q" decoder states not present - doesn't seem to cause an issue
+    generator = generator.cuda()
+    discriminator = discriminator.cuda()
+    models = {'generator': generator, 'discriminator': discriminator}
+
+    train_dataset = TextAudioLoaderMultiNSFsid(train_config['filelist_path'], HParams(**data_config)) # dv is sid
+    collate_fn = TextAudioCollateMultiNSFsid()
+    n_gpus = 1
+    train_sampler = DistributedBucketSampler(
+        train_dataset,
+        train_config['batch_size'] * n_gpus,
+        [100, 200, 300, 400, 500, 600, 700, 800, 900],  # 16s
+        num_replicas=n_gpus,
+        rank=0,
+        shuffle=True,
+    )
+    train_loader = DataLoader(
+        train_dataset,
+        num_workers=1,
+        shuffle=False,
+        pin_memory=True,
+        collate_fn=collate_fn,
+        batch_sampler=train_sampler,
+        persistent_workers=True,
+        prefetch_factor=8,
+    )
+    optimization_parameters = {'optimizers': {"generator": generator_optimizer,
+                                            "discriminator": discriminator_optimizer},
+                            "scaler": GradScaler(),
+                            # NOTE (Sam): need to pass names rather than vector of losses since arguments differ
+                            "losses": {'l1': {'loss': F.l1_loss, 'weight': 1.},
+                                      'kl': {'loss': kl_loss, 'weight': 1.},
+                                      'feature': {'loss' : feature_loss, 'weight': 1.},
+                                      'generator': {'loss': generator_loss, 'weight': 1.},
+                                      'discriminator': {'loss': discriminator_loss, 'weight': 1}}
+                            }
+    
+
+    iteration = 0
+    start_epoch = 0
+    for epoch in range(start_epoch, train_config['epochs']):
+        iteration = train_epoch(
+            train_loader,
+            config,
+            models,
+            optimization_parameters,
+            logging_parameters = {},
+            iteration = iteration,
+        )
 
 
 # 40k config
