@@ -284,7 +284,6 @@ class TextAudioCollateMultiNSFsid:
         phone_padded.zero_()
         pitch_padded.zero_()
         pitchf_padded.zero_()
-        # dv = torch.FloatTensor(len(batch), 256)#gin=256
         sid = torch.LongTensor(len(batch))
 
         for i in range(len(ids_sorted_decreasing)):
@@ -307,20 +306,7 @@ class TextAudioCollateMultiNSFsid:
             pitchf = row[4]
             pitchf_padded[i, : pitchf.size(0)] = pitchf
 
-            # dv[i] = row[5]
             sid[i] = row[5]
-
-        # forked subprocess
-        # if self.cudnn_enabled:
-        #     phone_padded = phone_padded.cuda()
-        #     phone_lengths = phone_lengths.cuda()
-        #     pitch_padded = pitch_padded.cuda()
-        #     pitchf_padded = pitchf_padded.cuda()
-        #     spec_padded = spec_padded.cuda()
-        #     spec_lengths = spec_lengths.cuda()
-        #     wave_padded = wave_padded.cuda()
-        #     wave_lengths = wave_lengths.cuda()
-        #     sid=sid.cuda()
 
         return (
             phone_padded,
@@ -331,6 +317,5 @@ class TextAudioCollateMultiNSFsid:
             spec_lengths,
             wave_padded,
             wave_lengths,
-            # dv
-            sid,
+            sid, # nee "dv"
         )
