@@ -42,8 +42,6 @@ def train_func(config: dict):
     )
 
     start_epoch = 0
-
-    # NOTE (Sam): uncomment to run with torch DataLoader rather than ray dataset
     train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
     train_dataloader = train.torch.prepare_data_loader(train_loader)
 

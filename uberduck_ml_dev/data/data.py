@@ -1,15 +1,17 @@
 import torch
 import os
-from typing import List, Optional, Dict
+from typing import List, Optional
+import lmdb
+import pickle as pkl
+
 from torch.utils.data import Dataset
 from einops import rearrange
 from scipy.io.wavfile import read
 from scipy.ndimage import distance_transform_edt as distance_transform
 import numpy as np
+import librosa
 from librosa import pyin
-import lmdb
-import pickle as pkl
-
+import parselmouth
 
 from ..models.common import MelSTFT
 from ..utils.utils import (
@@ -806,34 +808,145 @@ def get_f0_pvoiced(
     return f0, voiced_mask, p_voiced
 
 
+# NOTE (Sam): I believed that the RVC data processing using pyworld why we use parselmouth for inference.
+# On second thought this might not have been true - the issue was a result of sampling rate.
+# Results were improved by using parselmouth with the fixed sample rate.
+# Librosa (pyin), pyworld (harvest), and crepe have not been tested.
+# Cris recommends harvest with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
+# Since there is a fair amount of confusion and we aren't using it currently, I'm removing the pyworld dependency for now.
+# import pyworld
+# import scipy.signal as signal
+# def get_f0_pyworld(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
+#     x_pad = 1
+#     f0_min = 50
+#     f0_max = 1100
+#     f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+#     f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+#     f0, t = pyworld.harvest(
+#         x.astype(np.double),
+#         fs=sr,
+#         f0_ceil=f0_max,
+#         f0_floor=f0_min,
+#         frame_period=10,
+#     )
+#     f0 = pyworld.stonemask(x.astype(np.double), f0, t, sr)
+#     f0 = signal.medfilt(f0, 3)
+#     f0 *= pow(2, f0_up_key / 12)
+#     tf0 = sr // window  # 每秒f0点数
+#     if inp_f0 is not None:
+#         delta_t = np.round(
+#             (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
+#         ).astype("int16")
+#         replace_f0 = np.interp(
+#             list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
+#         )
+#         shape = f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)].shape[0]
+#         f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
+#     f0bak = f0.copy()
+#     f0_mel = 1127 * np.log(1 + f0 / 700)
+#     f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
+#         f0_mel_max - f0_mel_min
+#     ) + 1
+#     f0_mel[f0_mel <= 1] = 1
+#     f0_mel[f0_mel > 255] = 255
+#     f0_coarse = np.rint(f0_mel).astype(np.int)
+#     return f0_coarse, f0bak  # 1-0 (a.k.a. pitch, pitchf from RVC)
+
+
+
+
+# NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
+def get_f0_parselmouth(x, hop_length, f0_up_key=0):
+    p_len = x.shape[0] // hop_length
+    time_step = 160 / 16000 * 1000
+    f0_min = 50
+    f0_max = 1100
+    f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+    f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+
+    f0 = (
+        parselmouth.Sound(x, 16000)
+        .to_pitch_ac(
+            time_step=time_step / 1000,
+            voicing_threshold=0.6,
+            pitch_floor=f0_min,
+            pitch_ceiling=f0_max,
+        )
+        .selected_array["frequency"]
+    )
+
+    pad_size = (p_len - len(f0) + 1) // 2
+    if pad_size > 0 or p_len - len(f0) - pad_size > 0:
+        f0 = np.pad(f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant")
+    f0 *= pow(2, f0_up_key / 12)
+    f0bak = f0.copy()
+
+    f0_mel = 1127 * np.log(1 + f0 / 700)
+    f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
+        f0_mel_max - f0_mel_min
+    ) + 1
+    f0_mel[f0_mel <= 1] = 1
+    f0_mel[f0_mel > 255] = 255
+    # f0_mel[f0_mel > 188] = 188
+    f0_coarse = np.rint(f0_mel).astype(np.int)
+    # NOTE (Sam): I think this is pitch, pitchf
+    return f0_coarse, f0bak
+
+
 class DataPitch:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
-    def __init__(self, data_config, audiopaths, subpath_truncation=41):
+    # TODO (Sam): method here should reflect pitch method (e.g. parselmouth, pyworld, etc.) and not model type (e.g. radtts)
+    # TODO (Sam): consider add padding as in models.rvc.vc
+    def __init__(
+        self,
+        data_config=None,
+        audiopaths=None,
+        subpath_truncation=41,
+        method="radtts",
+        sample_rate=None,
+    ):
         self.hop_length = data_config["hop_length"]
-        self.f0_min = data_config["f0_min"]
-        self.f0_max = data_config["f0_max"]
-        self.frame_length = data_config["filter_length"]
+        if method == "radtts":
+            self.f0_min = data_config["f0_min"]
+            self.f0_max = data_config["f0_max"]
+            self.frame_length = data_config["filter_length"]
         self.audiopaths = audiopaths
         self.subpath_truncation = subpath_truncation
+        self.method = method
+        self.sample_rate = sample_rate
 
-    def _get_data(self, audiopath):
-        rate, data = read(audiopath)
+    def _get_data(self, audiopath, sample_rate=None):
+        if sample_rate is not None:
+            data, rate = librosa.load(audiopath, sr=sample_rate)
+        else:
+            rate, data = read(audiopath)
         sub_path = audiopath[: self.subpath_truncation]
-        pitch = get_f0_pvoiced(
-            data,
-            f0_min=self.f0_min,
-            f0_max=self.f0_max,
-            hop_length=self.hop_length,
-            frame_length=self.frame_length,
-            sampling_rate=22050,
-        )
+        print("sub_path", sub_path)
+        if self.method == "radtts":
+            pitch = get_f0_pvoiced(
+                data,
+                f0_min=self.f0_min,
+                f0_max=self.f0_max,
+                hop_length=self.hop_length,
+                frame_length=self.frame_length,
+                sampling_rate=22050,
+            )
+
+        if self.method == "pyworld":
+            pitch, pitchf = get_f0_pyworld(data, f0_up_key=0)
+            torch.save(pitchf, f"{sub_path}/f0f.pt")
+
+        if self.method == "parselmouth":
+            pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
+            torch.save(pitchf, f"{sub_path}/f0f.pt")
+
         pitch_path_local = f"{sub_path}/f0.pt"
         torch.save(pitch, pitch_path_local)
 
     def __getitem__(self, idx):
         try:
-            self._get_data(audiopath=self.audiopaths[idx])
+            self._get_data(audiopath=self.audiopaths[idx], sample_rate=self.sample_rate)
 
         except Exception as e:
             print(f"Error while getting data: index = {idx}")
@@ -898,4 +1011,252 @@ RADTTS_DEFAULTS = {
     "betabinom_scaling_factor": 1.0,
     "distance_tx_unvoiced": False,
     "mel_noise_scale": 0.0,
+}
+
+
+# RVC
+from ..trainer.rvc.utils import load_wav_to_torch
+from .utils import spectrogram_torch
+
+
+class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
+    """
+    1) loads audio, text pairs
+    2) normalizes text and converts them to sequences of integers
+    3) computes spectrograms from audio files.
+    """
+
+    def __init__(self, audiopaths_and_text, hparams):
+        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text)
+        self.max_wav_value = hparams.max_wav_value
+        self.sampling_rate = hparams.sampling_rate
+        self.filter_length = hparams.filter_length
+        self.hop_length = hparams.hop_length
+        self.win_length = hparams.win_length
+        self.sampling_rate = hparams.sampling_rate
+        self.min_text_len = getattr(hparams, "min_text_len", 1)
+        self.max_text_len = getattr(hparams, "max_text_len", 5000)
+        self._filter()
+
+    def _filter(self):
+        """
+        Filter text & store spec lengths
+        """
+        # Store spectrogram lengths for Bucketing
+        # wav_length ~= file_size / (wav_channels * Bytes per dim) = file_size / (1 * 2)
+        # spec_length = wav_length // hop_length
+        audiopaths_and_text_new = []
+        lengths = []
+        for audiopath, text, pitch, pitchf, dv in self.audiopaths_and_text:
+            if self.min_text_len <= len(text) and len(text) <= self.max_text_len:
+                audiopaths_and_text_new.append([audiopath, text, pitch, pitchf, dv])
+                lengths.append(os.path.getsize(audiopath) // (2 * self.hop_length))
+        self.audiopaths_and_text = audiopaths_and_text_new
+        self.lengths = lengths
+
+    def get_sid(self, sid):
+        sid = torch.LongTensor([int(sid)])
+        return sid
+
+    def get_audio_text_pair(self, audiopath_and_text):
+        # separate filename and text
+        file = audiopath_and_text[0]
+        phone = audiopath_and_text[1]
+        pitch = audiopath_and_text[2]
+        pitchf = audiopath_and_text[3]
+        dv = audiopath_and_text[4]
+
+        phone, pitch, pitchf = self.get_labels(phone, pitch, pitchf)
+        spec, wav = self.get_audio(file)
+        dv = self.get_sid(dv)
+
+        len_phone = phone.size()[0]
+        len_spec = spec.size()[-1]
+        if len_phone != len_spec:
+            len_min = min(len_phone, len_spec)
+            len_wav = len_min * self.hop_length
+
+            spec = spec[:, :len_min]
+            wav = wav[:, :len_wav]
+
+            phone = phone[:len_min, :]
+            pitch = pitch[:len_min]
+            pitchf = pitchf[:len_min]
+
+        return (spec, wav, phone, pitch, pitchf, dv)
+
+    def get_labels(self, phone, pitch, pitchf):
+        phone = np.asarray(torch.load(phone))
+        phone = np.repeat(
+            phone, 2, axis=0
+        )  # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
+        pitch = torch.load(pitch)
+        pitchf = torch.load(pitchf)
+        n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
+        phone = phone[:n_num, :]
+        pitch = pitch[:n_num]
+        pitchf = pitchf[:n_num]
+        phone = torch.FloatTensor(phone)
+        pitch = torch.LongTensor(pitch)
+        pitchf = torch.FloatTensor(pitchf)
+        return phone, pitch, pitchf
+
+    def get_audio(self, filename):
+        audio, _ = load_wav_to_torch(filename, self.sampling_rate)
+        # NOTE (Sam): this was necessary when not using librosa load
+        # We should probably replace librosa.load with scipy.wavfile.read since it is unnecessarily slow.
+        # Then we can readd the assertion.
+        # if sampling_rate != :
+        #     raise ValueError(
+        #         "{} SR doesn't match target {} SR".format(
+        #             sampling_rate, self.sampling_rate
+        #         )
+        #     )
+        audio_norm = audio.unsqueeze(0)
+        spec = spectrogram_torch(
+            audio_norm,
+            self.filter_length,
+            self.sampling_rate,
+            self.hop_length,
+            self.win_length,
+            center=False,
+        )
+        spec = torch.squeeze(spec, 0)
+        return spec, audio_norm
+
+    def __getitem__(self, index):
+        return self.get_audio_text_pair(self.audiopaths_and_text[index])
+
+    def __len__(self):
+        return len(self.audiopaths_and_text)
+
+
+class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
+    """
+    Maintain similar input lengths in a batch.
+    Length groups are specified by boundaries.
+    Ex) boundaries = [b1, b2, b3] -> any batch is included either {x | b1 < length(x) <=b2} or {x | b2 < length(x) <= b3}.
+
+    It removes samples which are not included in the boundaries.
+    Ex) boundaries = [b1, b2, b3] -> any x s.t. length(x) <= b1 or length(x) > b3 are discarded.
+    """
+
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        boundaries,
+        num_replicas=None,
+        rank=None,
+        shuffle=True,
+    ):
+        super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)
+        self.lengths = dataset.lengths
+        self.batch_size = batch_size
+        self.boundaries = boundaries
+
+        self.buckets, self.num_samples_per_bucket = self._create_buckets()
+        self.total_size = sum(self.num_samples_per_bucket)
+        self.num_samples = self.total_size // self.num_replicas
+
+    def _create_buckets(self):
+        buckets = [[] for _ in range(len(self.boundaries) - 1)]
+        for i in range(len(self.lengths)):
+            length = self.lengths[i]
+            idx_bucket = self._bisect(length)
+            if idx_bucket != -1:
+                buckets[idx_bucket].append(i)
+
+        for i in range(len(buckets) - 1, -1, -1):  #
+            if len(buckets[i]) == 0:
+                buckets.pop(i)
+                self.boundaries.pop(i + 1)
+
+        num_samples_per_bucket = []
+        for i in range(len(buckets)):
+            len_bucket = len(buckets[i])
+            total_batch_size = self.num_replicas * self.batch_size
+            rem = (
+                total_batch_size - (len_bucket % total_batch_size)
+            ) % total_batch_size
+            num_samples_per_bucket.append(len_bucket + rem)
+        return buckets, num_samples_per_bucket
+
+    def __iter__(self):
+        # deterministically shuffle based on epoch
+        g = torch.Generator()
+        g.manual_seed(self.epoch)
+
+        indices = []
+        if self.shuffle:
+            for bucket in self.buckets:
+                indices.append(torch.randperm(len(bucket), generator=g).tolist())
+        else:
+            for bucket in self.buckets:
+                indices.append(list(range(len(bucket))))
+
+        batches = []
+        for i in range(len(self.buckets)):
+            bucket = self.buckets[i]
+            len_bucket = len(bucket)
+            ids_bucket = indices[i]
+            num_samples_bucket = self.num_samples_per_bucket[i]
+
+            # add extra samples to make it evenly divisible
+            rem = num_samples_bucket - len_bucket
+            ids_bucket = (
+                ids_bucket
+                + ids_bucket * (rem // len_bucket)
+                + ids_bucket[: (rem % len_bucket)]
+            )
+
+            # subsample
+            ids_bucket = ids_bucket[self.rank :: self.num_replicas]
+
+            # batching
+            for j in range(len(ids_bucket) // self.batch_size):
+                batch = [
+                    bucket[idx]
+                    for idx in ids_bucket[
+                        j * self.batch_size : (j + 1) * self.batch_size
+                    ]
+                ]
+                batches.append(batch)
+
+        if self.shuffle:
+            batch_ids = torch.randperm(len(batches), generator=g).tolist()
+            batches = [batches[i] for i in batch_ids]
+        self.batches = batches
+
+        assert len(self.batches) * self.batch_size == self.num_samples
+        return iter(self.batches)
+
+    def _bisect(self, x, lo=0, hi=None):
+        if hi is None:
+            hi = len(self.boundaries) - 1
+
+        if hi > lo:
+            mid = (hi + lo) // 2
+            if self.boundaries[mid] < x and x <= self.boundaries[mid + 1]:
+                return mid
+            elif x <= self.boundaries[mid]:
+                return self._bisect(x, lo, mid)
+            else:
+                return self._bisect(x, mid + 1, hi)
+        else:
+            return -1
+
+    def __len__(self):
+        return self.num_samples // self.batch_size
+
+
+RVC_DEFAULTS = {
+    "max_wav_value": 32768.0,
+    "sampling_rate": 40000,
+    "filter_length": 2048,
+    "hop_length": 400,
+    "win_length": 2048,
+    "n_mel_channels": 125,
+    "mel_fmin": 0.0,
+    "mel_fmax": None,
 }
