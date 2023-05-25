@@ -5,6 +5,7 @@ import torch
 from scipy.stats import betabinom
 from librosa.filters import mel as librosa_mel_fn
 
+
 def oversample(filepaths_text_sid, sid_to_weight):
     assert all([isinstance(sid, str) for sid in sid_to_weight.keys()])
     output = []
@@ -92,6 +93,7 @@ def get_shuffle_indices(levels):
 
 # RVC
 
+
 def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
     """
     PARAMS
@@ -121,6 +123,7 @@ def spectral_de_normalize_torch(magnitudes):
 # Reusable banks
 mel_basis = {}
 hann_window = {}
+
 
 # TODO (Sam): combine with identically-named function is models.common
 def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False):

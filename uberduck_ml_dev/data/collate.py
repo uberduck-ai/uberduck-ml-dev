@@ -317,5 +317,5 @@ class TextAudioCollateMultiNSFsid:
             spec_lengths,
             wave_padded,
             wave_lengths,
-            sid, # nee "dv"
+            sid,  # nee "dv"
         )

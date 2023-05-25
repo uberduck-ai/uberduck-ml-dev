@@ -2,7 +2,14 @@
 import torch
 
 
-def save_checkpoint(generator, generator_optimizer, discriminator, discriminator_optimizer, iteration, filepath):
+def save_checkpoint(
+    generator,
+    generator_optimizer,
+    discriminator,
+    discriminator_optimizer,
+    iteration,
+    filepath,
+):
     print(
         "Saving model and optimizer state at iteration {} to {}".format(
             iteration, filepath

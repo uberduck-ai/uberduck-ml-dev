@@ -5,7 +5,6 @@ from uberduck_ml_dev.data.collate import CollateBlank
 
 
 def get_parallel_torch(data):
-
     data_loader = DataLoader(data, batch_size=32, collate_fn=CollateBlank())
     for batch in data_loader:
         pass
@@ -55,8 +54,18 @@ def get_embeddings(
 
 
 # NOTE (Sam): pitch, pitchf == f0 coarse, f0bak in rvc parlance.
-def get_pitches(paths, data_config = None, subpath_truncation=41, method = 'parselmouth', sample_rate = 16000):
+def get_pitches(
+    paths,
+    data_config=None,
+    subpath_truncation=41,
+    method="parselmouth",
+    sample_rate=16000,
+):
     data = DataPitch(
-        audiopaths=paths, data_config=data_config, subpath_truncation=subpath_truncation, method = method, sample_rate = sample_rate
+        audiopaths=paths,
+        data_config=data_config,
+        subpath_truncation=subpath_truncation,
+        method=method,
+        sample_rate=sample_rate,
     )
     get_parallel_torch(data)

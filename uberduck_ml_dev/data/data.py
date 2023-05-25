@@ -739,6 +739,7 @@ from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
     get_pretrained_model,
 )
 
+
 class DataEmbedding:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
@@ -805,6 +806,7 @@ def get_f0_pvoiced(
     voiced_mask = torch.FloatTensor(voiced_mask)
     return f0, voiced_mask, p_voiced
 
+
 # NOTE (Sam): I believed that the RVC data processing using pyworld why we use parselmouth for inference.
 # On second thought this might not have been true - the issue was a result of sampling rate.
 # Results were improved by using parselmouth with the fixed sample rate.
@@ -850,6 +852,8 @@ def get_f0_pvoiced(
 #     return f0_coarse, f0bak  # 1-0 (a.k.a. pitch, pitchf from RVC)
 
 import parselmouth
+
+
 # NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
 def get_f0_parselmouth(x, hop_length, f0_up_key=0):
     p_len = x.shape[0] // hop_length
@@ -887,16 +891,22 @@ def get_f0_parselmouth(x, hop_length, f0_up_key=0):
     # NOTE (Sam): I think this is pitch, pitchf
     return f0_coarse, f0bak
 
+
 class DataPitch:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
     # TODO (Sam): method here should reflect pitch method (e.g. parselmouth, pyworld, etc.) and not model type (e.g. radtts)
     # TODO (Sam): consider add padding as in models.rvc.vc
-    def __init__(self, data_config = None, audiopaths = None, subpath_truncation=41, method = 'radtts', sample_rate = None):
-
+    def __init__(
+        self,
+        data_config=None,
+        audiopaths=None,
+        subpath_truncation=41,
+        method="radtts",
+        sample_rate=None,
+    ):
         self.hop_length = data_config["hop_length"]
-        if method == 'radtts':
-            
+        if method == "radtts":
             self.f0_min = data_config["f0_min"]
             self.f0_max = data_config["f0_max"]
             self.frame_length = data_config["filter_length"]
@@ -905,13 +915,13 @@ class DataPitch:
         self.method = method
         self.sample_rate = sample_rate
 
-    def _get_data(self, audiopath, sample_rate = None):
+    def _get_data(self, audiopath, sample_rate=None):
         if sample_rate is not None:
             data, rate = librosa.load(audiopath, sr=sample_rate)
         else:
-            rate, data = read(audiopath) 
+            rate, data = read(audiopath)
         sub_path = audiopath[: self.subpath_truncation]
-        print('sub_path', sub_path)
+        print("sub_path", sub_path)
         if self.method == "radtts":
             pitch = get_f0_pvoiced(
                 data,
@@ -922,9 +932,8 @@ class DataPitch:
                 sampling_rate=22050,
             )
 
-        if self.method == 'pyworld':
-            
-            pitch, pitchf  = get_f0_pyworld(data, f0_up_key = 0 )
+        if self.method == "pyworld":
+            pitch, pitchf = get_f0_pyworld(data, f0_up_key=0)
             torch.save(pitchf, f"{sub_path}/f0f.pt")
 
         if self.method == "parselmouth":
@@ -1008,6 +1017,7 @@ RADTTS_DEFAULTS = {
 from ..trainer.rvc.utils import load_wav_to_torch
 from .utils import spectrogram_torch
 
+
 class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
     """
     1) loads audio, text pairs
@@ -1076,7 +1086,9 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
 
     def get_labels(self, phone, pitch, pitchf):
         phone = np.asarray(torch.load(phone))
-        phone = np.repeat(phone, 2, axis=0) # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
+        phone = np.repeat(
+            phone, 2, axis=0
+        )  # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
         pitch = torch.load(pitch)
         pitchf = torch.load(pitchf)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
@@ -1089,7 +1101,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
-        audio, _ = load_wav_to_torch(filename, self.sampling_rate) 
+        audio, _ = load_wav_to_torch(filename, self.sampling_rate)
         # NOTE (Sam): this was necessary when not using librosa load
         # We should probably replace librosa.load with scipy.wavfile.read since it is unnecessarily slow.
         # Then we can readd the assertion.
@@ -1101,13 +1113,13 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         #     )
         audio_norm = audio.unsqueeze(0)
         spec = spectrogram_torch(
-                audio_norm,
-                self.filter_length,
-                self.sampling_rate,
-                self.hop_length,
-                self.win_length,
-                center=False,
-            )
+            audio_norm,
+            self.filter_length,
+            self.sampling_rate,
+            self.hop_length,
+            self.win_length,
+            center=False,
+        )
         spec = torch.squeeze(spec, 0)
         return spec, audio_norm
 
@@ -1116,9 +1128,6 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.audiopaths_and_text)
-
-
-
 
 
 class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
@@ -1238,9 +1247,9 @@ class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
 
     def __len__(self):
         return self.num_samples // self.batch_size
-    
 
-RVC_DEFAULTS =  {
+
+RVC_DEFAULTS = {
     "max_wav_value": 32768.0,
     "sampling_rate": 40000,
     "filter_length": 2048,
@@ -1248,5 +1257,5 @@ RVC_DEFAULTS =  {
     "win_length": 2048,
     "n_mel_channels": 125,
     "mel_fmin": 0.0,
-    "mel_fmax": None
-  }
+    "mel_fmax": None,
+}

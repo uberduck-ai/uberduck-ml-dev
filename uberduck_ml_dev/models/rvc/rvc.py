@@ -534,10 +534,8 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         self.flow.remove_weight_norm()
         self.enc_q.remove_weight_norm()
 
-    def forward(
-        self, phone, phone_lengths, pitch, pitchf, y, y_lengths, ds
-    ): 
-        g = self.emb_g(ds).unsqueeze(-1)  
+    def forward(self, phone, phone_lengths, pitch, pitchf, y, y_lengths, ds):
+        g = self.emb_g(ds).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths)
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         z_p = self.flow(z, y_mask, g=g)
@@ -705,12 +703,12 @@ DEFAULTS = {
     "kernel_size": 3,
     "p_dropout": 0,
     "resblock": "1",
-    "resblock_kernel_sizes": [3,7,11],
-    "resblock_dilation_sizes": [[1,3,5], [1,3,5], [1,3,5]],
-    "upsample_rates": [10,10,2,2],
+    "resblock_kernel_sizes": [3, 7, 11],
+    "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+    "upsample_rates": [10, 10, 2, 2],
     "upsample_initial_channel": 512,
-    "upsample_kernel_sizes": [16,16,4,4],
+    "upsample_kernel_sizes": [16, 16, 4, 4],
     "use_spectral_norm": False,
     "gin_channels": 256,
-    "spk_embed_dim": 109
-  }
+    "spk_embed_dim": 109,
+}

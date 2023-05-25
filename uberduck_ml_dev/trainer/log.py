@@ -2,9 +2,9 @@ import torch
 import wandb
 from ray.air import session
 
+
 @torch.no_grad()
 def log(metrics, audios={}):
-    
     wandb_metrics = dict(metrics)
 
     for k, v in audios.items():
