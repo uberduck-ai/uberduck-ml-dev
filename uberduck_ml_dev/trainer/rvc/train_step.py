@@ -1,5 +1,6 @@
 from torch.cuda.amp import autocast
 from ray.air import session
+from datetime import datetime
 
 from uberduck_ml_dev.models.rvc.commons import clip_grad_value_, slice_segments
 from uberduck_ml_dev.data.utils import mel_spectrogram_torch, spec_to_mel_torch
@@ -48,7 +49,8 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     wave_lengths,
     sid) = batch
 
-    # TODO (Sam): move to batch.go_gpu().
+    # NOTE (Sam): moving to gpu needs to be done in the training step not in the collate function (i.e. here).
+    # TODO (Sam): move to batch.to_gpu().
     phone = to_gpu(phone)
     phone_lengths = to_gpu(phone_lengths)
     pitch = to_gpu(pitch)
@@ -67,10 +69,10 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
         (z, z_p, m_p, logs_p, m_q, logs_q),
     ) = generator(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
 
-    # NOTE (Sam): I think we only train on a portion of the audio determined by the segment_size
+    # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
     wave = slice_segments(
         wave, ids_slice * data_config['hop_length'], train_config['segment_size']
-    )  # slice
+    )  
 
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(wave, y_hat.detach())
     with autocast(enabled=False):
@@ -110,8 +112,6 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
         y_hat_mel = y_hat_mel.half()
     with autocast(enabled=train_config['fp16_run']):
         y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(wave, y_hat)
-        # NOTE (Sam): autocasting being on twice feels wrong.
-        # with autocast(enabled=False):
         loss_mel = l1_loss(y_mel, y_hat_mel) * train_config['c_mel']
         loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config['c_kl']
         loss_fm = feature_loss(fmap_r, fmap_g)
@@ -126,8 +126,7 @@ def _train_step(batch, config, models, optimization_parameters, logging_paramete
     scaler.update()
 
     metrics = {"generator loss": loss_gen_all}
-
-    from datetime import datetime
+    
     print("iteration: ", iteration, datetime.now())
     log_sample = iteration % train_config['steps_per_sample'] == 0
     log_checkpoint = iteration % train_config['iters_per_checkpoint'] == 0

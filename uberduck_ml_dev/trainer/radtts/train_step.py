@@ -147,7 +147,6 @@ def _train_step(
     else:
         log(metrics)
 
-    # session.report(metrics) # NOTE (Sam): this is for ray trainer.
     if log_checkpoint and session.get_world_rank() == 0:
         checkpoint_path = f"{output_directory}/model_{iteration}.pt"
         save_checkpoint(model, optim, iteration, checkpoint_path)
