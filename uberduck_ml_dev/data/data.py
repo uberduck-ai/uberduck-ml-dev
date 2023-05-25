@@ -1,6 +1,9 @@
 import torch
 import os
-from typing import List, Optional, Dict
+from typing import List, Optional
+import lmdb
+import pickle as pkl
+
 from torch.utils.data import Dataset
 from einops import rearrange
 from scipy.io.wavfile import read
@@ -8,9 +11,7 @@ from scipy.ndimage import distance_transform_edt as distance_transform
 import numpy as np
 import librosa
 from librosa import pyin
-import lmdb
-import pickle as pkl
-
+import parselmouth
 
 from ..models.common import MelSTFT
 from ..utils.utils import (
@@ -851,7 +852,7 @@ def get_f0_pvoiced(
 #     f0_coarse = np.rint(f0_mel).astype(np.int)
 #     return f0_coarse, f0bak  # 1-0 (a.k.a. pitch, pitchf from RVC)
 
-import parselmouth
+
 
 
 # NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
