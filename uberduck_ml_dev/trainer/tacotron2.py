@@ -701,7 +701,7 @@ class Tacotron2Trainer(TTSTrainer):
             "cudnn_enabled": self.cudnn_enabled,
         }
 
-# NOTE (Sam): worth considering only keeping trainer params here.
+# NOTE (Sam): I think we should only keep trainer params here (i.e. not update model params).
 config = TRAINER_DEFAULTS.values()
 config.update(TACOTRON2_DEFAULTS.values())
 config.update(
