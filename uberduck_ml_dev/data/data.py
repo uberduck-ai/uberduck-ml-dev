@@ -1089,18 +1089,17 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
-        sampling_rate = 40000 # necessary in RVC world
-        print(filename, 'audio file name')
-        audio, _ = load_wav_to_torch(filename, sampling_rate) 
-        # if sampling_rate != self.sampling_rate:
+        audio, _ = load_wav_to_torch(filename, self.sampling_rate) 
+        # NOTE (Sam): this was necessary when not using librosa load
+        # We should probably replace librosa.load with scipy.wavfile.read since it is unnecessarily slow.
+        # Then we can readd the assertion.
+        # if sampling_rate != :
         #     raise ValueError(
         #         "{} SR doesn't match target {} SR".format(
         #             sampling_rate, self.sampling_rate
         #         )
         #     )
-        audio_norm = audio
-
-        audio_norm = audio_norm.unsqueeze(0)
+        audio_norm = audio.unsqueeze(0)
         spec = spectrogram_torch(
                 audio_norm,
                 self.filter_length,
