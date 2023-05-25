@@ -6,6 +6,7 @@ from einops import rearrange
 from scipy.io.wavfile import read
 from scipy.ndimage import distance_transform_edt as distance_transform
 import numpy as np
+import librosa
 from librosa import pyin
 import lmdb
 import pickle as pkl
@@ -738,7 +739,6 @@ from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
     get_pretrained_model,
 )
 
-
 class DataEmbedding:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
@@ -806,49 +806,51 @@ def get_f0_pvoiced(
     return f0, voiced_mask, p_voiced
 
 # NOTE (Sam): I believed that the RVC data processing using pyworld why we use parselmouth for inference.
-# On second thought this might not be true.
-# I'm going to add parselmouth.
-# Results seem discongruent in pitch and time scaling, while parselmouth also seems cleaner.
-import pyworld
-import scipy.signal as signal
-def get_f0_pyworld(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
-    x_pad = 1
-    f0_min = 50
-    f0_max = 1100
-    f0_mel_min = 1127 * np.log(1 + f0_min / 700)
-    f0_mel_max = 1127 * np.log(1 + f0_max / 700)
-    f0, t = pyworld.harvest(
-        x.astype(np.double),
-        fs=sr,
-        f0_ceil=f0_max,
-        f0_floor=f0_min,
-        frame_period=10,
-    )
-    f0 = pyworld.stonemask(x.astype(np.double), f0, t, sr)
-    f0 = signal.medfilt(f0, 3)
-    f0 *= pow(2, f0_up_key / 12)
-    tf0 = sr // window  # 每秒f0点数
-    if inp_f0 is not None:
-        delta_t = np.round(
-            (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
-        ).astype("int16")
-        replace_f0 = np.interp(
-            list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
-        )
-        shape = f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)].shape[0]
-        f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
-    f0bak = f0.copy()
-    f0_mel = 1127 * np.log(1 + f0 / 700)
-    f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
-        f0_mel_max - f0_mel_min
-    ) + 1
-    f0_mel[f0_mel <= 1] = 1
-    f0_mel[f0_mel > 255] = 255
-    f0_coarse = np.rint(f0_mel).astype(np.int)
-    return f0_coarse, f0bak  # 1-0
+# On second thought this might not have been true - the issue was a result of sampling rate.
+# Results were improved by using parselmouth with the fixed sample rate.
+# Librosa (pyin), pyworld (harvest), and crepe have not been tested.
+# Cris recommends harvest with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
+# Since there is a fair amount of confusion and we aren't using it currently, I'm removing the pyworld dependency for now.
+# import pyworld
+# import scipy.signal as signal
+# def get_f0_pyworld(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
+#     x_pad = 1
+#     f0_min = 50
+#     f0_max = 1100
+#     f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+#     f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+#     f0, t = pyworld.harvest(
+#         x.astype(np.double),
+#         fs=sr,
+#         f0_ceil=f0_max,
+#         f0_floor=f0_min,
+#         frame_period=10,
+#     )
+#     f0 = pyworld.stonemask(x.astype(np.double), f0, t, sr)
+#     f0 = signal.medfilt(f0, 3)
+#     f0 *= pow(2, f0_up_key / 12)
+#     tf0 = sr // window  # 每秒f0点数
+#     if inp_f0 is not None:
+#         delta_t = np.round(
+#             (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
+#         ).astype("int16")
+#         replace_f0 = np.interp(
+#             list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
+#         )
+#         shape = f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)].shape[0]
+#         f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
+#     f0bak = f0.copy()
+#     f0_mel = 1127 * np.log(1 + f0 / 700)
+#     f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
+#         f0_mel_max - f0_mel_min
+#     ) + 1
+#     f0_mel[f0_mel <= 1] = 1
+#     f0_mel[f0_mel > 255] = 255
+#     f0_coarse = np.rint(f0_mel).astype(np.int)
+#     return f0_coarse, f0bak  # 1-0 (a.k.a. pitch, pitchf from RVC)
 
-import librosa
 import parselmouth
+# NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
 def get_f0_parselmouth(x, hop_length, f0_up_key=0):
     p_len = x.shape[0] // hop_length
     time_step = 160 / 16000 * 1000
@@ -885,34 +887,11 @@ def get_f0_parselmouth(x, hop_length, f0_up_key=0):
     # NOTE (Sam): I think this is pitch, pitchf
     return f0_coarse, f0bak
 
-# def get_f0_parselmouth(path, hop):
-#     x, sr = librosa.load(path, 16000)  # , res_type='soxr_vhq'
-#     p_len = x.shape[0] // hop
-#     time_step = 160 / 16000 * 1000
-#     f0_min = 50
-#     f0_max = 1100
-#     f0 = (
-#         parselmouth.Sound(x, sr)
-#         .to_pitch_ac(
-#             time_step=time_step / 1000,
-#             voicing_threshold=0.6,
-#             pitch_floor=f0_min,
-#             pitch_ceiling=f0_max,
-#         )
-#         .selected_array["frequency"]
-#     )
-#     pad_size = (p_len - len(f0) + 1) // 2
-#     if pad_size > 0 or p_len - len(f0) - pad_size > 0:
-#         f0 = np.pad(
-#             f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
-#         )
-#     return f0
-
 class DataPitch:
     # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
-    # NOTE (Sam): method here was supposed to reflect the model type this was actually used for and is not the actual pitch method.
-    # TODO (Sam): but now I'm adding parselmouth from rvc so it should be changed to reflect that.
+    # TODO (Sam): method here should reflect pitch method (e.g. parselmouth, pyworld, etc.) and not model type (e.g. radtts)
+    # TODO (Sam): consider add padding as in models.rvc.vc
     def __init__(self, data_config = None, audiopaths = None, subpath_truncation=41, method = 'radtts', sample_rate = None):
 
         self.hop_length = data_config["hop_length"]
@@ -927,7 +906,6 @@ class DataPitch:
         self.sample_rate = sample_rate
 
     def _get_data(self, audiopath, sample_rate = None):
-        # rate, data = read(audiopath)
         if sample_rate is not None:
             data, rate = librosa.load(audiopath, sr=sample_rate)
         else:
@@ -944,16 +922,10 @@ class DataPitch:
                 sampling_rate=22050,
             )
 
-        if self.method == 'rvc':
+        if self.method == 'pyworld':
             
             pitch, pitchf  = get_f0_pyworld(data, f0_up_key = 0 )
             torch.save(pitchf, f"{sub_path}/f0f.pt")
-            # sample_lower = chunk_idx * 16000
-            # sample_upper = (chunk_idx + CHUNK_SIZE_SECONDS) * 16000
-            # audio_sub = data[sample_lower:sample_upper]
-            # audio_pad = np.pad(audio_sub, (vc.t_pad, vc.t_pad), mode="reflect")
-            # p_len = audio_pad.shape[0] // vc.window_size
-            # pitch, pitchf = vc.get_f0(data, p_len, f0_up_key, 'pm', None)
 
         if self.method == "parselmouth":
             pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
@@ -1104,13 +1076,9 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
 
     def get_labels(self, phone, pitch, pitchf):
         phone = np.asarray(torch.load(phone))
-        phone = np.repeat(phone, 2, axis=0) # janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
+        phone = np.repeat(phone, 2, axis=0) # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
         pitch = torch.load(pitch)
         pitchf = torch.load(pitchf)
-        # phone = np.load(phone)
-        # phone = np.repeat(phone, 2, axis=0)
-        # pitch = np.load(pitch)
-        # pitchf = np.load(pitchf)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
         phone = phone[:n_num, :]
         pitch = pitch[:n_num]
@@ -1121,8 +1089,8 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
-        # audio, sampling_rate = load_wav_to_torch(filename)
         sampling_rate = 40000 # necessary in RVC world
+        print(filename, 'audio file name')
         audio, _ = load_wav_to_torch(filename, sampling_rate) 
         # if sampling_rate != self.sampling_rate:
         #     raise ValueError(
