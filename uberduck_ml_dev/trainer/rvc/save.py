@@ -9,7 +9,7 @@ def save_checkpoint(generator, generator_optimizer, discriminator, discriminator
         )
     )
 
-    # NOTE (Sam): learning rate not accessible here
+    # TODO (Sam): figure out where to put learning rate.
     torch.save(
         {
             "generator_state_dict": generator.state_dict(),
