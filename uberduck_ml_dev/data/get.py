@@ -1,4 +1,8 @@
 from torch.utils.data import DataLoader
+import librosa
+from pathlib import Path
+from tqdm import tqdm
+import torch
 
 from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
 from uberduck_ml_dev.data.collate import CollateBlank
@@ -69,3 +73,35 @@ def get_pitches(
         sample_rate=sample_rate,
     )
     get_parallel_torch(data)
+
+HUBERT_PATH = 'hubert_embedding.pt'
+F0_PATH = 'f0.pt'
+F0F_PATH= 'f0f.pt'
+import os
+# NOTE (Sam): this is a little different from the other get functions because it's not a torch dataset.
+# NOTE (Sam): assumes name is a penultimate directory name in filepath, e.g. /tmp/{uuid}/resampled_normalized.wav.
+def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_path = HUBERT_PATH):
+
+    hubert_paths = []
+    for audiopath in tqdm(audiopaths):
+        audio0, sr = librosa.load(audiopath, sr=16000)
+        feats = torch.from_numpy(audio0)
+        feats = feats.float()
+        feats = feats.view(1, -1)
+        padding_mask = torch.BoolTensor(feats.shape).to('cpu').fill_(False)
+        inputs = {
+            "source": feats.to('cpu'),
+            "padding_mask": padding_mask,
+            "output_layer": output_layer,
+        }
+
+        folder_path = str(Path(*Path(audiopath).parts[:-1]))
+        hubert_path = os.path.join(folder_path , hubert_path)
+        
+        with torch.no_grad():
+            logits = hubert_model.extract_features(**inputs)
+            feats = hubert_model.final_proj(logits[0])
+            torch.save(feats[0], hubert_path)
+        hubert_paths.append(hubert_path)
+        
+        
