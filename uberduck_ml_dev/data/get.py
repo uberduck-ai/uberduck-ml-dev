@@ -85,6 +85,7 @@ def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_pat
 
     hubert_abs_paths = []
     for audiopath in tqdm(audiopaths):
+        # NOTE (Sam): Hubert expects 16k sample rate.
         audio0, sr = librosa.load(audiopath, sr=16000)
         feats = torch.from_numpy(audio0)
         feats = feats.float()
