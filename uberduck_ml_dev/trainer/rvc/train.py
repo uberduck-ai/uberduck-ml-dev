@@ -55,7 +55,7 @@ def train_func(config: dict, project: str = "rvc"):
 
     # TODO (Sam): move to "warmstart" or "load_checkpoint" functions
     generator_checkpoint = torch.load(train_config["warmstart_G_checkpoint_path"])[
-        "weight"
+        "model"
     ]
     discriminator_checkpoint = torch.load(train_config["warmstart_D_checkpoint_path"])[
         "model"

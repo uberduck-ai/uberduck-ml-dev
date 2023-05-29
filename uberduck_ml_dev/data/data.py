@@ -916,34 +916,44 @@ class DataPitch:
         self.method = method
         self.sample_rate = sample_rate
 
-    def _get_data(self, audiopath, sample_rate=None):
+    def _get_data(self, audiopath, sample_rate=None, recompute = False):
         if sample_rate is not None:
             data, rate = librosa.load(audiopath, sr=sample_rate)
         else:
             rate, data = read(audiopath)
         sub_path = audiopath[: self.subpath_truncation]
         print("sub_path", sub_path)
-        if self.method == "radtts":
-            pitch = get_f0_pvoiced(
-                data,
-                f0_min=self.f0_min,
-                f0_max=self.f0_max,
-                hop_length=self.hop_length,
-                frame_length=self.frame_length,
-                sampling_rate=22050,
-            )
+        # NOTE (Sam): we need caching to debug training issues in dev.
+        # NOTE (Sam): the logic here is convoluted and still won't catch issues with recomputation of f0 using different parameters
+        # TODO (Sam): add hashing of cached files.
+        if recompute or not os.path.exists(f"{sub_path}/f0.pt"):
+            if self.method == "radtts":
+                pitch = get_f0_pvoiced(
+                    data,
+                    f0_min=self.f0_min,
+                    f0_max=self.f0_max,
+                    hop_length=self.hop_length,
+                    frame_length=self.frame_length,
+                    sampling_rate=22050,
+                )
 
-        if self.method == "pyworld":
-            pitch, pitchf = get_f0_pyworld(data, f0_up_key=0)
-            torch.save(pitchf, f"{sub_path}/f0f.pt")
+            # if self.method == "pyworld":
+            #     pitch, pitchf = get_f0_pyworld(data, f0_up_key=0)
+            #     torch.save(pitchf, f"{sub_path}/f0f.pt")
 
-        if self.method == "parselmouth":
-            pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
-            torch.save(pitchf, f"{sub_path}/f0f.pt")
+            if self.method == "parselmouth":
 
-        pitch_path_local = f"{sub_path}/f0.pt"
-        torch.save(pitch, pitch_path_local)
+                
+                pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
+                torch.save(pitchf, f"{sub_path}/f0f.pt")
 
+            pitch_path_local = f"{sub_path}/f0.pt"
+            torch.save(pitch, pitch_path_local)
+        else:
+            if self.method == "parselmouth":
+                if not os.path.exists(f"{sub_path}/f0f.pt"):
+                    raise Exception(f"File {sub_path}/f0f.pt does not exist - please set recompute = True")
+                
     def __getitem__(self, idx):
         try:
             self._get_data(audiopath=self.audiopaths[idx], sample_rate=self.sample_rate)
@@ -1085,13 +1095,14 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
 
         return (spec, wav, phone, pitch, pitchf, dv)
 
-    def get_labels(self, phone, pitch, pitchf):
-        phone = np.asarray(torch.load(phone))
+    def get_labels(self, phone_path, pitch_path, pitchf_path):
+        print(phone_path, pitch_path, pitchf_path)
+        phone = np.asarray(torch.load(phone_path))
         phone = np.repeat(
             phone, 2, axis=0
         )  # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
-        pitch = torch.load(pitch)
-        pitchf = torch.load(pitchf)
+        pitch = torch.load(pitch_path)
+        pitchf = torch.load(pitchf_path)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
         phone = phone[:n_num, :]
         pitch = pitch[:n_num]
