@@ -25,6 +25,8 @@ from uberduck_ml_dev.trainer.rvc.train_epoch import train_epoch
 
 
 def train_func(config: dict, project: str = "rvc"):
+
+    print('entering training function')
     setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
     train_config = config["train"]
     model_config = config["model"]
@@ -53,6 +55,7 @@ def train_func(config: dict, project: str = "rvc"):
         eps=train_config["eps"],
     )
 
+    print('this should print since it errored past this point')
     # TODO (Sam): move to "warmstart" or "load_checkpoint" functions
     generator_checkpoint = torch.load(train_config["warmstart_G_checkpoint_path"])[
         "model"
@@ -68,6 +71,7 @@ def train_func(config: dict, project: str = "rvc"):
     discriminator = discriminator.cuda()
     models = {"generator": generator, "discriminator": discriminator}
 
+    print('maybe printington')
     train_dataset = TextAudioLoaderMultiNSFsid(
         train_config["filelist_path"], HParams(**data_config)
     )  # dv is sid
@@ -91,6 +95,7 @@ def train_func(config: dict, project: str = "rvc"):
         persistent_workers=True,
         prefetch_factor=8,
     )
+    print('binarino')
     optimization_parameters = {
         "optimizers": {
             "generator": generator_optimizer,
@@ -109,7 +114,9 @@ def train_func(config: dict, project: str = "rvc"):
 
     iteration = 0
     start_epoch = 0
+    print(train_config["epochs"], "epochs")
     for epoch in range(start_epoch, train_config["epochs"]):
+        print(f"Epoch: {epoch}")
         iteration = train_epoch(
             train_loader,
             config,

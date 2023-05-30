@@ -917,16 +917,18 @@ class DataPitch:
         self.sample_rate = sample_rate
 
     def _get_data(self, audiopath, sample_rate=None, recompute = False):
-        if sample_rate is not None:
-            data, rate = librosa.load(audiopath, sr=sample_rate)
-        else:
-            rate, data = read(audiopath)
+
         sub_path = audiopath[: self.subpath_truncation]
         print("sub_path", sub_path)
         # NOTE (Sam): we need caching to debug training issues in dev.
         # NOTE (Sam): the logic here is convoluted and still won't catch issues with recomputation of f0 using different parameters
         # TODO (Sam): add hashing of cached files.
         if recompute or not os.path.exists(f"{sub_path}/f0.pt"):
+            print('computing')
+            if sample_rate is not None:
+                data, rate = librosa.load(audiopath, sr=sample_rate)
+            else:
+                rate, data = read(audiopath)
             if self.method == "radtts":
                 pitch = get_f0_pvoiced(
                     data,
@@ -950,6 +952,7 @@ class DataPitch:
             pitch_path_local = f"{sub_path}/f0.pt"
             torch.save(pitch, pitch_path_local)
         else:
+            print('skipping')
             if self.method == "parselmouth":
                 if not os.path.exists(f"{sub_path}/f0f.pt"):
                     raise Exception(f"File {sub_path}/f0f.pt does not exist - please set recompute = True")
