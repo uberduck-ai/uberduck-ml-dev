@@ -924,6 +924,7 @@ class DataPitch:
         # NOTE (Sam): the logic here is convoluted and still won't catch issues with recomputation of f0 using different parameters
         # TODO (Sam): add hashing of cached files.
         if recompute or not os.path.exists(f"{sub_path}/f0.pt"):
+        # if recompute or not os.path.exists(f"{sub_path}/f0.npy"):
             print('computing')
             if sample_rate is not None:
                 data, rate = librosa.load(audiopath, sr=sample_rate)
@@ -947,15 +948,22 @@ class DataPitch:
 
                 
                 pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
-                torch.save(pitchf, f"{sub_path}/f0f.pt")
+                torch.save(torch.tensor(pitchf), f"{sub_path}/f0f.pt")
+                # np.save(f"{sub_path}/f0f.npy", pitchf.numpy())
+                # np.save(f"{sub_path}/f0f.npy", pitchf) 
 
             pitch_path_local = f"{sub_path}/f0.pt"
-            torch.save(pitch, pitch_path_local)
+            # pitch_path_local = f"{sub_path}/f0.npy"
+            torch.save(torch.tensor(pitch), pitch_path_local)
+            # np.save(pitch_path_local, pitch.numpy())
+            # np.save(pitch_path_local, pitch)
         else:
             print('skipping')
             if self.method == "parselmouth":
                 if not os.path.exists(f"{sub_path}/f0f.pt"):
+                # if not os.path.exists(f"{sub_path}/f0f.npy"):
                     raise Exception(f"File {sub_path}/f0f.pt does not exist - please set recompute = True")
+                    # raise Exception(f"File {sub_path}/f0f.npy does not exist - please set recompute = True")
                 
     def __getitem__(self, idx):
         try:
@@ -1102,19 +1110,27 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         print(phone_path, pitch_path, pitchf_path, flush = True)
         phone_pt = torch.load(phone_path)
         phone = np.asarray(phone_pt)
+        # phone = np.load(phone_path)
         phone = np.repeat(
             phone, 2, axis=0
         )  # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
         pitch = torch.load(pitch_path)
+        # pitch_np = np.load(pitch_path)
+        # pitch = torch.tensor(pitch_np)
         print('pitch_path loaded', pitch_path)
         pitchf = torch.load(pitchf_path)
+        # pitchf_np = np.load(pitchf_path)
+        # pitchf = torch.tensor(pitchf_np)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
         phone = phone[:n_num, :]
         pitch = pitch[:n_num]
         pitchf = pitchf[:n_num]
-        phone = torch.FloatTensor(phone)
+        # phone = torch.FloatTensor(phone)
+        phone = torch.from_numpy(phone)
         pitch = torch.LongTensor(pitch)
-        pitchf = torch.FloatTensor(pitchf)
+        pitchf = pitchf.float()
+        print(type(pitchf))
+        # pitchf = torch.FloatTensor(pitchf)
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
