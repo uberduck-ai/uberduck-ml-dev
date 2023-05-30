@@ -88,14 +88,14 @@ def train_func(config: dict, project: str = "rvc"):
     train_loader = DataLoader(
         train_dataset,
         # num_workers=1,
-        # num_workers=1,
-        num_workers=0,
-        # shuffle=False,
-        # pin_memory=True,
+        num_workers=1,
+        # num_workers=0,
+        shuffle=False,
+        pin_memory=True,
         collate_fn=collate_fn,
         batch_sampler=train_sampler,
-        # persistent_workers=True,
-        # prefetch_factor=8,
+        persistent_workers=True,
+        prefetch_factor=8,
     )
     print('binarino')
     optimization_parameters = {
