@@ -1074,12 +1074,12 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
     def get_audio_text_pair(self, audiopath_and_text):
         # separate filename and text
         file = audiopath_and_text[0]
-        phone = audiopath_and_text[1]
-        pitch = audiopath_and_text[2]
-        pitchf = audiopath_and_text[3]
+        phone_path = audiopath_and_text[1]
+        pitch_path = audiopath_and_text[2]
+        pitchf_path = audiopath_and_text[3]
         dv = audiopath_and_text[4]
 
-        phone, pitch, pitchf = self.get_labels(phone, pitch, pitchf)
+        phone, pitch, pitchf = self.get_labels(phone_path, pitch_path, pitchf_path)
         spec, wav = self.get_audio(file)
         dv = self.get_sid(dv)
 
@@ -1099,12 +1099,14 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return (spec, wav, phone, pitch, pitchf, dv)
 
     def get_labels(self, phone_path, pitch_path, pitchf_path):
-        print(phone_path, pitch_path, pitchf_path)
-        phone = np.asarray(torch.load(phone_path))
+        print(phone_path, pitch_path, pitchf_path, flush = True)
+        phone_pt = torch.load(phone_path)
+        phone = np.asarray(phone_pt)
         phone = np.repeat(
             phone, 2, axis=0
         )  # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
         pitch = torch.load(pitch_path)
+        print('pitch_path loaded', pitch_path)
         pitchf = torch.load(pitchf_path)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
         phone = phone[:n_num, :]
