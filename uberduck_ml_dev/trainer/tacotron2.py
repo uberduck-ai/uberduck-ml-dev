@@ -18,9 +18,6 @@ from ..vendor.tfcompat.hparam import HParams
 from .base import DEFAULTS as TRAINER_DEFAULTS
 from ..models.tacotron2 import DEFAULTS as TACOTRON2_DEFAULTS, INFERENCE
 from ..models.torchmoji import TorchMojiInterface
-from ..models.components.encoders.speaker_encoder import (
-    get_speaker_encoding_for_dataset,
-)
 from ..utils.plot import (
     plot_attention,
     plot_gate_outputs,
@@ -68,18 +65,19 @@ class Tacotron2Trainer(TTSTrainer):
             self.hparams.with_gsts
         )  # NOTE (Sam): should this be singular or plural?
 
-        if hasattr(self.hparams, "speaker_embeddings_path"):
-            # TODO (Sam): move this to "load" type method in Data.
-            get_speaker_encoding_for_dataset(
-                self.hparams.speaker_embeddings_path,
-                self.training_audiopaths_and_text,
-                embedding_dim=192,
-                speaker_encoder_path="/tmp/speaker_encoder",  # TODO (Sam): make this a hparam and load from DB
-            )
+        # NOTE (Sam): commented out for now as tacotron speaker encoding is deprecated by radtts.
+        # TODO (Sam): move this to method in uberduck_ml_dev.data.get.
+        # if hasattr(self.hparams, "speaker_embeddings_path"):
+        #
+        #     get_speaker_encoding_for_dataset(
+        #         self.hparams.speaker_embeddings_path,
+        #         self.training_audiopaths_and_text,
+        #         embedding_dim=192,
+        #         speaker_encoder_path="/tmp/speaker_encoder",  # TODO (Sam): make this a hparam and load from DB
+        #     )
 
-            self.speaker_embeddings = torch.load(self.hparams.speaker_embeddings_path)
-        else:
-            self.speaker_embeddings = None
+        #     self.speaker_embeddings = torch.load(self.hparams.speaker_embeddings_path)
+        self.speaker_embeddings = None
         # NOTE (Sam): gst_type == torchmoji and with_gst are currently redundant.
         # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder).
         if self.hparams.get("with_gsts"):
