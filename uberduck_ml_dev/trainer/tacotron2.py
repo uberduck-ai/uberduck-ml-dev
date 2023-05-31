@@ -65,6 +65,7 @@ class Tacotron2Trainer(TTSTrainer):
             self.hparams.with_gsts
         )  # NOTE (Sam): should this be singular or plural?
 
+        # NOTE (Sam): commented out for now as tacotron speaker encoding is deprecated by radtts.
         # TODO (Sam): move this to method in uberduck_ml_dev.data.get.
         # if hasattr(self.hparams, "speaker_embeddings_path"):
         #     
@@ -76,7 +77,6 @@ class Tacotron2Trainer(TTSTrainer):
         #     )
 
         #     self.speaker_embeddings = torch.load(self.hparams.speaker_embeddings_path)
-        # else:
         self.speaker_embeddings = None
         # NOTE (Sam): gst_type == torchmoji and with_gst are currently redundant.
         # NOTE (Sam): its not clear we should lambdafy models here rather than the data_loader or helper function (e.g. speaker_encoder).

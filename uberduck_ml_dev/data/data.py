@@ -34,6 +34,8 @@ from ..models.common import (
     TacotronSTFT,
 )
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
+from ..trainer.rvc.utils import load_wav_to_torch
+from .utils import spectrogram_torch
 
 F0_MIN = 80
 F0_MAX = 640
@@ -808,12 +810,9 @@ def get_f0_pvoiced(
     return f0, voiced_mask, p_voiced
 
 
-# NOTE (Sam): I believed that the RVC data processing using pyworld why we use parselmouth for inference.
-# On second thought this might not have been true - the issue was a result of sampling rate.
-# Results were improved by using parselmouth with the fixed sample rate.
-# Librosa (pyin), pyworld (harvest), and crepe have not been tested.
-# Cris recommends harvest with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
-# Since there is a fair amount of confusion and we aren't using it currently, I'm removing the pyworld dependency for now.
+
+# NOTE (Sam): Cris recommends harvest with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
+# He hasn't used pyin. I'm removing this unused pyworld method to remove the dependency.
 # import pyworld
 # import scipy.signal as signal
 # def get_f0_pyworld(x, f0_up_key = -2, inp_f0=None, sr = 22050, window = 160):
@@ -851,9 +850,6 @@ def get_f0_pvoiced(
 #     f0_mel[f0_mel > 255] = 255
 #     f0_coarse = np.rint(f0_mel).astype(np.int)
 #     return f0_coarse, f0bak  # 1-0 (a.k.a. pitch, pitchf from RVC)
-
-
-
 
 # NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
 def get_f0_parselmouth(x, hop_length, f0_up_key=0):
@@ -924,8 +920,6 @@ class DataPitch:
         # NOTE (Sam): the logic here is convoluted and still won't catch issues with recomputation of f0 using different parameters
         # TODO (Sam): add hashing of cached files.
         if recompute or not os.path.exists(f"{sub_path}/f0.pt"):
-        # if recompute or not os.path.exists(f"{sub_path}/f0.npy"):
-            print('computing')
             if sample_rate is not None:
                 data, rate = librosa.load(audiopath, sr=sample_rate)
             else:
@@ -940,30 +934,17 @@ class DataPitch:
                     sampling_rate=22050,
                 )
 
-            # if self.method == "pyworld":
-            #     pitch, pitchf = get_f0_pyworld(data, f0_up_key=0)
-            #     torch.save(pitchf, f"{sub_path}/f0f.pt")
-
             if self.method == "parselmouth":
 
-                
                 pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
                 torch.save(torch.tensor(pitchf), f"{sub_path}/f0f.pt")
-                # np.save(f"{sub_path}/f0f.npy", pitchf.numpy())
-                # np.save(f"{sub_path}/f0f.npy", pitchf) 
 
             pitch_path_local = f"{sub_path}/f0.pt"
-            # pitch_path_local = f"{sub_path}/f0.npy"
             torch.save(torch.tensor(pitch), pitch_path_local)
-            # np.save(pitch_path_local, pitch.numpy())
-            # np.save(pitch_path_local, pitch)
         else:
-            print('skipping')
             if self.method == "parselmouth":
                 if not os.path.exists(f"{sub_path}/f0f.pt"):
-                # if not os.path.exists(f"{sub_path}/f0f.npy"):
                     raise Exception(f"File {sub_path}/f0f.pt does not exist - please set recompute = True")
-                    # raise Exception(f"File {sub_path}/f0f.npy does not exist - please set recompute = True")
                 
     def __getitem__(self, idx):
         try:
@@ -1036,9 +1017,6 @@ RADTTS_DEFAULTS = {
 
 
 # RVC
-from ..trainer.rvc.utils import load_wav_to_torch
-from .utils import spectrogram_torch
-
 
 class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
     """
@@ -1080,8 +1058,8 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return sid
 
     def get_audio_text_pair(self, audiopath_and_text):
-        # separate filename and text
         file = audiopath_and_text[0]
+        # NOTE (Sam): phone_path is a path to the hubert embeddings.
         phone_path = audiopath_and_text[1]
         pitch_path = audiopath_and_text[2]
         pitchf_path = audiopath_and_text[3]
@@ -1110,33 +1088,24 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         print(phone_path, pitch_path, pitchf_path, flush = True)
         phone_pt = torch.load(phone_path)
         phone = np.asarray(phone_pt)
-        # phone = np.load(phone_path)
         phone = np.repeat(
             phone, 2, axis=0
         )  # NOTE (Sam): janky fix for now since repeat isn't present in torch (I think I should just use tile but dont want to check)
         pitch = torch.load(pitch_path)
-        # pitch_np = np.load(pitch_path)
-        # pitch = torch.tensor(pitch_np)
-        print('pitch_path loaded', pitch_path)
         pitchf = torch.load(pitchf_path)
-        # pitchf_np = np.load(pitchf_path)
-        # pitchf = torch.tensor(pitchf_np)
         n_num = min(phone.shape[0], 900)  # DistributedBucketSampler
         phone = phone[:n_num, :]
         pitch = pitch[:n_num]
         pitchf = pitchf[:n_num]
-        # phone = torch.FloatTensor(phone)
         phone = torch.from_numpy(phone)
         pitch = torch.LongTensor(pitch)
         pitchf = pitchf.float()
-        print(type(pitchf))
-        # pitchf = torch.FloatTensor(pitchf)
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
         audio, _ = load_wav_to_torch(filename, self.sampling_rate)
         # NOTE (Sam): this was necessary when not using librosa load
-        # We should probably replace librosa.load with scipy.wavfile.read since it is unnecessarily slow.
+        # Consider replacing librosa.load with scipy.wavfile.read when possible for speed.
         # Then we can readd the assertion.
         # if sampling_rate != :
         #     raise ValueError(

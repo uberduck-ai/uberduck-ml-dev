@@ -1,6 +1,0 @@
-include settings.ini
-include LICENSE
-include CONTRIBUTING.md
-include README.md
-recursive-exclude * __pycache__
-include uberduck_ml_dev/text/*

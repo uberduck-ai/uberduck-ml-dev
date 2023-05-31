@@ -3,6 +3,7 @@ import librosa
 from pathlib import Path
 from tqdm import tqdm
 import torch
+import os
 
 from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
 from uberduck_ml_dev.data.collate import CollateBlank
@@ -77,19 +78,17 @@ def get_pitches(
 HUBERT_PATH = 'hubert_embedding.pt'
 F0_PATH = 'f0.pt'
 F0F_PATH= 'f0f.pt'
-import os
-# NOTE (Sam): this is a little different from the other get functions because it's not a torch dataset.
-# NOTE (Sam): assumes name is a penultimate directory name in filepath, e.g. /tmp/{uuid}/resampled_normalized.wav.
-# It returns the abs paths, but these therefore are predetermined.
-def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_path = HUBERT_PATH):
 
+# NOTE (Sam): this is different from the other get functions because it doesn't use torch dataset.
+def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_path = HUBERT_PATH):
+    '''Returns the abs path w.r.t penultimate directory name in audiopaths, e.g. suitable for /tmp/{uuid}/resampled_normalized.wav.'''
     hubert_abs_paths = []
     for audiopath in tqdm(audiopaths):
         folder_path = str(Path(*Path(audiopath).parts[:-1]))
         hubert_abs_path = os.path.join(folder_path, hubert_path)
         # TODO (Sam): add hashing to avoid mistakenly not recomputing.
         if not os.path.exists(hubert_abs_path):
-            print(hubert_abs_path, 'hubert_abs_path')
+
             # NOTE (Sam): Hubert expects 16k sample rate.
             audio0, sr = librosa.load(audiopath, sr=16000)
             feats = torch.from_numpy(audio0)
@@ -110,6 +109,6 @@ def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_pat
         hubert_abs_paths.append(hubert_abs_path)
 
 
-    print("hubert_abs_paths \n\n\n\n", hubert_abs_paths)
+
     return hubert_abs_paths 
         
