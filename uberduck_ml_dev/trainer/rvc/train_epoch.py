@@ -11,7 +11,7 @@ def train_epoch(
     iteration,
 ):
     for batch in dataloader:
-        print(iteration, 'iteration')
+        print(iteration, "iteration")
         _train_step(
             batch,
             config,

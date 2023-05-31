@@ -68,7 +68,7 @@ class Tacotron2Trainer(TTSTrainer):
         # NOTE (Sam): commented out for now as tacotron speaker encoding is deprecated by radtts.
         # TODO (Sam): move this to method in uberduck_ml_dev.data.get.
         # if hasattr(self.hparams, "speaker_embeddings_path"):
-        #     
+        #
         #     get_speaker_encoding_for_dataset(
         #         self.hparams.speaker_embeddings_path,
         #         self.training_audiopaths_and_text,

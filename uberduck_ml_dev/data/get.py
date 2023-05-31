@@ -75,13 +75,16 @@ def get_pitches(
     )
     get_parallel_torch(data)
 
-HUBERT_PATH = 'hubert_embedding.pt'
-F0_PATH = 'f0.pt'
-F0F_PATH= 'f0f.pt'
+
+HUBERT_PATH = "hubert_embedding.pt"
+F0_PATH = "f0.pt"
+F0F_PATH = "f0f.pt"
 
 # NOTE (Sam): this is different from the other get functions because it doesn't use torch dataset.
-def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_path = HUBERT_PATH):
-    '''Returns the abs path w.r.t penultimate directory name in audiopaths, e.g. suitable for /tmp/{uuid}/resampled_normalized.wav.'''
+def get_hubert_embeddings(
+    audiopaths, hubert_model, output_layer=9, hubert_path=HUBERT_PATH
+):
+    """Returns the abs path w.r.t penultimate directory name in audiopaths, e.g. suitable for /tmp/{uuid}/resampled_normalized.wav."""
     hubert_abs_paths = []
     for audiopath in tqdm(audiopaths):
         folder_path = str(Path(*Path(audiopath).parts[:-1]))
@@ -94,9 +97,9 @@ def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_pat
             feats = torch.from_numpy(audio0)
             feats = feats.float()
             feats = feats.view(1, -1)
-            padding_mask = torch.BoolTensor(feats.shape).to('cpu').fill_(False)
+            padding_mask = torch.BoolTensor(feats.shape).to("cpu").fill_(False)
             inputs = {
-                "source": feats.to('cpu'),
+                "source": feats.to("cpu"),
                 "padding_mask": padding_mask,
                 "output_layer": output_layer,
             }
@@ -108,7 +111,4 @@ def get_hubert_embeddings(audiopaths, hubert_model, output_layer = 9, hubert_pat
 
         hubert_abs_paths.append(hubert_abs_path)
 
-
-
-    return hubert_abs_paths 
-        
+    return hubert_abs_paths

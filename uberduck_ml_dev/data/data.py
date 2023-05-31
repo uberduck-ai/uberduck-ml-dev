@@ -810,7 +810,6 @@ def get_f0_pvoiced(
     return f0, voiced_mask, p_voiced
 
 
-
 # NOTE (Sam): Cris recommends harvest with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
 # He hasn't used pyin. I'm removing this unused pyworld method to remove the dependency.
 # import pyworld
@@ -912,7 +911,7 @@ class DataPitch:
         self.method = method
         self.sample_rate = sample_rate
 
-    def _get_data(self, audiopath, sample_rate=None, recompute = False):
+    def _get_data(self, audiopath, sample_rate=None, recompute=False):
 
         sub_path = audiopath[: self.subpath_truncation]
         print("sub_path", sub_path)
@@ -944,8 +943,10 @@ class DataPitch:
         else:
             if self.method == "parselmouth":
                 if not os.path.exists(f"{sub_path}/f0f.pt"):
-                    raise Exception(f"File {sub_path}/f0f.pt does not exist - please set recompute = True")
-                
+                    raise Exception(
+                        f"File {sub_path}/f0f.pt does not exist - please set recompute = True"
+                    )
+
     def __getitem__(self, idx):
         try:
             self._get_data(audiopath=self.audiopaths[idx], sample_rate=self.sample_rate)
@@ -1018,6 +1019,7 @@ RADTTS_DEFAULTS = {
 
 # RVC
 
+
 class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
     """
     1) loads audio, text pairs
@@ -1085,7 +1087,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return (spec, wav, phone, pitch, pitchf, dv)
 
     def get_labels(self, phone_path, pitch_path, pitchf_path):
-        print(phone_path, pitch_path, pitchf_path, flush = True)
+        print(phone_path, pitch_path, pitchf_path, flush=True)
         phone_pt = torch.load(phone_path)
         phone = np.asarray(phone_pt)
         phone = np.repeat(
