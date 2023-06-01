@@ -21,7 +21,7 @@ class TestTrainer:
         assert trainer.hparams == hparams
 
         assert trainer.cudnn_enabled == True
-        mel = torch.load("tests/fixtures/stevejobs-1.pt")
+        mel = torch.load("analytics/tests/fixtures/stevejobs-1.pt")
         audio = trainer.sample(mel)
         assert audio.size(0) == 1
 

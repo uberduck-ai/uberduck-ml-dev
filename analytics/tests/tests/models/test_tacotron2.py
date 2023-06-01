@@ -17,7 +17,7 @@ from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 class TestTacotron2Model:
     def test_tacotron2_model(self):
         config = TACOTRON2_TRAINER_DEFAULTS.values()
-        with open("tests/fixtures/ljtest/taco2_lj2lj.json") as f:
+        with open("analytics/tests/fixtures/ljtest/taco2_lj2lj.json") as f:
             config.update(json.load(f))
         hparams = HParams(**config)
         if torch.cuda.is_available():
