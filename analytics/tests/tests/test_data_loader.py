@@ -22,7 +22,7 @@ class TestTextMelCollation:
 
     def test_batch_structure(self):
         ds = Data(
-            "tests/fixtures/val.txt",
+            "analytics/tests/fixtures/val.txt",
             debug=True,
             debug_dataset_size=12,
             symbol_set="default",
@@ -35,7 +35,7 @@ class TestTextMelCollation:
 
     def test_batch_dimensions(self):
         ds = Data(
-            audiopaths_and_text="tests/fixtures/val.txt",
+            audiopaths_and_text="analytics/tests/fixtures/val.txt",
             debug=True,
             debug_dataset_size=12,
             symbol_set="default",
@@ -54,7 +54,7 @@ class TestTextMelCollation:
 
     def test_batch_dimensions_partial(self):
         ds = Data(
-            "tests/fixtures/val.txt",
+            "analytics/tests/fixtures/val.txt",
             debug=True,
             debug_dataset_size=12,
             symbol_set="default",
