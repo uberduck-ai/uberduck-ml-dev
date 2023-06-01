@@ -5,7 +5,8 @@ import torch
 
 class TestHifiGan:
     def test_hifi_gan(self):
-        path = "tests/fixtures/wavs/stevejobs-1.wav"
+        # TODO (Sam): move to settings file.
+        path = "analytics/tests/fixtures/wavs/stevejobs-1.wav"
         sr, data = read(path)
 
         assert sr == 22050

@@ -1,4 +1,4 @@
-tests/fixtures/ljtest/wavs/LJ001-0001.wav|Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition|0
-tests/fixtures/ljtest/wavs/LJ001-0002.wav|in being comparatively modern.|0
-tests/fixtures/ljtest/wavs/LJ001-0003.wav|For although the Chinese took impressions from wood blocks engraved in relief for centuries before the woodcutters of the Netherlands, by a similar process|0
-tests/fixtures/ljtest/wavs/LJ001-0004.wav|produced the block books, which were the immediate predecessors of the true printed book,|0
+analytics/tests/fixtures/ljtest/wavs/LJ001-0001.wav|Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition|0
+analytics/tests/fixtures/ljtest/wavs/LJ001-0002.wav|in being comparatively modern.|0
+analytics/tests/fixtures/ljtest/wavs/LJ001-0003.wav|For although the Chinese took impressions from wood blocks engraved in relief for centuries before the woodcutters of the Netherlands, by a similar process|0
+analytics/tests/fixtures/ljtest/wavs/LJ001-0004.wav|produced the block books, which were the immediate predecessors of the true printed book,|0

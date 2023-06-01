@@ -1,7 +1,7 @@
 {
   "batch_size": 16,
   "checkpoint_name": null,
-  "checkpoint_path": "tests/fixtures/results/checkpoints",
+  "checkpoint_path": "analytics/tests/fixtures/results/checkpoints",
   "cudnn_enabled": false,
   "dataset_path": "./dataset",
   "debug": false,
@@ -15,7 +15,7 @@
   "ignore_layers": ["speaker_embedding.weight"],
   "include_f0": false,
   "learning_rate": 1e-3,
-  "log_dir": "tests/fixtures/results/logs",
+  "log_dir": "analytics/tests/fixtures/results/logs",
   "mask_padding": true,
   "max_wav_value": 32768.0,
   "mel_fmax": 8000,
@@ -58,9 +58,9 @@
   "sampling_rate": 22050,
   "steps_per_sample": 100,
   "text_cleaners": ["english_cleaners"],
-  "training_audiopaths_and_text": "tests/fixtures/ljtest/list.txt",
-  "val_audiopaths_and_text": "tests/fixtures/ljtest/list.txt",
-  "warm_start_name": "tests/fixtures/models/taco2ljdefault",
+  "training_audiopaths_and_text": "analytics/tests/fixtures/ljtest/list.txt",
+  "val_audiopaths_and_text": "analytics/tests/fixtures/ljtest/list.txt",
+  "warm_start_name": "analytics/tests/fixtures/models/taco2ljdefault",
   "weight_decay": 1e-6,
   "win_length": 1024
 }
