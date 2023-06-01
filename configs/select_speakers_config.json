@@ -1,9 +1,0 @@
-{
-    "filelists": [
-        {
-            "path": "~/data/voice/dvc-managed/uberduck-multispeaker",
-            "speakers": []
-        }
-    ],
-    "output": "list.txt"
-}

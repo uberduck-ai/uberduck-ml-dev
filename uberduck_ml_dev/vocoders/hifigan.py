@@ -34,14 +34,10 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from uberduck_ml_dev.models.common import LRELU_SLOPE, ResBlock1, ResBlock2
 
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
+# NOTE(Sam): other defaults are in trainer.
 DEFAULTS = {
     "resblock": "1",
     "num_gpus": 0,
-    "batch_size": 16,
-    "learning_rate": 0.0002,
-    "adam_b1": 0.8,
-    "adam_b2": 0.99,
-    "lr_decay": 0.999,
     "seed": 1234,
     "upsample_rates": [8, 8, 2, 2],
     "upsample_kernel_sizes": [16, 16, 4, 4],
@@ -58,12 +54,6 @@ DEFAULTS = {
     "fmin": 0,
     "fmax": 8000,
     "fmax_for_loss": None,
-    "num_workers": 4,
-    "dist_config": {
-        "dist_backend": "nccl",
-        "dist_url": "tcp://localhost:54321",
-        "world_size": 1,
-    },
 }
 
 

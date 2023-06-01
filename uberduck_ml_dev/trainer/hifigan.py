@@ -362,3 +362,18 @@ def train(rank, a, h, warm_start):
                     epoch + 1, int(time.time() - start)
                 )
             )
+
+
+DEFAULTS = {
+    "num_workers": 4,
+    "dist_config": {
+        "dist_backend": "nccl",
+        "dist_url": "tcp://localhost:54321",
+        "world_size": 1,
+    },
+    "batch_size": 16,
+    "learning_rate": 0.0002,
+    "adam_b1": 0.8,
+    "adam_b2": 0.99,
+    "lr_decay": 0.999,
+}
