@@ -15,7 +15,13 @@ The models in this repository used in production are the Tacotron2, SO-VITS-SVC,
 
 ## Usage
 
-Download models to fine-tune from [**here**](https://huggingface.co/Uberduck).  The [**notebooks**](https://app.uberduck.ai/) are the easiest ways to try these out.
+Download models to fine-tune from [**here**](https://huggingface.co/Uberduck).  The [**notebooks**](https://app.uberduck.ai/) are the easiest ways to try these out.  To install uberduck-ml-dev, you can use conda:
+
+```
+conda create -n 'test-env' python=3.10 -y
+source activate test-env
+pip install git+https://github.com/uberduck-ai/uberduck-ml-dev
+```
 
 ### Installation
 
