@@ -11,7 +11,7 @@
 
 The models in this repository used in production are the Tacotron2, SO-VITS-SVC, zero-shot RADTTS, and HiFi-GAN.  Training code is included for Tacotron2, RADTTS, and HiFi-GAN.  Other goodies include fill-populating inference, additional languages, and Torchmoji emotional encoding. 
 
-![Summary](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/details.png)
+![Summary](https://github.com/uberduck-ai/uberduck-ml-dev/blob/master/analytics/dependencies/details.png)
 
 ## Usage
 
