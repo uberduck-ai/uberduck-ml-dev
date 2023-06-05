@@ -6,7 +6,8 @@ import json
 from scipy.io.wavfile import read
 import torch
 
-from .speaker import ResNetSpeakerEncoder
+# TODO (Sam): eliminate redundancy.
+from .speaker.resnet import ResNetSpeakerEncoder
 
 DEFAULT_AUDIO_CONFIG = {
     "fft_size": 512,
