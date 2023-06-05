@@ -1,98 +1,16 @@
-import os, traceback
+import os
 import glob
-import sys
 import argparse
-import logging
 import json
 import subprocess
+
 import numpy as np
-from scipy.io.wavfile import read
 import torch
 import librosa
 
 MATPLOTLIB_FLAG = False
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-logger = logging
 
-
-def load_checkpoint_d(checkpoint_path, combd, sbd, optimizer=None, load_opt=1):
-    assert os.path.isfile(checkpoint_path)
-    checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
-
-    ##################
-    def go(model, bkey):
-        saved_state_dict = checkpoint_dict[bkey]
-        if hasattr(model, "module"):
-            state_dict = model.module.state_dict()
-        else:
-            state_dict = model.state_dict()
-        new_state_dict = {}
-        for k, v in state_dict.items():  # 模型需要的shape
-            try:
-                new_state_dict[k] = saved_state_dict[k]
-                if saved_state_dict[k].shape != state_dict[k].shape:
-                    print(
-                        "shape-%s-mismatch|need-%s|get-%s"
-                        % (k, state_dict[k].shape, saved_state_dict[k].shape)
-                    )  #
-                    raise KeyError
-            except:
-                # logger.info(traceback.format_exc())
-                logger.info("%s is not in the checkpoint" % k)  # pretrain缺失的
-                new_state_dict[k] = v  # 模型自带的随机值
-        if hasattr(model, "module"):
-            model.module.load_state_dict(new_state_dict, strict=False)
-        else:
-            model.load_state_dict(new_state_dict, strict=False)
-
-    go(combd, "combd")
-    go(sbd, "sbd")
-    #############
-    logger.info("Loaded model weights")
-
-    iteration = checkpoint_dict["iteration"]
-    learning_rate = checkpoint_dict["learning_rate"]
-    if (
-        optimizer is not None and load_opt == 1
-    ):  ###加载不了，如果是空的的话，重新初始化，可能还会影响lr时间表的更新，因此在train文件最外围catch
-        #   try:
-        optimizer.load_state_dict(checkpoint_dict["optimizer"])
-    #   except:
-    #     traceback.print_exc()
-    logger.info("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, iteration))
-    return model, optimizer, learning_rate, iteration
-
-
-# def load_checkpoint(checkpoint_path, model, optimizer=None):
-#   assert os.path.isfile(checkpoint_path)
-#   checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-#   iteration = checkpoint_dict['iteration']
-#   learning_rate = checkpoint_dict['learning_rate']
-#   if optimizer is not None:
-#     optimizer.load_state_dict(checkpoint_dict['optimizer'])
-#   # print(1111)
-#   saved_state_dict = checkpoint_dict['model']
-#   # print(1111)
-#
-#   if hasattr(model, 'module'):
-#     state_dict = model.module.state_dict()
-#   else:
-#     state_dict = model.state_dict()
-#   new_state_dict= {}
-#   for k, v in state_dict.items():
-#     try:
-#       new_state_dict[k] = saved_state_dict[k]
-#     except:
-#       logger.info("%s is not in the checkpoint" % k)
-#       new_state_dict[k] = v
-#   if hasattr(model, 'module'):
-#     model.module.load_state_dict(new_state_dict)
-#   else:
-#     model.load_state_dict(new_state_dict)
-#   logger.info("Loaded checkpoint '{}' (epoch {})" .format(
-#     checkpoint_path, iteration))
-#   return model, optimizer, learning_rate, iteration
 def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
@@ -113,34 +31,23 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
                 )  #
                 raise KeyError
         except:
-            # logger.info(traceback.format_exc())
-            logger.info("%s is not in the checkpoint" % k)  # pretrain缺失的
             new_state_dict[k] = v  # 模型自带的随机值
     if hasattr(model, "module"):
         model.module.load_state_dict(new_state_dict, strict=False)
     else:
         model.load_state_dict(new_state_dict, strict=False)
-    logger.info("Loaded model weights")
 
     iteration = checkpoint_dict["iteration"]
     learning_rate = checkpoint_dict["learning_rate"]
     if (
         optimizer is not None and load_opt == 1
     ):  ###加载不了，如果是空的的话，重新初始化，可能还会影响lr时间表的更新，因此在train文件最外围catch
-        #   try:
         optimizer.load_state_dict(checkpoint_dict["optimizer"])
-    #   except:
-    #     traceback.print_exc()
-    logger.info("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, iteration))
+
     return model, optimizer, learning_rate, iteration
 
 
 def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
-    logger.info(
-        "Saving model and optimizer state at epoch {} to {}".format(
-            iteration, checkpoint_path
-        )
-    )
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
     else:
@@ -157,11 +64,6 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
 
 
 def save_checkpoint_d(combd, sbd, optimizer, learning_rate, iteration, checkpoint_path):
-    logger.info(
-        "Saving model and optimizer state at epoch {} to {}".format(
-            iteration, checkpoint_path
-        )
-    )
     if hasattr(combd, "module"):
         state_dict_combd = combd.module.state_dict()
     else:
@@ -216,8 +118,7 @@ def plot_spectrogram_to_numpy(spectrogram):
 
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
-        mpl_logger = logging.getLogger("matplotlib")
-        mpl_logger.setLevel(logging.WARNING)
+
     import matplotlib.pylab as plt
     import numpy as np
 
@@ -242,8 +143,6 @@ def plot_alignment_to_numpy(alignment, info=None):
 
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
-        mpl_logger = logging.getLogger("matplotlib")
-        mpl_logger.setLevel(logging.WARNING)
     import matplotlib.pylab as plt
     import numpy as np
 
@@ -403,11 +302,6 @@ def get_hparams_from_file(config_path):
 def check_git_hash(model_dir):
     source_dir = os.path.dirname(os.path.realpath(__file__))
     if not os.path.exists(os.path.join(source_dir, ".git")):
-        logger.warn(
-            "{} is not a git repository, therefore hash value comparison will be ignored.".format(
-                source_dir
-            )
-        )
         return
 
     cur_hash = subprocess.getoutput("git rev-parse HEAD")
@@ -416,28 +310,9 @@ def check_git_hash(model_dir):
     if os.path.exists(path):
         saved_hash = open(path).read()
         if saved_hash != cur_hash:
-            logger.warn(
-                "git hash values are different. {}(saved) != {}(current)".format(
-                    saved_hash[:8], cur_hash[:8]
-                )
-            )
+            pass
     else:
         open(path, "w").write(cur_hash)
-
-
-def get_logger(model_dir, filename="train.log"):
-    global logger
-    logger = logging.getLogger(os.path.basename(model_dir))
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    h = logging.FileHandler(os.path.join(model_dir, filename))
-    h.setLevel(logging.DEBUG)
-    h.setFormatter(formatter)
-    logger.addHandler(h)
-    return logger
 
 
 class HParams:
