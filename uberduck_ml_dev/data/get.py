@@ -19,8 +19,8 @@ def get_parallel_torch(data):
 # NOTE (Sam): assumes data is in a directory structure like:
 # /tmp/{uuid}/resampled_normalized.wav
 # These functions add spectrogram.pt, f0.pt, and coqui_resnet_512_emb.pt to each file-specific directory.
-def get_mels(paths, data_config):
-    data = DataMel(audiopaths=paths, data_config=data_config)
+def get_mels(paths, data_config, target_paths):
+    data = DataMel(audiopaths=paths, data_config=data_config, target_paths=target_paths)
 
     collate_fn = CollateBlank()
 
@@ -62,14 +62,14 @@ def get_embeddings(
 def get_pitches(
     paths,
     data_config=None,
-    subpath_truncation=41,
+    target_folders=None,
     method="parselmouth",
     sample_rate=16000,
 ):
     data = DataPitch(
         audiopaths=paths,
         data_config=data_config,
-        subpath_truncation=subpath_truncation,
+        target_folders=target_folders,
         method=method,
         sample_rate=sample_rate,
     )
@@ -79,6 +79,7 @@ def get_pitches(
 HUBERT_PATH = "hubert_embedding.pt"
 F0_PATH = "f0.pt"
 F0F_PATH = "f0f.pt"
+
 
 # NOTE (Sam): this is different from the other get functions because it doesn't use torch dataset.
 def get_hubert_embeddings(
@@ -91,7 +92,6 @@ def get_hubert_embeddings(
         hubert_abs_path = os.path.join(folder_path, hubert_path)
         # TODO (Sam): add hashing to avoid mistakenly not recomputing.
         if not os.path.exists(hubert_abs_path):
-
             # NOTE (Sam): Hubert expects 16k sample rate.
             audio0, sr = librosa.load(audiopath, sr=16000)
             feats = torch.from_numpy(audio0)
