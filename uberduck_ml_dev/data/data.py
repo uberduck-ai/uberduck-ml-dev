@@ -939,9 +939,11 @@ class DataPitch:
             if self.method == "parselmouth":
                 pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
                 torch.save(torch.tensor(pitchf), f"{target_folder}/f0f.pt")
-
+                pitch = torch.tensor(pitch)
             pitch_path_local = f"{target_folder}/f0.pt"
-            torch.save(torch.tensor(pitch), pitch_path_local)
+            torch.save(
+                pitch, pitch_path_local
+            )  # NOTE (Sam): "pitch" here is a tuple "f0, voiced_mask, p_voiced" for radtts.
         else:
             if self.method == "parselmouth":
                 if not os.path.exists(f"{target_folder}/f0f.pt"):
