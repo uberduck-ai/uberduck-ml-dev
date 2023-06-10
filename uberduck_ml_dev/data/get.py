@@ -64,7 +64,7 @@ def get_pitches(
     data_config=None,
     target_folders=None,
     method="parselmouth",
-    sample_rate=16000,
+    sample_rate=None,
 ):
     data = DataPitch(
         audiopaths=paths,
