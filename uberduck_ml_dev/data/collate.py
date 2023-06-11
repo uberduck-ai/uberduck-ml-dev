@@ -171,6 +171,8 @@ class DataCollateRADTTS:
             )  # emb size - TODO (Sam): try to reduce this via PCA
             # audio_embedding_padded = torch.FloatTensor(len(batch), 16) # PCA version
             audio_embedding_padded.zero_()
+        else:
+            audio_embedding_padded = None
 
         attn_prior_padded = torch.FloatTensor(len(batch), max_target_len, max_input_len)
         attn_prior_padded.zero_()
@@ -178,6 +180,7 @@ class DataCollateRADTTS:
         output_lengths = torch.LongTensor(len(batch))
         speaker_ids = torch.LongTensor(len(batch))
         audiopaths = []
+        # NOTE (Sam): I don't think we need to sort decreasing in modern torch versions (>= 1.9 at least).
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]]["mel"]
             mel_padded[i, :, : mel.size(1)] = mel

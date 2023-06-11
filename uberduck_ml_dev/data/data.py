@@ -397,6 +397,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         dur_min=None,
         dur_max=None,
         combine_speaker_and_emotion=False,
+        is_zero_shot=True,
         **kwargs,
     ):
         self.combine_speaker_and_emotion = combine_speaker_and_emotion
@@ -430,6 +431,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         self.use_energy_avg = use_energy_avg
         self.use_scaled_energy = use_scaled_energy
         self.sampling_rate = sampling_rate
+        self.is_zero_shot = is_zero_shot
         self.tp = TextProcessing(
             symbol_set,
             cleaner_names,
@@ -669,7 +671,11 @@ class DataRADTTS(torch.utils.data.Dataset):
         if not self.use_attn_prior_masking:
             attn_prior = None
 
-        audio_emb = torch.load(audio_emb_path)
+        if self.is_zero_shot:
+            audio_emb = torch.load(audio_emb_path)
+        else:
+            audio_emb = None
+
         return {
             "mel": mel,
             "speaker_id": speaker_id,
