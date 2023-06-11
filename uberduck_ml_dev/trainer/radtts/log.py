@@ -102,6 +102,10 @@ def get_log_audio(
             durations = (durations + 0.5).floor().int()
             # NOTE (Sam): should we load vocoder to CPU to avoid taking up valuable GPU vRAM?
             for attribute_sigma in attribute_sigmas:
+                if audio_embedding is not None:
+                    audio_embedding_argument = audio_embedding[0:1]
+                else:
+                    audio_embedding_argument = None
                 # try:
                 if attribute_sigma > 0.0:
                     if hasattr(model, "infer"):
@@ -115,7 +119,7 @@ def get_log_audio(
                             voiced_mask=None,
                             sigma_f0=attribute_sigma,
                             sigma_energy=attribute_sigma,
-                            audio_embedding=audio_embedding[0:1],
+                            audio_embedding=audio_embedding_argument,
                         )
                     else:
                         model_output = model.module.infer(
@@ -128,7 +132,7 @@ def get_log_audio(
                             voiced_mask=None,
                             sigma_f0=attribute_sigma,
                             sigma_energy=attribute_sigma,
-                            audio_embedding=audio_embedding[0:1],
+                            audio_embedding=audio_embedding_argument,
                         )
                 else:
                     if hasattr(model, "infer"):
@@ -140,7 +144,7 @@ def get_log_audio(
                             f0=f0[0:1, : durations.sum()],
                             energy_avg=energy_avg[0:1, : durations.sum()],
                             voiced_mask=voiced_mask[0:1, : durations.sum()],
-                            audio_embedding=audio_embedding[0:1],
+                            audio_embedding=audio_embedding_argument,
                         )
                     else:
                         model_output = model.module.infer(
@@ -151,7 +155,7 @@ def get_log_audio(
                             f0=f0[0:1, : durations.sum()],
                             energy_avg=energy_avg[0:1, : durations.sum()],
                             voiced_mask=voiced_mask[0:1, : durations.sum()],
-                            audio_embedding=audio_embedding[0:1],
+                            audio_embedding=audio_embedding_argument,
                         )
                 # except:
                 #     print("Instability or issue occured during inference, skipping sample generation for TB logger")
