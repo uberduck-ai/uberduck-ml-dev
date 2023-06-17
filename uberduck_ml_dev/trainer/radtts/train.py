@@ -42,7 +42,12 @@ def train_func(config: dict):
     )
 
     start_epoch = 0
-    train_loader, valset, collate_fn = prepare_dataloaders(data_config, 2, 6)
+    # NOTE (Sam): what is significance of batch_size=6?  Think this is overriden within the dataloader.
+    train_loader, valset, collate_fn = prepare_dataloaders(
+        data_config,
+        2,  # 2 gpus by default
+        train_config["batch_size"],
+    )
     train_dataloader = train.torch.prepare_data_loader(train_loader)
 
     optim = RAdam(

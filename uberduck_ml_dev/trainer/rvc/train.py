@@ -25,7 +25,6 @@ from uberduck_ml_dev.trainer.rvc.train_epoch import train_epoch
 
 
 def train_func(config: dict, project: str = "rvc"):
-
     print("Entering training function")
     setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
     train_config = config["train"]

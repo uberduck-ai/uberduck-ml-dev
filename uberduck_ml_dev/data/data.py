@@ -397,6 +397,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         dur_min=None,
         dur_max=None,
         combine_speaker_and_emotion=False,
+        is_zero_shot=True,
         **kwargs,
     ):
         self.combine_speaker_and_emotion = combine_speaker_and_emotion
@@ -430,6 +431,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         self.use_energy_avg = use_energy_avg
         self.use_scaled_energy = use_scaled_energy
         self.sampling_rate = sampling_rate
+        self.is_zero_shot = is_zero_shot
         self.tp = TextProcessing(
             symbol_set,
             cleaner_names,
@@ -669,7 +671,11 @@ class DataRADTTS(torch.utils.data.Dataset):
         if not self.use_attn_prior_masking:
             attn_prior = None
 
-        audio_emb = torch.load(audio_emb_path)
+        if self.is_zero_shot:
+            audio_emb = torch.load(audio_emb_path)
+        else:
+            audio_emb = None
+
         return {
             "mel": mel,
             "speaker_id": speaker_id,
@@ -692,8 +698,10 @@ class DataMel(Dataset):
         self,
         data_config,
         audiopaths: Optional[List[str]] = None,
+        target_paths: Optional[List[str]] = None,
     ):
         self.audiopaths = audiopaths
+        self.target_paths = target_paths
         stft = TacotronSTFT(
             filter_length=data_config["filter_length"],
             hop_length=data_config["hop_length"],
@@ -707,21 +715,22 @@ class DataMel(Dataset):
 
     # NOTE (Sam): assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
-    def _get_data(self, audiopath: str):
+    def _get_data(self, audiopath: str, target_path: str):
         rate, audio = read(audiopath)
-        sub_path = audiopath.split("resampled_unnormalized.wav")[0]
+        # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
         audio = np.asarray(audio / (np.abs(audio).max() * 2))
         audio_norm = torch.tensor(audio, dtype=torch.float32)
         audio_norm = audio_norm.unsqueeze(0)
         melspec = self.stft.mel_spectrogram(audio_norm)
         melspec = torch.squeeze(melspec, 0)
         melspec = (melspec + 5.5) / 2
-        spec_path_local = f"{sub_path}/spectrogram.pt"
-        torch.save(melspec.detach(), spec_path_local)
+        torch.save(melspec.detach(), target_path)
 
     def __getitem__(self, idx):
         try:
-            self._get_data(audiopath=self.audiopaths[idx])
+            self._get_data(
+                audiopath=self.audiopaths[idx], target_path=self.target_paths[idx]
+            )
 
         except Exception as e:
             print(f"Error while getting data: index = {idx}")
@@ -850,6 +859,7 @@ def get_f0_pvoiced(
 #     f0_coarse = np.rint(f0_mel).astype(np.int)
 #     return f0_coarse, f0bak  # 1-0 (a.k.a. pitch, pitchf from RVC)
 
+
 # NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
 def get_f0_parselmouth(x, hop_length, f0_up_key=0):
     p_len = x.shape[0] // hop_length
@@ -897,7 +907,7 @@ class DataPitch:
         self,
         data_config=None,
         audiopaths=None,
-        subpath_truncation=41,
+        target_folders=None,
         method="radtts",
         sample_rate=None,
     ):
@@ -907,18 +917,17 @@ class DataPitch:
             self.f0_max = data_config["f0_max"]
             self.frame_length = data_config["filter_length"]
         self.audiopaths = audiopaths
-        self.subpath_truncation = subpath_truncation
+        self.target_folders = target_folders
         self.method = method
         self.sample_rate = sample_rate
 
-    def _get_data(self, audiopath, sample_rate=None, recompute=False):
-
-        sub_path = audiopath[: self.subpath_truncation]
-        print("sub_path", sub_path)
+    def _get_data(
+        self, audiopath, sample_rate=None, recompute=False, target_folder=None
+    ):
         # NOTE (Sam): we need caching to debug training issues in dev.
         # NOTE (Sam): the logic here is convoluted and still won't catch issues with recomputation of f0 using different parameters
         # TODO (Sam): add hashing of cached files.
-        if recompute or not os.path.exists(f"{sub_path}/f0.pt"):
+        if recompute or not os.path.exists(f"{target_folder}/f0.pt"):
             if sample_rate is not None:
                 data, rate = librosa.load(audiopath, sr=sample_rate)
             else:
@@ -934,22 +943,27 @@ class DataPitch:
                 )
 
             if self.method == "parselmouth":
-
                 pitch, pitchf = get_f0_parselmouth(data, self.hop_length)
-                torch.save(torch.tensor(pitchf), f"{sub_path}/f0f.pt")
-
-            pitch_path_local = f"{sub_path}/f0.pt"
-            torch.save(torch.tensor(pitch), pitch_path_local)
+                torch.save(torch.tensor(pitchf), f"{target_folder}/f0f.pt")
+                pitch = torch.tensor(pitch)
+            pitch_path_local = f"{target_folder}/f0.pt"
+            torch.save(
+                pitch, pitch_path_local
+            )  # NOTE (Sam): "pitch" here is a tuple "f0, voiced_mask, p_voiced" for radtts.
         else:
             if self.method == "parselmouth":
-                if not os.path.exists(f"{sub_path}/f0f.pt"):
+                if not os.path.exists(f"{target_folder}/f0f.pt"):
                     raise Exception(
-                        f"File {sub_path}/f0f.pt does not exist - please set recompute = True"
+                        f"File {target_folder}/f0f.pt does not exist - please set recompute = True"
                     )
 
     def __getitem__(self, idx):
         try:
-            self._get_data(audiopath=self.audiopaths[idx], sample_rate=self.sample_rate)
+            self._get_data(
+                audiopath=self.audiopaths[idx],
+                sample_rate=self.sample_rate,
+                target_folder=self.target_folders[idx],
+            )
 
         except Exception as e:
             print(f"Error while getting data: index = {idx}")
