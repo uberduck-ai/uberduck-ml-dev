@@ -899,9 +899,7 @@ def get_f0_parselmouth(x, hop_length, f0_up_key=0):
 
 
 class DataPitch:
-    # NOTE (Sam): subpath_truncation=41 assumes data is in a directory structure like:
-    # /tmp/{uuid}/resampled_unnormalized.wav
-    # TODO (Sam): method here should reflect pitch method (e.g. parselmouth, pyworld, etc.) and not model type (e.g. radtts)
+    # TODO (Sam): method here should reflect pitch method (e.g. parselmouth, pyworld.harvest, etc.) and not model type (e.g. radtts)
     # TODO (Sam): consider add padding as in models.rvc.vc
     def __init__(
         self,
@@ -1101,7 +1099,6 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return (spec, wav, phone, pitch, pitchf, dv)
 
     def get_labels(self, phone_path, pitch_path, pitchf_path):
-        print(phone_path, pitch_path, pitchf_path, flush=True)
         phone_pt = torch.load(phone_path)
         phone = np.asarray(phone_pt)
         phone = np.repeat(
