@@ -529,7 +529,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         ]
 
     def create_speaker_lookup_table(self, data):
-        speaker_ids = np.sort(np.unique([x["speaker"] for x in data]))
+        speaker_ids = np.sort(np.unique([int(x["speaker"]) for x in data]))
         d = {speaker_ids[i]: i for i in range(len(speaker_ids))}
         print("Number of speakers:", len(d))
         print("Speaker IDS", d)
