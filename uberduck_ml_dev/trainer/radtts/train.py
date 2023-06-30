@@ -1,7 +1,11 @@
+import ray
 import torch
 from torch.cuda.amp import GradScaler
+from ray.air import session
 from ray.air.integrations.wandb import setup_wandb
 import ray.train as train
+from torchvision.models import resnet18
+
 
 from .train_epoch import train_epoch
 from .load import prepare_dataloaders, warmstart
@@ -32,23 +36,28 @@ def train_func(config: dict):
     model = RADTTS(
         **model_config,
     )
+    # model = resnet18()
 
     if train_config["warmstart_checkpoint_path"] != "":
         warmstart(train_config["warmstart_checkpoint_path"], model)
 
-    # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
-    model = train.torch.prepare_model(
-        model, parallel_strategy_kwargs=dict(find_unused_parameters=True)
-    )
-
     start_epoch = 0
     # NOTE (Sam): what is significance of batch_size=6?  Think this is overriden within the dataloader.
+    print("PREPARING DATALOADER")
     train_loader, valset, collate_fn = prepare_dataloaders(
         data_config,
         2,  # 2 gpus by default
         train_config["batch_size"],
     )
     train_dataloader = train.torch.prepare_data_loader(train_loader)
+    print("DONE PREPARING DATA LOSDER")
+
+    print("PREPARING MODEL...")
+    # NOTE (Sam): find_unused_parameters=True is necessary for num_workers >1 in ScalingConfig.
+    model = train.torch.prepare_model(
+        model, parallel_strategy_kwargs=dict(find_unused_parameters=True)
+    )
+    print("Done PREPARING MODEL...")
 
     optim = RAdam(
         model.parameters(),
@@ -74,7 +83,7 @@ def train_func(config: dict):
     )
     attention_kl_loss = AttentionBinarizationLoss()
     iteration = 0
-    for epoch in range(start_epoch, start_epoch + epochs):
+    for _ in range(start_epoch, start_epoch + epochs):
         iteration = train_epoch(
             train_dataloader,
             train_config["log_decoder_samples"],

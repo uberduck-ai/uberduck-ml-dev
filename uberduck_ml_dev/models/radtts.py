@@ -20,6 +20,7 @@
 # DEALINGS IN THE SOFTWARE.
 from typing import Optional
 
+
 import torch
 from torch import nn
 from .common import (
@@ -82,20 +83,6 @@ class FlowStep(nn.Module):
             z, log_det_W = self.invtbl_conv(z)
             z, log_s = self.affine_tfn(z, context, seq_lens=seq_lens)
             return z, log_det_W, log_s
-
-
-# # NOTE (Sam): comment this out for GPU
-# def get_mask_from_lengths(lengths):
-#     """Constructs binary mask from a 1D torch tensor of input lengths
-#     Args:
-#         lengths (torch.tensor): 1D tensor
-#     Returns:
-#         mask (torch.tensor): num_sequences x max_length x 1 binary tensor
-#     """
-#     max_len = torch.max(lengths).item()
-#     ids = torch.arange(0, max_len, out=torch.LongTensor(max_len))
-#     mask = (ids < lengths.unsqueeze(1)).bool()
-#     return mask
 
 
 class RADTTS(torch.nn.Module):
@@ -1011,7 +998,7 @@ DEFAULTS = {
     "n_early_every": 2,
     "n_group_size": 2,
     "affine_model": "wavenet",
-    "include_modules": "decatndpmvpredapm",
+    "include_modules": ["dec", "atn", "dpm", "vpred", "apm"],
     "scaling_fn": "tanh",
     "matrix_decomposition": "LUS",
     "learn_alignments": True,

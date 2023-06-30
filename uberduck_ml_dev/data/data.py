@@ -514,7 +514,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         return dataset
 
     def filter_by_speakers_(self, speakers, include=True):
-        print("Include spaker {}: {}".format(speakers, include))
+        print("Include speaker {}: {}".format(speakers, include))
         if include:
             self.data = [x for x in self.data if x["speaker"] in speakers]
         else:
@@ -609,6 +609,9 @@ class DataRADTTS(torch.utils.data.Dataset):
         if self.speaker_map is not None and speaker in self.speaker_map:
             speaker = self.speaker_map[speaker]
 
+        if speaker not in self.speaker_ids and int(speaker) in self.speaker_ids:
+            speaker = int(speaker)
+
         return torch.LongTensor([self.speaker_ids[speaker]])
 
     def get_text(self, text):
@@ -655,6 +658,17 @@ class DataRADTTS(torch.utils.data.Dataset):
             distance_map = np.log(distance_transform(mask))
             distance_map[distance_map <= 0] = 0.0
             f0 = f0 - distance_map
+
+        if not os.path.exists(mel_path):
+            _, audio = read(audiopath)
+            # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
+            audio = np.asarray(audio / (np.abs(audio).max() * 2))
+            audio_norm = torch.tensor(audio, dtype=torch.float32)
+            audio_norm = audio_norm.unsqueeze(0)
+            melspec = self.stft.mel_spectrogram(audio_norm)
+            melspec = torch.squeeze(melspec, 0)
+            melspec = (melspec + 5.5) / 2
+            torch.save(melspec.detach(), mel_path)
 
         mel = torch.load(mel_path)
 
