@@ -18,6 +18,7 @@ def train_epoch(
     binarization_start_iter,
     iteration,
     vocoder,
+    epoch=None,
 ):
     # def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
     # for batch_idx, ray_batch_df in enumerate(
@@ -43,6 +44,7 @@ def train_epoch(
             kl_loss_start_iter,
             binarization_start_iter,
             vocoder,
+            epoch=epoch,
         )
         iteration += 1
 

@@ -14,6 +14,10 @@ def warmstart(
     checkpoint_path, model, include_layers=[], ignore_layers_warmstart=[], strict=False
 ):
     pretrained_dict = torch.load(checkpoint_path, map_location="cpu")
+    iteration = 0
+    if "iteration" in pretrained_dict:
+        iteration = pretrained_dict["iteration"]
+
     pretrained_dict = pretrained_dict["state_dict"]
 
     is_module = False
@@ -29,9 +33,9 @@ def warmstart(
     model_dict = model.state_dict()
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict, strict=strict)
-    print("Warm started from {}".format(checkpoint_path))
+    print(f"Warm started from {checkpoint_path}, iteration {iteration}")
     model.train()
-    return model
+    return (model, iteration)
 
 
 def prepare_dataloaders(data_config, n_gpus, batch_size):

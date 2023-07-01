@@ -171,6 +171,9 @@ def get_log_audio(
                     sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
                 if oos_name is not None:
                     sample_tag = f"{sample_tag}_oos_{oos_name}"
-                audios[sample_tag] = audio
+                print("ADDING AUDIO WITH CAPTION: ", batch_dict.get("original_text")[0])
+                audios[sample_tag] = dict(
+                    audio=audio, caption=batch_dict.get("original_text")[0]
+                )
 
     return images, audios

@@ -693,6 +693,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         return {
             "mel": mel,
             "speaker_id": speaker_id,
+            "text": text,
             "text_encoded": text_encoded,
             "audiopath": audiopath,
             "attn_prior": attn_prior,

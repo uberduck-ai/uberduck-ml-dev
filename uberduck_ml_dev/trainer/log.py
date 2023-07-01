@@ -4,11 +4,19 @@ from ray.air import session
 
 
 @torch.no_grad()
-def log(metrics, audios={}):
+def log(metrics, audios=None, images=None):
+    if session.get_world_rank() != 0:
+        return
+    audios = audios or {}
+    images = images or {}
     wandb_metrics = dict(metrics)
 
     for k, v in audios.items():
-        wandb_metrics[k] = wandb.Audio(v, sample_rate=22050)
+        wandb_metrics[k] = wandb.Audio(
+            v["audio"], sample_rate=22050, caption=v.get("caption")
+        )
 
-    if session.get_world_rank() == 0:
-        wandb.log(wandb_metrics)
+    for k, v in images.items():
+        wandb_metrics[k] = wandb.Image(v)
+
+    wandb.log(wandb_metrics)

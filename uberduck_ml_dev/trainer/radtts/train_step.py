@@ -30,6 +30,7 @@ def _train_step(
     kl_loss_start_iter,
     binarization_start_iter,
     vocoder,
+    epoch=None,
 ):
     print(datetime.now(), "entering train step:", iteration)
     if iteration >= binarization_start_iter:
@@ -76,7 +77,9 @@ def _train_step(
         for k, (v, w) in loss_outputs.items():
             if w > 0:
                 loss = v * w if loss is None else loss + v * w
-            print_list.append("  |  {}: {:.3f}".format(k, v))
+            print_list.append("{}: {:.3f}".format(k, v))
+        print_list.append(f"epoch: {epoch}")
+        print_list.append(f"iteration: {iteration}")
 
         w_bin = criterion.loss_weights.get("binarization_loss_weight", 1.0)
         if binarize and iteration >= kl_loss_start_iter:
@@ -86,7 +89,7 @@ def _train_step(
             binarization_loss = torch.zeros_like(loss)
         loss_outputs["binarization_loss"] = (binarization_loss, w_bin)
     grad_clip_val = 1.0  # TODO (Sam): make this a config option
-    print(print_list)
+    print("  |  ".join(print_list))
     scaler.scale(loss).backward()
     if grad_clip_val > 0:
         scaler.unscale_(optim)
@@ -99,7 +102,6 @@ def _train_step(
     for k, (v, w) in loss_outputs.items():
         metrics[k] = v.item()
 
-    print("iteration: ", iteration, datetime.now())
     log_sample = iteration % steps_per_sample == 0
     log_checkpoint = iteration % iters_per_checkpoint == 0
 
@@ -142,7 +144,7 @@ def _train_step(
         #         audio_embedding_oos=audio_embedding_oos,
         #     )
         #     audios.update(audios_oos)
-        log(metrics, audios)
+        log(metrics, audios, images)
         model.train()
     else:
         log(metrics)

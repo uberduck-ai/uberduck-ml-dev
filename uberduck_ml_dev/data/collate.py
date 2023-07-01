@@ -218,10 +218,16 @@ class DataCollateRADTTS:
                     i, : cur_attn_prior.size(0), : cur_attn_prior.size(1)
                 ] = cur_attn_prior
 
+        original_text = [
+            batch[ids_sorted_decreasing[i]]["text"]
+            for i in range(len(ids_sorted_decreasing))
+        ]
+
         return {
             "mel": mel_padded,
             "speaker_ids": speaker_ids,
             "text": text_padded,
+            "original_text": original_text,
             "input_lengths": input_lengths,
             "output_lengths": output_lengths,
             "audiopaths": audiopaths,
