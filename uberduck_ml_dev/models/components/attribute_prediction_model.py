@@ -21,7 +21,7 @@
 import torch
 from torch import nn
 
-from uberduck_ml_dev.models.attentions import FFT
+from .attentions import FFT
 from ..common import (
     ConvNorm,
     Invertible1x1Conv,

@@ -8,8 +8,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .common import LayerNorm
-from ..utils.utils import convert_pad_shape, subsequent_mask
+from ..common import LayerNorm
+from ...utils.utils import convert_pad_shape, subsequent_mask
 
 
 class FFT(nn.Module):

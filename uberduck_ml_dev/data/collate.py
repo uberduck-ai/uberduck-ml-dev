@@ -181,6 +181,7 @@ class DataCollateRADTTS:
         speaker_ids = torch.LongTensor(len(batch))
         audiopaths = []
         # NOTE (Sam): I don't think we need to sort decreasing in modern torch versions (>= 1.9 at least).
+        # However, it is necessary for onxx export.
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]]["mel"]
             mel_padded[i, :, : mel.size(1)] = mel
