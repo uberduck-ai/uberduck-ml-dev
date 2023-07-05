@@ -1,3 +1,5 @@
+# NOTE (Sam): this was used for radtts training inference and inference on uberduck
+# the main differences is in how parameters are passed
 __all__ = [
     "HiFiGanGenerator",
     "ResBlock1",
@@ -50,26 +52,36 @@ DEFAULTS = {
     "fmin": 0,
     "fmax": 8000,
     "fmax_for_loss": None,
+    "gaussian_blur": {"p_blurring": 0.0},
 }
 
 
+def _load_uninitialized(device="cpu", config_overrides=None):
+    dev = torch.device(device)
+    config_dict = DEFAULTS
+    if config_overrides is not None:
+        config_dict.update(config_overrides)
+    config = AttrDict(config_dict)
+    generator = Generator(config).to(dev)
+    return generator
+
+
 # NOTE (Sam): denoiser not used here in contrast with radtts repo
-def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
-    h = AttrDict(vocoder_config)
-    if "gaussian_blur" in vocoder_config:
-        vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
-    else:
-        vocoder_config["gaussian_blur"] = {"p_blurring": 0.0}
-        h["gaussian_blur"] = {"p_blurring": 0.0}
+# def load_vocoder(vocoder_state_dict, vocoder_config, device="cuda"):
+#     h = AttrDict(vocoder_config)
+#     if "gaussian_blur" in vocoder_config:
+#         vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
+#     else:
+#         vocoder_config["gaussian_blur"] = {"p_blurring": 0.0}
+#         h["gaussian_blur"] = {"p_blurring": 0.0}
 
-    vocoder = Generator(h)
-    vocoder.load_state_dict(vocoder_state_dict)
-    if to_cuda:
-        vocoder.cuda()
+#     vocoder = Generator(h)
+#     vocoder.load_state_dict(vocoder_state_dict)
+#     vocoder.to(device)
 
-    vocoder.eval()
+#     vocoder.eval()
 
-    return vocoder
+#     return vocoder
 
 
 # TODO (Sam): combine loading methods
@@ -294,9 +306,14 @@ class Generator(torch.nn.Module):
         self.p_blur = h.gaussian_blur["p_blurring"]
         self.gaussian_blur_fn = None
         if self.p_blur > 0.0:
-            self.gaussian_blur_fn = GaussianBlurAugmentation(
-                h.gaussian_blur["kernel_size"], h.gaussian_blur["sigmas"], self.p_blur
+            # self.gaussian_blur_fn = GaussianBlurAugmentation(
+            #     h.gaussian_blur["kernel_size"], h.gaussian_blur["sigmas"], self.p_blur
+            # )
+            raise Exception(
+                "Gaussian blur is not supported in this version of the code."
             )
+            # self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
+
         else:
             self.gaussian_blur_fn = nn.Identity()
         self.lrelu_slope = LRELU_SLOPE
