@@ -1277,3 +1277,16 @@ RVC_DEFAULTS = {
     "mel_fmin": 0.0,
     "mel_fmax": None,
 }
+
+
+HIFIGAN_DEFAULTS = {
+    "segment_size": 8192,
+    "num_mels": 80,
+    "n_fft": 1024,
+    "hop_size": 256,
+    "win_size": 1024,
+    "sampling_rate": 22050,
+    "fmin": 0,
+    "fmax": 8000,
+    "fmax_for_loss": None,
+}

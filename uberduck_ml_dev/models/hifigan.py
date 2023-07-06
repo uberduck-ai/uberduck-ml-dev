@@ -42,16 +42,6 @@ DEFAULTS = {
     "upsample_initial_channel": 512,
     "resblock_kernel_sizes": [3, 7, 11],
     "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-    "segment_size": 8192,
-    "num_mels": 80,
-    "num_freq": 1025,
-    "n_fft": 1024,
-    "hop_size": 256,
-    "win_size": 1024,
-    "sampling_rate": 22050,
-    "fmin": 0,
-    "fmax": 8000,
-    "fmax_for_loss": None,
     "p_blur": 0.0,
 }
 
@@ -61,8 +51,7 @@ def _load_uninitialized(device="cpu", config_overrides=None):
     config_dict = DEFAULTS
     if config_overrides is not None:
         config_dict.update(config_overrides)
-    config = AttrDict(config_dict)
-    generator = Generator(config).to(dev)
+    generator = Generator(**config_dict).to(dev)
     return generator
 
 
@@ -115,7 +104,6 @@ class Generator(torch.nn.Module):
 
     def __init__(
         self,
-        initial_channel,
         resblock,
         resblock_kernel_sizes,
         resblock_dilation_sizes,
@@ -123,13 +111,22 @@ class Generator(torch.nn.Module):
         upsample_initial_channel,
         upsample_kernel_sizes,
         p_blur,
+        weight_norm_conv=True,
+        initial_channel=80,
+        conv_post_bias=True,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
-        self.conv_pre = weight_norm(
-            Conv1d(80, upsample_initial_channel, 7, 1, padding=3)
-        )
+        # TODO (Sam): detect this automatically
+        if weight_norm_conv:
+            self.conv_pre = weight_norm(
+                Conv1d(initial_channel, upsample_initial_channel, 7, 1, padding=3)
+            )
+        else:
+            self.conv_pre = Conv1d(
+                initial_channel, upsample_initial_channel, 7, 1, padding=3
+            )
         self.p_blur = p_blur
         self.gaussian_blur_fn = None
         if self.p_blur > 0.0:
@@ -170,7 +167,12 @@ class Generator(torch.nn.Module):
                 resblock_list.append(resblock(ch, k, d))
             self.resblocks.append(resblock_list)
 
-        self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
+        if weight_norm_conv:
+            self.conv_post = weight_norm(
+                Conv1d(ch, 1, 7, 1, padding=3, bias=conv_post_bias)
+            )
+        else:
+            self.conv_post = Conv1d(ch, 1, 7, 1, padding=3, bias=conv_post_bias)
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
