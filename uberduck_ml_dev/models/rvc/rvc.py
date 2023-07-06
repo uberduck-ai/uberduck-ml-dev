@@ -339,6 +339,9 @@ class SourceModuleHnNSF(torch.nn.Module):
         return sine_merge, None, None  # noise, uv
 
 
+from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
+
+
 class GeneratorNSF(torch.nn.Module):
     def __init__(
         self,
@@ -365,7 +368,7 @@ class GeneratorNSF(torch.nn.Module):
         self.conv_pre = Conv1d(
             initial_channel, upsample_initial_channel, 7, 1, padding=3
         )
-        resblock = modules.ResBlock1 if resblock == "1" else modules.ResBlock2
+        resblock = ResBlock1 if resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
