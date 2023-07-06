@@ -83,7 +83,7 @@ def _load_uninitialized(device="cpu", config_overrides=None):
 
 #     return vocoder
 
-from ..utils import load_pretrained
+from .utils import load_pretrained
 
 
 # NOTE (Sam): this is the loading method used by radtts
@@ -122,10 +122,7 @@ class Generator(torch.nn.Module):
         upsample_rates,
         upsample_initial_channel,
         upsample_kernel_sizes,
-        gin_channels,
-        sr,
         p_blur,
-        is_half=False,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -142,7 +139,6 @@ class Generator(torch.nn.Module):
             raise Exception(
                 "Gaussian blur is not supported in this version of the code."
             )
-            # self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
 
         else:
             self.gaussian_blur_fn = nn.Identity()
