@@ -49,6 +49,7 @@ DEFAULTS = {
 def _load_uninitialized(device="cpu", config_overrides=None):
     dev = torch.device(device)
     config_dict = DEFAULTS
+    # print(config_dict)
     if config_overrides is not None:
         config_dict.update(config_overrides)
     print(config_dict)
@@ -196,6 +197,7 @@ class Generator(torch.nn.Module):
             for j, (k, d) in enumerate(
                 zip(resblock_kernel_sizes, resblock_dilation_sizes)
             ):
+                # print("params", ch, k, d)
                 resblock_list.append(resblock(ch, k, d))
             self.resblocks.append(resblock_list)
 

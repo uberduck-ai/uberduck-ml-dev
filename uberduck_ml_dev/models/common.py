@@ -2106,6 +2106,7 @@ class ConvLSTMLinear(nn.Module):
 
 # NOTE (Sam): ironically, this is from RADTTS
 # TODO (Sam): combine this and MelSTFT (the class actually from Tacotron)
+# NOTE (Sam): MelSTFT has griffin lim inverse transform (need that)
 class TacotronSTFT(torch.nn.Module):
     def __init__(
         self,
