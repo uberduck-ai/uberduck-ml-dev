@@ -344,10 +344,10 @@ class Data(Dataset):
         f0_max=F0_MAX,
     ):
         f0, voiced_mask, p_voiced = pyin(
-            audio,
-            f0_min,
-            f0_max,
-            sampling_rate,
+            y=audio,
+            fmin=f0_min,
+            fmax=f0_max,
+            sr=sampling_rate,
             frame_length=frame_length,
             win_length=frame_length // 2,
             hop_length=hop_length,
@@ -810,8 +810,10 @@ def get_f0_pvoiced(
     f0_max=300,
 ):
     # NOTE (Sam): is this normalization kosher?
+    # NO!  Have to remember to pass ints normalized to MAX_WAV_VALUE / 2
     MAX_WAV_VALUE = 32768.0
     audio_norm = audio / MAX_WAV_VALUE
+    print(audio_norm)
     f0, voiced_mask, p_voiced = pyin(
         y=audio_norm,
         fmin=f0_min,
@@ -821,6 +823,7 @@ def get_f0_pvoiced(
         win_length=frame_length // 2,
         hop_length=hop_length,
     )
+    print(f0)
     f0[~voiced_mask] = 0.0
     f0 = torch.FloatTensor(f0)
     p_voiced = torch.FloatTensor(p_voiced)
@@ -940,9 +943,13 @@ class DataPitch:
         # TODO (Sam): add hashing of cached files.
         if recompute or not os.path.exists(f"{target_folder}/f0.pt"):
             if sample_rate is not None:
-                data, rate = librosa.load(audiopath, sr=sample_rate)
+                data, rate = librosa.load(
+                    audiopath, sr=sample_rate
+                )  # undoes normalization
+                data = (data * MAX_WAV_VALUE) / (np.abs(data).max() * 2)
             else:
                 rate, data = read(audiopath)
+            print(data)
             if self.method == "radtts":
                 pitch = get_f0_pvoiced(
                     data,
