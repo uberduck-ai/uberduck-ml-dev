@@ -121,6 +121,7 @@ class Generator(torch.nn.Module):
         use_noise_convs=False,
         sr=22050,
         is_half=False,
+        gin_channels=0,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -203,6 +204,9 @@ class Generator(torch.nn.Module):
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
 
+        if gin_channels != 0:
+            self.cond = nn.Conv1d(gin_channels, upsample_initial_channel, 1)
+
     def load_state_dict(self, state_dict):
         new_state_dict = {}
         for k, v in state_dict.items():
@@ -224,6 +228,8 @@ class Generator(torch.nn.Module):
         if self.p_blur > 0.0:
             x = self.gaussian_blur_fn(x)
         x = self.conv_pre(x)
+        if g is not None:
+            x = x + self.cond(g)
         for i, upsample_layer, resblock_group in enumerate(
             zip(self.ups, self.resblocks)
         ):
@@ -351,6 +357,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 
+# NOTE (Sam): quite different from rvc parameters here
 class DiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
         super(DiscriminatorS, self).__init__()
