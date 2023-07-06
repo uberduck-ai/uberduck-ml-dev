@@ -59,12 +59,17 @@ def get_embeddings(
 
 
 # NOTE (Sam): pitch, pitchf == f0 coarse, f0bak in rvc parlance.
+# NOTE (Sam): sample_rate is also passed as part of data_config
+# TODO (Sam): remove as an independent argument?
+# TODO (Sam): decide on sample_rate v sampling_rate
+# NOTE (Sam): radtts and parselmouth pitch methods seem to generate pitches of different lengths.
 def get_pitches(
     paths,
     data_config=None,
     target_folders=None,
     method="parselmouth",
     sample_rate=None,
+    recompute=False,
 ):
     data = DataPitch(
         audiopaths=paths,
@@ -72,6 +77,7 @@ def get_pitches(
         target_folders=target_folders,
         method=method,
         sample_rate=sample_rate,
+        recompute=recompute,
     )
     get_parallel_torch(data)
 

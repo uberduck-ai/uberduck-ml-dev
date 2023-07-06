@@ -126,6 +126,8 @@ class Generator(torch.nn.Module):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
+        self.conv_post_bias = conv_post_bias
+        self.use_noise_convs = use_noise_convs
         # TODO (Sam): detect this automatically
         if weight_norm_conv:
             self.conv_pre = weight_norm(
@@ -140,6 +142,8 @@ class Generator(torch.nn.Module):
             self.m_source = SourceModuleHnNSF(
                 sampling_rate=sr, harmonic_num=0, is_half=is_half
             )
+            self.upp = np.prod(upsample_rates)
+
         self.p_blur = p_blur
         self.gaussian_blur_fn = None
         if self.p_blur > 0.0:
@@ -230,7 +234,7 @@ class Generator(torch.nn.Module):
         x = self.conv_pre(x)
         if g is not None:
             x = x + self.cond(g)
-        for i, upsample_layer, resblock_group in enumerate(
+        for i, (upsample_layer, resblock_group) in enumerate(
             zip(self.ups, self.resblocks)
         ):
             x = F.leaky_relu(x, self.lrelu_slope)

@@ -706,17 +706,24 @@ class DataMel(Dataset):
             filter_length=data_config["filter_length"],
             hop_length=data_config["hop_length"],
             win_length=data_config["win_length"],
-            sampling_rate=22050,
+            sampling_rate=data_config["sampling_rate"],
             n_mel_channels=data_config["n_mel_channels"],
             mel_fmin=data_config["mel_fmin"],
             mel_fmax=data_config["mel_fmax"],
         )
         self.stft = stft
+        # NOTE (Sam): we will frequently end up using librosa load rather than scipy
+        # its not clear if this is actually slower if the native rate of the .wav = the provided rate
+        self.sampling_rate = data_config["sampling_rate"]
 
     # NOTE (Sam): assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
-    def _get_data(self, audiopath: str, target_path: str):
-        rate, audio = read(audiopath)
+    def _get_data(self, audiopath: str, target_path: str, sampling_rate: int = None):
+        if sampling_rate is None:
+            rate, audio = read(audiopath)
+        else:
+            rate = sampling_rate
+            audio, _ = librosa.load(audiopath, sr=rate)
         # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
         audio = np.asarray(audio / (np.abs(audio).max() * 2))
         audio_norm = torch.tensor(audio, dtype=torch.float32)
@@ -729,7 +736,9 @@ class DataMel(Dataset):
     def __getitem__(self, idx):
         try:
             self._get_data(
-                audiopath=self.audiopaths[idx], target_path=self.target_paths[idx]
+                audiopath=self.audiopaths[idx],
+                target_path=self.target_paths[idx],
+                sampling_rate=self.sampling_rate,
             )
 
         except Exception as e:
@@ -910,6 +919,7 @@ class DataPitch:
         target_folders=None,
         method="radtts",
         sample_rate=None,
+        recompute=False,
     ):
         self.hop_length = data_config["hop_length"]
         if method == "radtts":
@@ -920,6 +930,7 @@ class DataPitch:
         self.target_folders = target_folders
         self.method = method
         self.sample_rate = sample_rate
+        self.recompute = recompute
 
     def _get_data(
         self, audiopath, sample_rate=None, recompute=False, target_folder=None
@@ -939,7 +950,7 @@ class DataPitch:
                     f0_max=self.f0_max,
                     hop_length=self.hop_length,
                     frame_length=self.frame_length,
-                    sampling_rate=22050,
+                    sampling_rate=sample_rate,
                 )
 
             if self.method == "parselmouth":
@@ -962,6 +973,7 @@ class DataPitch:
             self._get_data(
                 audiopath=self.audiopaths[idx],
                 sample_rate=self.sample_rate,
+                recompute=self.recompute,
                 target_folder=self.target_folders[idx],
             )
 
