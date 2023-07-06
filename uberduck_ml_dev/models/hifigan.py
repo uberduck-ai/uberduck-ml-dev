@@ -37,7 +37,7 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
 DEFAULTS = {
     "resblock": "1",
-    "upsample_rates": [8, 8, 2, 2],
+    "upsample_rates": [8, 8, 2, 2],  # RVC is 10,10,2,2
     "upsample_kernel_sizes": [16, 16, 4, 4],
     "upsample_initial_channel": 512,
     "resblock_kernel_sizes": [3, 7, 11],
@@ -51,6 +51,7 @@ def _load_uninitialized(device="cpu", config_overrides=None):
     config_dict = DEFAULTS
     if config_overrides is not None:
         config_dict.update(config_overrides)
+    print(config_dict)
     generator = Generator(**config_dict).to(dev)
     return generator
 
@@ -97,6 +98,9 @@ LRELU_SLOPE = 0.1
 
 
 from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
+from uberduck_ml_dev.models.rvc.rvc import (
+    SourceModuleHnNSF,
+)  # TODO (Sam): we should switch the direction of this import
 
 
 class Generator(torch.nn.Module):
@@ -114,6 +118,9 @@ class Generator(torch.nn.Module):
         weight_norm_conv=True,
         initial_channel=80,
         conv_post_bias=True,
+        use_noise_convs=False,
+        sr=22050,
+        is_half=False,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -126,6 +133,11 @@ class Generator(torch.nn.Module):
         else:
             self.conv_pre = Conv1d(
                 initial_channel, upsample_initial_channel, 7, 1, padding=3
+            )
+        if use_noise_convs:
+            self.noise_convs = nn.ModuleList()
+            self.m_source = SourceModuleHnNSF(
+                sampling_rate=sr, harmonic_num=0, is_half=is_half
             )
         self.p_blur = p_blur
         self.gaussian_blur_fn = None
@@ -156,6 +168,21 @@ class Generator(torch.nn.Module):
                     )
                 )
             )
+            if use_noise_convs:
+                c_cur = upsample_initial_channel // (2 ** (i + 1))
+                if i + 1 < len(upsample_rates):
+                    stride_f0 = np.prod(upsample_rates[i + 1 :])
+                    self.noise_convs.append(
+                        Conv1d(
+                            1,
+                            c_cur,
+                            kernel_size=stride_f0 * 2,
+                            stride=stride_f0,
+                            padding=stride_f0 // 2,
+                        )
+                    )
+                else:
+                    self.noise_convs.append(Conv1d(1, c_cur, kernel_size=1))
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
@@ -190,13 +217,20 @@ class Generator(torch.nn.Module):
             new_state_dict[new_k] = v
         super().load_state_dict(new_state_dict)
 
-    def forward(self, x):
+    def forward(self, x, f0=None, g=None):
+        if self.use_noise_convs:
+            har_source, noi_source, uv = self.m_source(f0, self.upp)
+            har_source = har_source.transpose(1, 2)
         if self.p_blur > 0.0:
             x = self.gaussian_blur_fn(x)
         x = self.conv_pre(x)
-        for upsample_layer, resblock_group in zip(self.ups, self.resblocks):
+        for i, upsample_layer, resblock_group in enumerate(
+            zip(self.ups, self.resblocks)
+        ):
             x = F.leaky_relu(x, self.lrelu_slope)
             x = upsample_layer(x)
+            if self.use_noise_convs:
+                x += self.noise_convs[i](har_source)
             xs = torch.zeros(x.shape, dtype=x.dtype, device=x.device)
             for resblock in resblock_group:
                 xs += resblock(x)
