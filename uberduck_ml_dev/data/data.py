@@ -1311,3 +1311,37 @@ HIFIGAN_DEFAULTS = {
     "fmax": 8000,
     "fmax_for_loss": None,
 }
+
+# HIFIGAn
+
+import math
+from .hifigan import mel_spectrogram, load_wav
+import random
+from librosa.util import normalize
+
+import pandas as pd
+
+
+class HifiGanDataset(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        filelist,
+    ):
+        filelist = pd.read_csv(filelist, header=None, index_col=None, sep="|")
+        self.data_paths = filelist[0].tolist()
+
+    def __getitem__(self, index):
+        data_path = self.data_paths[index]
+
+        mel_path = f"{data_path}/mel.pt"
+        audio_path = f"{data_path}/audio.pt"
+        f0_path = f"{data_path}/f0.pt"
+
+        mel = torch.load(mel_path)
+        audio = torch.load(audio_path)
+        f0 = torch.load(f0_path)
+
+        return (mel, audio, f0)
+
+    def __len__(self):
+        return len(self.data_paths)
