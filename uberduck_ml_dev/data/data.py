@@ -723,7 +723,9 @@ class DataMel(Dataset):
             rate, audio = read(audiopath)
         else:
             rate = sampling_rate
-            audio, _ = librosa.load(audiopath, sr=rate)
+            audio, _ = librosa.load(
+                audiopath, sr=rate
+            )  # NOTE (Sam): this destroys the normalization.
         # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
         audio = np.asarray(audio / (np.abs(audio).max() * 2))
         audio_norm = torch.tensor(audio, dtype=torch.float32)
@@ -873,18 +875,20 @@ def get_f0_pvoiced(
 
 
 # NOTE (Sam): requires x, hop_length w.r.t 16k sample rate.
-def get_f0_parselmouth(x, hop_length, f0_up_key=0):
+def get_f0_parselmouth(
+    x, hop_length, f0_up_key=0, f0_min=50, f0_max=1100, sampling_rate=16000
+):
     p_len = x.shape[0] // hop_length
-    time_step = 160 / 16000 * 1000
-    f0_min = 50
-    f0_max = 1100
+    # TODO (Sam): figure out what the data_config parameter that corresponds to time_step is.
+    # at 16k its at 1 / 100 of a second.
+    time_step = 160 / sampling_rate
     f0_mel_min = 1127 * np.log(1 + f0_min / 700)
     f0_mel_max = 1127 * np.log(1 + f0_max / 700)
 
     f0 = (
-        parselmouth.Sound(x, 16000)
+        parselmouth.Sound(x, sampling_rate)
         .to_pitch_ac(
-            time_step=time_step / 1000,
+            time_step=time_step,
             voicing_threshold=0.6,
             pitch_floor=f0_min,
             pitch_ceiling=f0_max,
@@ -904,7 +908,6 @@ def get_f0_parselmouth(x, hop_length, f0_up_key=0):
     ) + 1
     f0_mel[f0_mel <= 1] = 1
     f0_mel[f0_mel > 255] = 255
-    # f0_mel[f0_mel > 188] = 188
     f0_coarse = np.rint(f0_mel).astype(np.int)
     # NOTE (Sam): I think this is pitch, pitchf
     return f0_coarse, f0bak
@@ -1120,7 +1123,6 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         return (spec, wav, phone, pitch, pitchf, dv)
 
     def get_labels(self, phone_path, pitch_path, pitchf_path):
-        print(phone_path, pitch_path, pitchf_path, flush=True)
         phone_pt = torch.load(phone_path)
         phone = np.asarray(phone_pt)
         phone = np.repeat(
