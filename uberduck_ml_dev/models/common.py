@@ -1120,6 +1120,7 @@ def mel_spectrogram_torch(
     )
     y = y.squeeze(1)
 
+    print(y.shape, "y")
     spec = torch.stft(
         y,
         n_fft,
@@ -1132,6 +1133,7 @@ def mel_spectrogram_torch(
         onesided=True,
         return_complex=True,
     )
+    print(spec.shape, "spec")
     spec = torch.view_as_real(spec)
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
@@ -2152,8 +2154,10 @@ class TacotronSTFT(torch.nn.Module):
         assert torch.min(y.data) >= -1
         assert torch.max(y.data) <= 1
 
+        print(y.shape, "yshape")
         magnitudes, phases = self.stft_fn.transform(y)
         magnitudes = magnitudes.data
+        print(magnitudes.shape)
         mel_output = torch.matmul(self.mel_basis, magnitudes)
         mel_output = self.spectral_normalize(mel_output)
         return mel_output
@@ -2169,6 +2173,7 @@ class TacotronSTFT(torch.nn.Module):
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         melspec = self.mel_spectrogram(audio_norm)
+
         melspec = torch.squeeze(melspec, 0)
         # if self.do_mel_scaling:
         melspec = (melspec + 5.5) / 2

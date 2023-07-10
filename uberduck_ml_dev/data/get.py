@@ -15,6 +15,21 @@ def get_parallel_torch(data):
         pass
 
 
+from uberduck_ml_dev.data.data import FunctionalDataProcessor
+
+
+def get(function_, loading_function, paths, target_paths, recompute, function_kwargs):
+    data = FunctionalDataProcessor(
+        paths=paths,
+        target_paths=target_paths,
+        function_=function_,
+        loading_function=loading_function,
+        recompute=recompute,
+        function_kwargs=function_kwargs,
+    )
+    get_parallel_torch(data)
+
+
 # TODO (Sam): use get_parallel_torch to reduce boilerplate.
 # NOTE (Sam): assumes data is in a directory structure like:
 # /tmp/{uuid}/resampled_normalized.wav

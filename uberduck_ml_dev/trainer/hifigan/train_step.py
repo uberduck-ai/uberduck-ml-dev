@@ -41,6 +41,7 @@ def train_step(
 
     batch = batch.to_gpu()
 
+    print("asdfasdfasdfweqrqwer")
     # mel = .to_gpu()
     # mel_lengths = batch["mel_lengths"].to_gpu()
     # audio = batch["audio"].to_gpu()
@@ -62,8 +63,10 @@ def train_step(
     #     train_config["segment_size"],
     # )
 
+    print(batch["audio_padded"].shape, audio_hat.shape, "\n\n\n asdfasdf")
+    # with autocast(enabled=False):
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(
-        batch["audio_padded"], audio_hat.detach()
+        batch["audio_padded"].unsqueeze(0), audio_hat.detach()
     )
     with autocast(enabled=False):
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
@@ -89,11 +92,43 @@ def train_step(
         data_config["mel_fmin"],
         data_config["mel_fmax"],
     )
+    from ...models.common import (
+        TacotronSTFT,
+    )
+
+    stft = TacotronSTFT(
+        filter_length=data_config["filter_length"],
+        hop_length=data_config["hop_length"],
+        win_length=data_config["win_length"],
+        sampling_rate=data_config["sampling_rate"],
+        n_mel_channels=data_config["n_mel_channels"],
+        mel_fmin=data_config["mel_fmin"],
+        mel_fmax=data_config["mel_fmax"],
+    )
+    import numpy as np
+    import torch
+
+    audio = batch["audio_padded"].cpu().detach().numpy()
+    audio = 0.5 * audio / np.abs(audio).max()
+    print(audio.shape, "audioshape")
+    print(stft.mel_spectrogram(torch.tensor(audio)).shape, "melshape")
+    # print(
+    #     "other method",
+    #     stft.mel_spectrogram(
+
+    #         / (np.abs(batch["audio_padded"].cpu().detach().numpy().max() * 2))
+    #     ).shape,
+    # )
+
     # if train_config["fp16_run"] == True:
     #     y_hat_mel = y_hat_mel.half()
+    print("try this")
+    print(batch["mel_padded"].shape, y_hat_mel.shape, "\n\n\n bmbmb")
     with autocast(enabled=train_config["fp16_run"]):
+        print(batch["audio_padded"].shape, "\n\n\n asdfasdf")
         y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(
-            batch["audio_padded"], audio_hat
+            batch["audio_padded"].unsqueeze(0),
+            audio_hat,  # batch["audio_padded"].unsqueeze(0)?
         )  # how does this deal with the padding?
         loss_mel = l1_loss(batch["mel_padded"], y_hat_mel) * train_config["c_mel"]
         # loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config["c_kl"] # used in rvc not in hifigan
