@@ -18,12 +18,21 @@ def get_parallel_torch(data):
 from uberduck_ml_dev.data.data import FunctionalDataProcessor
 
 
-def get(function_, loading_function, paths, target_paths, recompute, function_kwargs):
+def get(
+    function_,
+    loading_function,
+    saving_function,
+    paths,
+    target_paths,
+    recompute,
+    function_kwargs,
+):
     data = FunctionalDataProcessor(
         paths=paths,
         target_paths=target_paths,
         function_=function_,
         loading_function=loading_function,
+        saving_function=saving_function,
         recompute=recompute,
         function_kwargs=function_kwargs,
     )

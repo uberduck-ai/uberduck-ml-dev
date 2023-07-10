@@ -1336,16 +1336,24 @@ class BasicDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         data_path = self.data_paths[index]
 
+        # if split:
+        #     frames_per_seg = math.ceil(self.segment_size / self.hop_size)
         output = {}
         if self.mel_suffix is not None:
             mel_path = os.path.join(data_path, self.mel_suffix)
             mel = torch.load(mel_path)
+
+            # if split:
+            #     mel_start = random.randint(0, mel.size(2) - frames_per_seg - 1)
             output["mel"] = mel
 
         if self.audio_suffix is not None:
             audio_path = os.path.join(data_path, self.audio_suffix)
             rate, audio = read(audio_path)
-            # print(audio)
+            # if split:
+            #     audio_start = mel_start * self.hop_size
+            #     audio = audio[audio_start : audio_start + self.segment_size]
+
             output["audio"] = torch.tensor(audio)
 
         if self.f0_suffix is not None:
@@ -1368,6 +1376,7 @@ class FunctionalDataProcessor:
         paths: List[str],
         function_: Callable,
         loading_function: Callable,
+        saving_function: Callable,
         target_paths: List[
             str
         ],  # NOTE (Sam): this is target_folders in certain versions of the code since for example we want to save pitch at f0.pt and pitch mask as f0f.pt.  Have to think of a solution.
@@ -1380,6 +1389,7 @@ class FunctionalDataProcessor:
         self.function_kwargs = function_kwargs
         self.recompute = recompute
         self.loading_function = loading_function
+        self.saving_function = saving_function
 
     def _get_data(self, path, target_path):
         # NOTE (Sam): we need caching to debug training issues in dev and for speed!
@@ -1388,7 +1398,7 @@ class FunctionalDataProcessor:
         if self.recompute or not os.path.exists(target_path):
             input_ = self.loading_function(path)
             data = self.function_(input_, **self.function_kwargs)
-            torch.save(data, target_path)
+            self.saving_function(data, target_path)
         else:
             pass
 

@@ -212,6 +212,7 @@ def mel_spectrogram_torch(
         melspec :: (B, Freq, Frame) - Mel-frequency Log-amplitude spectrogram
     """
     # Linear-frequency Linear-amplitude spectrogram :: (B, T) -> (B, Freq, Frame)
+    print(hop_size, "hoppity boppity")
     spec = spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center)
 
     print(spec.shape)

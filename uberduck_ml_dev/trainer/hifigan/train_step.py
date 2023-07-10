@@ -2,8 +2,8 @@ from torch.cuda.amp import autocast
 from ray.air import session
 from datetime import datetime
 
-from uberduck_ml_dev.models.rvc.commons import clip_grad_value_, slice_segments
-from uberduck_ml_dev.data.utils import mel_spectrogram_torch, spec_to_mel_torch
+from ...models.rvc.commons import clip_grad_value_, slice_segments
+from ...data.utils import mel_spectrogram_torch, spec_to_mel_torch
 from ..log import log
 from ..rvc.save import save_checkpoint
 
@@ -41,12 +41,15 @@ def train_step(
 
     batch = batch.to_gpu()
 
-    print("asdfasdfasdfweqrqwer")
     # mel = .to_gpu()
     # mel_lengths = batch["mel_lengths"].to_gpu()
     # audio = batch["audio"].to_gpu()
     # audio_lengths = batch["audio_lengths"].to_gpu()
+    from ...models.rvc.commons import rand_slice_segments
 
+    mel_slices, ids_slice = rand_slice_segments(
+        batch["mel_padded"], batch["mel_lengths"], train_config["segment_size"]
+    )
     # (
     #     y_hat,
     #     ids_slice,
@@ -54,8 +57,11 @@ def train_step(
     #     z_mask,
     #     (z, z_p, m_p, logs_p, m_q, logs_q),
     # )
-    audio_hat = generator(batch["mel_padded"], batch["mel_lengths"])
-
+    # audio_hat, ids_slice = generator(batch["mel_padded"], batch["mel_lengths"])
+    audio_hat = generator(mel_slices)
+    # print(batch["mel_padded"].shape)
+    # print(audio_hat.shape)
+    # print("loookkkkk!!!!")
     # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
     # wave = slice_segments(
     #     batch["audio"],
@@ -63,8 +69,11 @@ def train_step(
     #     train_config["segment_size"],
     # )
 
-    print(batch["audio_padded"].shape, audio_hat.shape, "\n\n\n asdfasdf")
+    # print(batch["audio_padded"].shape, audio_hat.shape, "\n\n\n asdfasdf")
     # with autocast(enabled=False):
+    audio_hat = slice_segments(
+        audio_hat, ids_slice, train_config["segment_size"] // data_config["hop_length"]
+    )
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(
         batch["audio_padded"].unsqueeze(0), audio_hat.detach()
     )
@@ -82,6 +91,7 @@ def train_step(
     #     mel, ids_slice, train_config["segment_size"] // data_config["hop_length"]
     # )
     # with autocast(enabled=False):
+    print(audio_hat.shape, "autio_hat_shape")
     y_hat_mel = mel_spectrogram_torch(
         audio_hat.float().squeeze(1),
         data_config["filter_length"],
@@ -92,26 +102,32 @@ def train_step(
         data_config["mel_fmin"],
         data_config["mel_fmax"],
     )
-    from ...models.common import (
-        TacotronSTFT,
+    mel_slices_reconstructed = slice_segments(
+        y_hat_mel,
+        ids_slice,
+        train_config["segment_size"] // data_config["hop_length"],
     )
+    print(y_hat_mel.shape, "gerkfsbdkj,bm")
+    # from ...models.common import (
+    #     TacotronSTFT,
+    # )
 
-    stft = TacotronSTFT(
-        filter_length=data_config["filter_length"],
-        hop_length=data_config["hop_length"],
-        win_length=data_config["win_length"],
-        sampling_rate=data_config["sampling_rate"],
-        n_mel_channels=data_config["n_mel_channels"],
-        mel_fmin=data_config["mel_fmin"],
-        mel_fmax=data_config["mel_fmax"],
-    )
-    import numpy as np
-    import torch
+    # stft = TacotronSTFT(
+    #     filter_length=data_config["filter_length"],
+    #     hop_length=data_config["hop_length"],
+    #     win_length=data_config["win_length"],
+    #     sampling_rate=data_config["sampling_rate"],
+    #     n_mel_channels=data_config["n_mel_channels"],
+    #     mel_fmin=data_config["mel_fmin"],
+    #     mel_fmax=data_config["mel_fmax"],
+    # )
+    # import numpy as np
+    # import torch
 
-    audio = batch["audio_padded"].cpu().detach().numpy()
-    audio = 0.5 * audio / np.abs(audio).max()
-    print(audio.shape, "audioshape")
-    print(stft.mel_spectrogram(torch.tensor(audio)).shape, "melshape")
+    # audio = batch["audio_padded"].cpu().detach().numpy()
+    # audio = 0.5 * audio / np.abs(audio).max()
+    # print(audio.shape, "audioshape")
+    # print(stft.mel_spectrogram(torch.tensor(audio)).shape, "melshape")
     # print(
     #     "other method",
     #     stft.mel_spectrogram(
@@ -122,25 +138,24 @@ def train_step(
 
     # if train_config["fp16_run"] == True:
     #     y_hat_mel = y_hat_mel.half()
-    print("try this")
-    print(batch["mel_padded"].shape, y_hat_mel.shape, "\n\n\n bmbmb")
-    with autocast(enabled=train_config["fp16_run"]):
-        print(batch["audio_padded"].shape, "\n\n\n asdfasdf")
-        y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(
-            batch["audio_padded"].unsqueeze(0),
-            audio_hat,  # batch["audio_padded"].unsqueeze(0)?
-        )  # how does this deal with the padding?
-        loss_mel = l1_loss(batch["mel_padded"], y_hat_mel) * train_config["c_mel"]
-        # loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config["c_kl"] # used in rvc not in hifigan
-        loss_fm = feature_loss(fmap_r, fmap_g)
-        loss_gen, losses_gen = generator_loss(y_d_hat_g)
-        # TODO (Sam): put these in a loss_outputs dict like radtts
-        loss_gen_all = (
-            loss_gen * generator_loss_weight
-            + loss_fm * feature_loss_weight
-            + loss_mel * l1_loss_weight
-            # + loss_kl * kl_loss_weight
-        )
+    # with autocast(enabled=train_config["fp16_run"]):
+    print(batch["audio_padded"].shape, "\n\n\n", audio_hat.shape)
+    y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(
+        batch["audio_padded"].unsqueeze(0),
+        audio_hat,  # batch["audio_padded"].unsqueeze(0)?
+    )  # how does this deal with the padding?
+    loss_mel = l1_loss(mel_slices, mel_slices_reconstructed) * train_config["c_mel"]
+    # loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config["c_kl"] # used in rvc not in hifigan
+    loss_fm = feature_loss(fmap_r, fmap_g)
+    loss_gen, losses_gen = generator_loss(y_d_hat_g)
+    # TODO (Sam): put these in a loss_outputs dict like radtts
+    loss_gen_all = (
+        loss_gen * generator_loss_weight
+        + loss_fm * feature_loss_weight
+        + loss_mel * l1_loss_weight
+        # + loss_kl * kl_loss_weight
+    )
+
     generator_optimizer.zero_grad()
     scaler.scale(loss_gen_all).backward()
     scaler.unscale_(generator_optimizer)

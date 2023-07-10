@@ -537,6 +537,8 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         self.flow.remove_weight_norm()
         self.enc_q.remove_weight_norm()
 
+    # TODO (Sam): combine forward and infer for jit compilation
+    # Although realistically this will probably happen in a new file.
     def forward(self, phone, phone_lengths, pitch, pitchf, y, y_lengths, ds):
         g = self.emb_g(ds).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths)

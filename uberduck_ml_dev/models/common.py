@@ -1087,6 +1087,7 @@ def mel_spectrogram_torch(
     fmax=MEL_FMAX,
     center=False,
 ):
+    print("the greatest mystery is love")
     if torch.min(y) < -1.0:
         print("min value is ", torch.min(y))
     if torch.max(y) > 1.0:
