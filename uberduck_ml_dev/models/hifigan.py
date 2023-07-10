@@ -20,21 +20,26 @@ __all__ = [
     "get_padding",
 ]
 
-
-""" from https://github.com/jik876/hifi-gan """
-
 import json
-import datetime as dt
 import numpy as np
-from scipy.io.wavfile import write
 
+import os
+import shutil
+from torch.nn.utils import weight_norm
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
+from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
+from uberduck_ml_dev.models.rvc.rvc import (
+    SourceModuleHnNSF,
+)  # TODO (Sam): we should switch the direction of this import
+
+
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
+# TODO (Sam): try the facebook config.
 DEFAULTS = {
     "resblock": "1",
     "upsample_rates": [8, 8, 2, 2],  # RVC is 10,10,2,2
@@ -96,12 +101,6 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
 
 
 LRELU_SLOPE = 0.1
-
-
-from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
-from uberduck_ml_dev.models.rvc.rvc import (
-    SourceModuleHnNSF,
-)  # TODO (Sam): we should switch the direction of this import
 
 
 class Generator(torch.nn.Module):
@@ -461,10 +460,6 @@ def generator_loss(disc_outputs):
     return loss, gen_losses
 
 
-import os
-import shutil
-
-
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
@@ -476,9 +471,6 @@ def build_env(config, config_name, path):
     if config != t_path:
         os.makedirs(path, exist_ok=True)
         shutil.copyfile(config, os.path.join(path, config_name))
-
-
-from torch.nn.utils import weight_norm
 
 
 def init_weights(m, mean=0.0, std=0.01):

@@ -5,17 +5,17 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
 from .train_epoch import train_epoch
-from uberduck_ml_dev.models.rvc.rvc import (
+from ...models.rvc.rvc import (
     SynthesizerTrnMs256NSFsid,
     MultiPeriodDiscriminator,
 )
-from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
-from uberduck_ml_dev.data.data import (
+from ...vendor.tfcompat.hparam import HParams
+from ...data.data import (
     TextAudioLoaderMultiNSFsid,
     DistributedBucketSampler,
 )
-from uberduck_ml_dev.data.collate import TextAudioCollateMultiNSFsid
-from uberduck_ml_dev.losses_rvc import (
+from ...data.collate import TextAudioCollateMultiNSFsid
+from ...losses_rvc import (
     generator_loss,
     discriminator_loss,
     feature_loss,

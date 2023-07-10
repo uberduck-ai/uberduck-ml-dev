@@ -1322,26 +1322,38 @@ from librosa.util import normalize
 import pandas as pd
 
 
-class HifiGanDataset(torch.utils.data.Dataset):
+class BasicDataset(torch.utils.data.Dataset):
     def __init__(
-        self,
-        filelist,
+        self, filelist_path, mel_suffix=None, audio_suffix=None, f0_suffix=None
     ):
-        filelist = pd.read_csv(filelist, header=None, index_col=None, sep="|")
-        self.data_paths = filelist[0].tolist()
+        self.data_paths = pd.read_csv(
+            filelist_path, header=None, index_col=None, sep="|"
+        )[0].values.tolist()
+        self.mel_suffix = mel_suffix
+        self.audio_suffix = audio_suffix
+        self.f0_suffix = f0_suffix
 
     def __getitem__(self, index):
         data_path = self.data_paths[index]
 
-        mel_path = f"{data_path}/mel.pt"
-        audio_path = f"{data_path}/audio.pt"
-        f0_path = f"{data_path}/f0.pt"
+        output = {}
+        if self.mel_suffix is not None:
+            mel_path = os.path.join(data_path, self.mel_suffix)
+            mel = torch.load(mel_path)
+            output["mel"] = mel
 
-        mel = torch.load(mel_path)
-        audio = torch.load(audio_path)
-        f0 = torch.load(f0_path)
+        if self.audio_suffix is not None:
+            audio_path = os.path.join(data_path, self.audio_suffix)
+            rate, audio = read(audio_path)
+            # print(audio)
+            output["audio"] = torch.tensor(audio)
 
-        return (mel, audio, f0)
+        if self.f0_suffix is not None:
+            f0_path = os.path.join(data_path, self.f0_suffix)
+            f0 = torch.load(f0_path)
+            output["f0"] = f0
+
+        return output
 
     def __len__(self):
         return len(self.data_paths)
