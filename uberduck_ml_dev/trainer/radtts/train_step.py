@@ -31,6 +31,7 @@ def _train_step(
     binarization_start_iter,
     vocoder,
     epoch=None,
+    grad_clip_val=None,
 ):
     print(datetime.now(), "entering train step:", iteration)
     if iteration >= binarization_start_iter:
@@ -88,17 +89,18 @@ def _train_step(
         else:
             binarization_loss = torch.zeros_like(loss)
         loss_outputs["binarization_loss"] = (binarization_loss, w_bin)
-    grad_clip_val = 1.0  # TODO (Sam): make this a config option
     print("  |  ".join(print_list))
+    metrics = {"loss": loss.item()}
     scaler.scale(loss).backward()
     if grad_clip_val > 0:
         scaler.unscale_(optim)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_val)
+        norm_ = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_val)
+        print("total norm: ", norm_.item())
+        metrics["grad_norm"] = norm_.item()
 
     scaler.step(optim)
     scaler.update()
 
-    metrics = {"loss": loss.item()}
     for k, (v, w) in loss_outputs.items():
         metrics[k] = v.item()
 

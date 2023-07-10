@@ -30,6 +30,7 @@ def train_func(config: dict):
     sigma = train_config["sigma"]
     kl_loss_start_iter = train_config["kl_loss_start_iter"]
     binarization_start_iter = train_config["binarization_start_iter"]
+    grad_clip_val = train_config["grad_clip_val"]
 
     model = RADTTS(
         **model_config,
@@ -97,6 +98,7 @@ def train_func(config: dict):
             iteration,
             vocoder,
             epoch=epoch,
+            grad_clip_val=grad_clip_val,
         )
 
 

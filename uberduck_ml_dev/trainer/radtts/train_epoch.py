@@ -19,6 +19,7 @@ def train_epoch(
     iteration,
     vocoder,
     epoch=None,
+    grad_clip_val=None,
 ):
     # def train_epoch(dataset_shard, batch_size, model, optim, steps_per_sample, scaler, scheduler, criterion, attention_kl_loss, kl_loss_start_iter, binarization_start_iter, epoch, iteration):
     # for batch_idx, ray_batch_df in enumerate(
@@ -45,6 +46,7 @@ def train_epoch(
             binarization_start_iter,
             vocoder,
             epoch=epoch,
+            grad_clip_val=grad_clip_val,
         )
         iteration += 1
 

@@ -7,7 +7,11 @@ import numpy as np
 from ...utils.utils import (
     to_gpu,
 )
-from ...utils.plot import plot_alignment_to_numpy
+from ...utils.plot import (
+    plot_alignment_to_numpy,
+    plot_attention_phonemes,
+    plot_spectrogram,
+)
 
 
 # want to test out of sample but can only do proper inference with zero shot dap so lets just look at zero shot decoder samples
@@ -65,6 +69,7 @@ def get_log_audio(
 
     images = {}
     audios = {}
+    images["mel_gt"] = plot_spectrogram(mel[0].data.cpu().numpy())
     if attn_used is not None:
         images["attention_weights"] = plot_alignment_to_numpy(
             attn_soft[0, 0].data.cpu().numpy().T, title="audioname"

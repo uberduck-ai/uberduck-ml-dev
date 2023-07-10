@@ -76,6 +76,9 @@ def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
 def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     print("Getting vocoder")
 
+    import os
+
+    print("CWD: ", os.getcwd())
     with open(hifi_gan_config_path) as f:
         hifigan_config = json.load(f)
 
