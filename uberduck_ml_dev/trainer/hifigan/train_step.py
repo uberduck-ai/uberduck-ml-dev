@@ -37,14 +37,8 @@ def train_step(
     kl_loss_weight = optimization_parameters["losses"]["kl"]["weight"]
 
     # NOTE (Sam): moving to gpu needs to be done in the training step not in the collate function (i.e. here).
-    # TODO (Sam): move to batch.to_gpu().
-
     batch = batch.to_gpu()
 
-    # mel = .to_gpu()
-    # mel_lengths = batch["mel_lengths"].to_gpu()
-    # audio = batch["audio"].to_gpu()
-    # audio_lengths = batch["audio_lengths"].to_gpu()
     from ...models.rvc.commons import rand_slice_segments
 
     mel_slices, ids_slice = rand_slice_segments(
@@ -52,48 +46,27 @@ def train_step(
         batch["mel_lengths"],
         train_config["segment_size"] // data_config["hop_length"],
     )
-    # (
-    #     y_hat,
-    #     ids_slice,
-    #     x_mask,
-    #     z_mask,
-    #     (z, z_p, m_p, logs_p, m_q, logs_q),
-    # )
-    # audio_hat, ids_slice = generator(batch["mel_padded"], batch["mel_lengths"])
     audio_hat = generator(mel_slices)
-    # print(batch["mel_padded"].shape)
-    # print(audio_hat.shape)
-    # print("loookkkkk!!!!")
+    # audio_hat = audio_hat.squeeze(0)  # NOTE (Sam): why is audio_hat a 3 way tensor? # looks like maybe to reuse the slice method between mel and audio.
     # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
-    # wave = slice_segments(
-    #     batch["audio"],
-    #     ids_slice * data_config["hop_length"],
-    #     train_config["segment_size"],
-    # )
 
-    # print(batch["audio_padded"].shape, audio_hat.shape, "\n\n\n asdfasdf")
     # with autocast(enabled=False):
-    audio_hat = slice_segments(
-        audio_hat, ids_slice * data_config["hop_length"], train_config["segment_size"]
+    print(batch["audio_padded"].shape)
+    audio_sliced = slice_segments(
+        batch["audio_padded"].unsqueeze(0),
+        ids_slice * data_config["hop_length"],
+        train_config["segment_size"],
     )
-    y_d_hat_r, y_d_hat_g, _, _ = discriminator(
-        batch["audio_padded"].unsqueeze(0), audio_hat.detach()
-    )
-    with autocast(enabled=False):
-        loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
-            y_d_hat_r, y_d_hat_g
-        )
+    y_d_hat_r, y_d_hat_g, _, _ = discriminator(audio_sliced, audio_hat.detach())
+    # with autocast(enabled=False):
+    loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
     discriminator_optimizer.zero_grad()
     scaler.scale(loss_disc).backward()
     scaler.unscale_(discriminator_optimizer)
     grad_norm_d = clip_grad_value_(discriminator.parameters(), None)
     scaler.step(discriminator_optimizer)
 
-    # y_mel = slice_segments(
-    #     mel, ids_slice, train_config["segment_size"] // data_config["hop_length"]
-    # )
     # with autocast(enabled=False):
-    print(audio_hat.shape, "autio_hat_shape")
     y_hat_mel = mel_spectrogram_torch(
         audio_hat.float().squeeze(1),
         data_config["filter_length"],
@@ -104,50 +77,22 @@ def train_step(
         data_config["mel_fmin"],
         data_config["mel_fmax"],
     )
-    mel_slices_reconstructed = slice_segments(
-        y_hat_mel,
-        ids_slice,
-        train_config["segment_size"] // data_config["hop_length"],
-    )
-    print(y_hat_mel.shape, "gerkfsbdkj,bm")
-    # from ...models.common import (
-    #     TacotronSTFT,
+    # NOTE (Sam) y_hat_mel already sliced.... but what of the bufferring??
+
+    # mel_slices_reconstructed = slice_segments(
+    #     y_hat_mel,
+    #     ids_slice,
+    #     train_config["segment_size"] // data_config["hop_length"],
     # )
-
-    # stft = TacotronSTFT(
-    #     filter_length=data_config["filter_length"],
-    #     hop_length=data_config["hop_length"],
-    #     win_length=data_config["win_length"],
-    #     sampling_rate=data_config["sampling_rate"],
-    #     n_mel_channels=data_config["n_mel_channels"],
-    #     mel_fmin=data_config["mel_fmin"],
-    #     mel_fmax=data_config["mel_fmax"],
-    # )
-    # import numpy as np
-    # import torch
-
-    # audio = batch["audio_padded"].cpu().detach().numpy()
-    # audio = 0.5 * audio / np.abs(audio).max()
-    # print(audio.shape, "audioshape")
-    # print(stft.mel_spectrogram(torch.tensor(audio)).shape, "melshape")
-    # print(
-    #     "other method",
-    #     stft.mel_spectrogram(
-
-    #         / (np.abs(batch["audio_padded"].cpu().detach().numpy().max() * 2))
-    #     ).shape,
-    # )
-
     # if train_config["fp16_run"] == True:
     #     y_hat_mel = y_hat_mel.half()
     # with autocast(enabled=train_config["fp16_run"]):
-    print(batch["audio_padded"].shape, "\n\n\n", audio_hat.shape)
+    # print(audio_sliced.unsqueeze(0).shape)
     y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(
-        batch["audio_padded"].unsqueeze(0),
+        audio_sliced,
         audio_hat,  # batch["audio_padded"].unsqueeze(0)?
     )  # how does this deal with the padding?
-    loss_mel = l1_loss(mel_slices, mel_slices_reconstructed) * train_config["c_mel"]
-    # loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * train_config["c_kl"] # used in rvc not in hifigan
+    loss_mel = l1_loss(mel_slices, y_hat_mel) * train_config["c_mel"]
     loss_fm = feature_loss(fmap_r, fmap_g)
     loss_gen, losses_gen = generator_loss(y_d_hat_g)
     # TODO (Sam): put these in a loss_outputs dict like radtts

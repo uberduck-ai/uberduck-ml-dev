@@ -23,7 +23,7 @@ from .train_step import train_step
 
 def train_func(config: dict, project: str = "rvc"):
     print("Entering training function")
-    # setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
+    setup_wandb(config, project=project, entity="uberduck-ai", rank_zero_only=False)
     train_config = config["train"]
     model_config = config["model"]
     data_config = config["data"]

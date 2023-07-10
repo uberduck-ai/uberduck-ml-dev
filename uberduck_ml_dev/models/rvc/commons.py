@@ -46,7 +46,11 @@ def slice_segments(x, ids_str, segment_size=4):
     for i in range(x.size(0)):
         idx_str = ids_str[i]
         idx_end = idx_str + segment_size
+        print(ret.shape, x.shape, idx_str, idx_end)
+        print(ret[i].shape)
+        print(x[i, :, idx_str:idx_end].shape)
         ret[i] = x[i, :, idx_str:idx_end]
+
     return ret
 
 
