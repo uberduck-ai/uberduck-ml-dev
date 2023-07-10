@@ -48,7 +48,9 @@ def train_step(
     from ...models.rvc.commons import rand_slice_segments
 
     mel_slices, ids_slice = rand_slice_segments(
-        batch["mel_padded"], batch["mel_lengths"], train_config["segment_size"]
+        batch["mel_padded"],
+        batch["mel_lengths"],
+        train_config["segment_size"] // data_config["hop_length"],
     )
     # (
     #     y_hat,
@@ -72,7 +74,7 @@ def train_step(
     # print(batch["audio_padded"].shape, audio_hat.shape, "\n\n\n asdfasdf")
     # with autocast(enabled=False):
     audio_hat = slice_segments(
-        audio_hat, ids_slice, train_config["segment_size"] // data_config["hop_length"]
+        audio_hat, ids_slice * data_config["hop_length"], train_config["segment_size"]
     )
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(
         batch["audio_padded"].unsqueeze(0), audio_hat.detach()
