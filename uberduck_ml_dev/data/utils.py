@@ -163,7 +163,6 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     y = y.squeeze(1)
 
     # Complex Spectrogram :: (B, T) -> (B, Freq, Frame, RealComplex=2)
-    print(y.shape, "mnfft")
     spec = torch.stft(
         y,
         n_fft,
@@ -176,7 +175,6 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
         onesided=True,
         return_complex=False,
     )
-    print(spec.shape)
     # Linear-frequency Linear-amplitude spectrogram :: (B, Freq, Frame, RealComplex=2) -> (B, Freq, Frame)
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
@@ -212,10 +210,8 @@ def mel_spectrogram_torch(
         melspec :: (B, Freq, Frame) - Mel-frequency Log-amplitude spectrogram
     """
     # Linear-frequency Linear-amplitude spectrogram :: (B, T) -> (B, Freq, Frame)
-    print(hop_size, "hoppity boppity")
     spec = spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center)
 
-    print(spec.shape)
     # Mel-frequency Log-amplitude spectrogram :: (B, Freq, Frame) -> (B, Freq=num_mels, Frame)
     melspec = spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax)
 

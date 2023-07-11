@@ -333,6 +333,7 @@ class DiscriminatorP(torch.nn.Module):
         return x, fmap
 
 
+# NOTE (Sam): can also use the rvc version, which has 6 period discriminators and only one scale one.
 class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self):
         super(MultiPeriodDiscriminator, self).__init__()

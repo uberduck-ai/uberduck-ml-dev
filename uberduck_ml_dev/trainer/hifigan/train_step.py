@@ -41,10 +41,9 @@ def train_step(
     )
     audio_hat = generator(mel_slices)
     # NOTE (Sam): it looks like audio_hat is a 3 way tensor to reuse the slice method between mel and audio.
-    # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
 
+    # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
     # with autocast(enabled=False):
-    print(batch["audio_padded"].shape)
     audio_sliced = slice_segments(
         batch["audio_padded"].unsqueeze(0),
         ids_slice * data_config["hop_length"],
@@ -70,15 +69,20 @@ def train_step(
         data_config["mel_fmin"],
         data_config["mel_fmax"],
     )
-    # NOTE (Sam) RVC training also compares reconstructed spectrograms to ground truth, mod buffering issues.
+    # NOTE (Sam): RVC training also compares reconstructed spectrograms to ground truth, mod buffering issues.
+    # I'm not sure if this makes sense for Hifigan, since the source values are themselves spectrograms, as opposed to hubert embeddings.
 
     # if train_config["fp16_run"] == True:
     #     y_hat_mel = y_hat_mel.half()
     # with autocast(enabled=train_config["fp16_run"]):
+    # NOTE (Sam): y_d_hat are list of coordinates of real and generated data at the output of each block
+    # fmap_r and fmap_g are coordinates at the output of each layer within each block
+    # thus, y_d_hat are lists, and fmap_r and fmap_g are lists of lists
     y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(
         audio_sliced,
         audio_hat,
     )
+
     loss_mel = l1_loss(mel_slices, y_hat_mel) * train_config["c_mel"]
     loss_fm = feature_loss(fmap_r, fmap_g)
     loss_gen, losses_gen = generator_loss(y_d_hat_g)
@@ -97,6 +101,10 @@ def train_step(
     scaler.step(generator_optimizer)
     scaler.update()
 
+    print("iteration: ", iteration, datetime.now())
+    log_sample = iteration % train_config["steps_per_sample"] == 0
+    log_checkpoint = iteration % train_config["iters_per_checkpoint"] == 0
+
     metrics = {
         "generator_total_loss": loss_gen_all,
         "generator_feature_loss": feature_loss_weight,
@@ -106,12 +114,12 @@ def train_step(
         "discriminator_loss_fake": losses_disc_g,
     }
 
-    print("iteration: ", iteration, datetime.now())
-    log_sample = iteration % train_config["steps_per_sample"] == 0
-    log_checkpoint = iteration % train_config["iters_per_checkpoint"] == 0
-
     log(metrics)
 
+    if log_sample and session.get_world_rank() == 0:
+        audios = {"real_audio": audio_sliced, "generated_audio": audio_hat}
+        images = None
+        log(audios=audios, images=images)
     if log_checkpoint and session.get_world_rank() == 0:
         checkpoint_path = f"{train_config['output_directory']}/model_{iteration}.pt"
         save_checkpoint(
