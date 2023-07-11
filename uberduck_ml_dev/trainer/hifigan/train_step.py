@@ -6,6 +6,7 @@ from ...models.rvc.commons import clip_grad_value_, slice_segments
 from ...data.utils import mel_spectrogram_torch, spec_to_mel_torch
 from ..log import log
 from ..rvc.save import save_checkpoint
+from ...models.rvc.commons import rand_slice_segments
 
 
 # TODO (Sam): add config arguments to model / optimization / logging and remove.
@@ -22,24 +23,16 @@ def train_step(
     generator_optimizer = optimization_parameters["optimizers"]["generator"]
     scaler = optimization_parameters["scaler"]
     discriminator_loss = optimization_parameters["losses"]["discriminator"]["loss"]
-    # NOTE (Sam): losses like l1_loss are quite generic outside of the arguments passed.
-    # The reason to pass the loss as a parameter rather than import it is to reuse the _train_step function for different losses.
-    # However, explicit assignments render that goal currently only half attained.
-    # The reason we need explicit assignments is because I'm not sure how to parameterize the arguments passed to the loss function in the _train_step function invocation.
-    # Once that's figured out, we will surely be Gucci.
+    # NOTE (Sam): The reason to pass the loss as a parameter rather than import it is to eventually reuse the _train_step function for different losses.
     l1_loss = optimization_parameters["losses"]["l1"]["loss"]
     l1_loss_weight = optimization_parameters["losses"]["l1"]["weight"]
     generator_loss = optimization_parameters["losses"]["generator"]["loss"]
     generator_loss_weight = optimization_parameters["losses"]["generator"]["weight"]
     feature_loss = optimization_parameters["losses"]["feature"]["loss"]
     feature_loss_weight = optimization_parameters["losses"]["feature"]["weight"]
-    kl_loss = optimization_parameters["losses"]["kl"]["loss"]
-    kl_loss_weight = optimization_parameters["losses"]["kl"]["weight"]
 
-    # NOTE (Sam): moving to gpu needs to be done in the training step not in the collate function (i.e. here).
+    # NOTE (Sam): moving to gpu needs to be done here not in the collate function
     batch = batch.to_gpu()
-
-    from ...models.rvc.commons import rand_slice_segments
 
     mel_slices, ids_slice = rand_slice_segments(
         batch["mel_padded"],
@@ -47,7 +40,7 @@ def train_step(
         train_config["segment_size"] // data_config["hop_length"],
     )
     audio_hat = generator(mel_slices)
-    # audio_hat = audio_hat.squeeze(0)  # NOTE (Sam): why is audio_hat a 3 way tensor? # looks like maybe to reuse the slice method between mel and audio.
+    # NOTE (Sam): it looks like audio_hat is a 3 way tensor to reuse the slice method between mel and audio.
     # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
 
     # with autocast(enabled=False):
@@ -77,21 +70,15 @@ def train_step(
         data_config["mel_fmin"],
         data_config["mel_fmax"],
     )
-    # NOTE (Sam) y_hat_mel already sliced.... but what of the bufferring??
+    # NOTE (Sam) RVC training also compares reconstructed spectrograms to ground truth, mod buffering issues.
 
-    # mel_slices_reconstructed = slice_segments(
-    #     y_hat_mel,
-    #     ids_slice,
-    #     train_config["segment_size"] // data_config["hop_length"],
-    # )
     # if train_config["fp16_run"] == True:
     #     y_hat_mel = y_hat_mel.half()
     # with autocast(enabled=train_config["fp16_run"]):
-    # print(audio_sliced.unsqueeze(0).shape)
     y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = discriminator(
         audio_sliced,
-        audio_hat,  # batch["audio_padded"].unsqueeze(0)?
-    )  # how does this deal with the padding?
+        audio_hat,
+    )
     loss_mel = l1_loss(mel_slices, y_hat_mel) * train_config["c_mel"]
     loss_fm = feature_loss(fmap_r, fmap_g)
     loss_gen, losses_gen = generator_loss(y_d_hat_g)
@@ -110,7 +97,14 @@ def train_step(
     scaler.step(generator_optimizer)
     scaler.update()
 
-    metrics = {"generator loss": loss_gen_all}
+    metrics = {
+        "generator_total_loss": loss_gen_all,
+        "generator_feature_loss": feature_loss_weight,
+        "generator_loss_mel": l1_loss_weight,
+        "discriminator_total_loss": loss_disc,
+        "discriminator_loss_real": losses_disc_r,
+        "discriminator_loss_fake": losses_disc_g,
+    }
 
     print("iteration: ", iteration, datetime.now())
     log_sample = iteration % train_config["steps_per_sample"] == 0

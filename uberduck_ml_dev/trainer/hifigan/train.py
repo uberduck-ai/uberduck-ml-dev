@@ -4,13 +4,12 @@ from ray.air.integrations.wandb import setup_wandb
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
+from ...data.data import BasicDataset
 from ...models.rvc.rvc import (
     MultiPeriodDiscriminator,
 )
 
-# from ...vendor.tfcompat.hparam import HParams
-
-from ...data.collate import Collate  # TextAudioCollateMultiNSFsid
+from ...data.collate import Collate
 from ...losses_rvc import (
     generator_loss,
     discriminator_loss,
@@ -19,6 +18,7 @@ from ...losses_rvc import (
 )
 from .train_epoch import train_epoch
 from .train_step import train_step
+from ..rvc.train import DEFAULTS as DEFAULTS
 
 
 def train_func(config: dict, project: str = "rvc"):
@@ -57,10 +57,11 @@ def train_func(config: dict, project: str = "rvc"):
     # TODO (Sam): move to "warmstart" or "load_checkpoint" functions
     if train_config["warmstart_G_checkpoint_path"] is not None:
         generator_checkpoint = torch.load(train_config["warmstart_G_checkpoint_path"])[
-            "model"
+            # "model"
+            "generator"
         ]
         generator.load_state_dict(
-            generator_checkpoint, strict=False
+            generator_checkpoint  # , False
         )  # NOTE (Sam): a handful of "enc_q" decoder states not present - doesn't seem to cause an issue
     if train_config["warmstart_D_checkpoint_path"] is not None:
         discriminator_checkpoint = torch.load(
@@ -73,38 +74,6 @@ def train_func(config: dict, project: str = "rvc"):
     models = {"generator": generator, "discriminator": discriminator}
 
     print("Loading dataset")
-    # trainset = MelDataset(
-    #     data_config["filelist"],
-    #     data_config["segment_size"],
-    #     data_config["n_fft"],
-    #     data_config["num_mels"],
-    #     data_config["hop_size"],
-    #     data_config["win_size"],
-    #     data_config["sampling_rate"],
-    #     data_config["fmin"],
-    #     data_config["fmax"],
-    #     n_cache_reuse=0,
-    #     shuffle=False if train_config["num_gpus"] > 1 else True,
-    #     fmax_loss=hi.fmax_for_loss,
-    #     device="cuda",
-    #     # fine_tuning=a.fine_tuning,
-    #     # base_mels_path=a.input_mels_dir,
-    # )
-
-    # train_dataset = TextAudioLoaderMultiNSFsid(
-    #     train_config["filelist_path"], HParams(**data_config)
-    # )  # dv is sid
-    # collate_fn = TextAudioCollateMultiNSFsid()
-    # n_gpus = 1
-    # train_sampler = DistributedBucketSampler(
-    #     train_dataset,
-    #     train_config["batch_size"] * n_gpus,
-    #     [100, 200, 300, 400, 500, 600, 700, 800, 900],  # 16s
-    #     num_replicas=n_gpus,
-    #     rank=0,
-    #     shuffle=True,
-    # )
-    from uberduck_ml_dev.data.data import BasicDataset
 
     train_dataset = BasicDataset(
         filelist_path=data_config["filelist_path"],
@@ -151,6 +120,3 @@ def train_func(config: dict, project: str = "rvc"):
             logging_parameters={},
             iteration=iteration,
         )
-
-
-from ..rvc.train import DEFAULTS as DEFAULTS
