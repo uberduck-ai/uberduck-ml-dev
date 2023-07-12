@@ -117,7 +117,10 @@ def train_step(
     log(metrics)
 
     if log_sample and session.get_world_rank() == 0:
-        audios = {"real_audio": audio_sliced, "generated_audio": audio_hat}
+        audios = {
+            "ground_truth": {"audio": audio_sliced[0][0]},
+            "generated": {"audio": audio_hat[0][0]},
+        }
         images = None
         log(audios=audios, images=images)
     if log_checkpoint and session.get_world_rank() == 0:

@@ -10,11 +10,12 @@ def log(metrics=None, audios=None, images=None):
     audios = audios or {}
     images = images or {}
     wandb_metrics = {}
-    wandb_metrics.update(metrics)
+    if metrics is not None:
+        wandb_metrics.update(metrics)
 
     for k, v in audios.items():
         wandb_metrics[k] = wandb.Audio(
-            v["audio"], sample_rate=22050, caption=v.get("caption")
+            v["audio"].cpu(), sample_rate=22050, caption=v.get("caption")
         )
 
     for k, v in images.items():
