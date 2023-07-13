@@ -1,3 +1,5 @@
+import re
+
 __all__ = [
     "symbols_portuguese",
     "PORTUGUESE_SYMBOLS",

@@ -9,8 +9,10 @@ from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
 from uberduck_ml_dev.data.collate import CollateBlank
 
 
-def get_parallel_torch(data):
-    data_loader = DataLoader(data, batch_size=32, collate_fn=CollateBlank())
+def get_parallel_torch(data, num_workers=0):
+    data_loader = DataLoader(
+        data, batch_size=32, collate_fn=CollateBlank(), num_workers=num_workers
+    )
     for batch in data_loader:
         pass
 
@@ -19,7 +21,7 @@ def get_parallel_torch(data):
 # NOTE (Sam): assumes data is in a directory structure like:
 # /tmp/{uuid}/resampled_normalized.wav
 # These functions add spectrogram.pt, f0.pt, and coqui_resnet_512_emb.pt to each file-specific directory.
-def get_mels(paths, data_config, target_paths):
+def get_mels(paths, data_config, target_paths, num_workers=0):
     data = DataMel(audiopaths=paths, data_config=data_config, target_paths=target_paths)
 
     collate_fn = CollateBlank()
@@ -28,6 +30,7 @@ def get_mels(paths, data_config, target_paths):
         data,
         batch_size=32,
         collate_fn=collate_fn,
+        num_workers=num_workers,
     )
     for batch in data_loader:
         pass  # computes in loader.
@@ -36,15 +39,16 @@ def get_mels(paths, data_config, target_paths):
 def get_embeddings(
     paths,
     data_config,
+    target_paths,
     resnet_se_model_path,
     resnet_se_config_path,
-    subpath_truncation=41,
+    num_workers=0,
 ):
     data = DataEmbedding(
         audiopaths=paths,
         resnet_se_model_path=resnet_se_model_path,
         resnet_se_config_path=resnet_se_config_path,
-        subpath_truncation=subpath_truncation,
+        target_paths=target_paths,
     )
 
     collate_fn = CollateBlank()
@@ -53,6 +57,7 @@ def get_embeddings(
         data,
         batch_size=32,
         collate_fn=collate_fn,
+        num_workers=num_workers,
     )
     for batch in data_loader:
         pass  # computes in loader.
@@ -65,6 +70,7 @@ def get_pitches(
     target_folders=None,
     method="parselmouth",
     sample_rate=None,
+    num_workers=0,
 ):
     data = DataPitch(
         audiopaths=paths,
@@ -73,7 +79,7 @@ def get_pitches(
         method=method,
         sample_rate=sample_rate,
     )
-    get_parallel_torch(data)
+    get_parallel_torch(data, num_workers=num_workers)
 
 
 HUBERT_PATH = "hubert_embedding.pt"

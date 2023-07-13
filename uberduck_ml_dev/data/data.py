@@ -775,25 +775,29 @@ class DataEmbedding:
         resnet_se_model_path,
         resnet_se_config_path,
         audiopaths,
-        subpath_truncation=41,
+        target_paths,
     ):
         self.model = get_pretrained_model(
             model_path=resnet_se_model_path, config_path=resnet_se_config_path
         )
         self.audiopaths = audiopaths
-        self.subpath_truncation = subpath_truncation
+        self.target_paths = target_paths
+        # self.subpath_truncation = subpath_truncation
 
-    def _get_data(self, audiopath):
+    def _get_data(self, audiopath, target_path):
         rate, data = read(audiopath)
         data = torch.FloatTensor(data.astype("float32") / MAX_WAV_VALUE).unsqueeze(0)
-        sub_path = audiopath[: self.subpath_truncation]
+        # sub_path = audiopath[: self.subpath_truncation]
         embedding = self.model(data).squeeze()
-        emb_path_local = f"{sub_path}/coqui_resnet_512_emb.pt"
+        # emb_path_local = f"{sub_path}/coqui_resnet_512_emb.pt"
+        emb_path_local = target_path
         torch.save(embedding.detach(), emb_path_local)
 
     def __getitem__(self, idx):
         try:
-            self._get_data(audiopath=self.audiopaths[idx])
+            self._get_data(
+                audiopath=self.audiopaths[idx], target_path=self.target_paths[idx]
+            )
 
         except Exception as e:
             print(f"Error while getting data: index = {idx}")

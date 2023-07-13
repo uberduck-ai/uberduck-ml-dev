@@ -135,7 +135,8 @@ class RADTTS(torch.nn.Module):
         )
         self.n_speaker_dim = n_speaker_dim
         assert self.n_speaker_dim % 2 == 0
-        self.speaker_embedding = torch.nn.Embedding(n_speakers, self.n_speaker_dim)
+        if n_speakers > 0:
+            self.speaker_embedding = torch.nn.Embedding(n_speakers, self.n_speaker_dim)
         self.embedding = torch.nn.Embedding(n_text, n_text_dim)
         self.flows = torch.nn.ModuleList()
         self.encoder = Encoder(
@@ -352,6 +353,7 @@ class RADTTS(torch.nn.Module):
         text_embeddings = self.embedding(text).transpose(1, 2)
         # text_enc: b x n_text_dim x encoder_dim (512)
 
+        print(text_embeddings.device)
         if in_lens is None:
             text_enc = self.encoder.infer(text_embeddings).transpose(1, 2)
         else:
@@ -586,6 +588,7 @@ class RADTTS(torch.nn.Module):
 
             z_out.append(mel)
             z_mel = torch.cat(z_out, 1)
+            print("SHAPE OF Z MEL: ", z_mel.shape, "SHAPE OF MEL: ", mel.shape)
 
         # duration predictor forward pass
         duration_model_outputs = None
