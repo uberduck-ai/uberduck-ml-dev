@@ -10,7 +10,9 @@ from uberduck_ml_dev.data.collate import CollateBlank
 
 
 def get_parallel_torch(data):
-    data_loader = DataLoader(data, batch_size=32, collate_fn=CollateBlank())
+    data_loader = DataLoader(
+        data, batch_size=32, collate_fn=CollateBlank(), num_workers=32
+    )
     for batch in data_loader:
         pass
 
