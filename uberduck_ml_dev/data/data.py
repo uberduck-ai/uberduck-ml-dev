@@ -716,6 +716,8 @@ class DataMel(Dataset):
     # NOTE (Sam): assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
     def _get_data(self, audiopath: str, target_path: str):
+        if os.path.exists(target_path):
+            return
         rate, audio = read(audiopath)
         # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
         audio = np.asarray(audio / (np.abs(audio).max() * 2))
