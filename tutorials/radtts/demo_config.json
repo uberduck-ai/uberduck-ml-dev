@@ -2,17 +2,17 @@
    "data_config":{
       "training_files":{
          "dataset_1":{
-            "basedir":"",
+            "basedir":"/usr/src/app/uberduck_ml_dev/tutorials/radtts/lj",
             "audiodir":"",
-            "filelist":"path/to/filelist.txt",
+            "filelist":"lj.txt",
             "lmdbpath":""
          }
       },
       "validation_files":{
          "dataset_1":{
-            "basedir":"",
+            "basedir":"/usr/src/app/uberduck_ml_dev/tutorials/radtts/lj",
             "audiodir":"",
-            "filelist":"path/to/filelist.txt",
+            "filelist":"lj.txt",
             "lmdbpath":""
          }
       },
@@ -36,8 +36,8 @@
       "cleaner_names":[
          "radtts_cleaners"
       ],
-      "heteronyms_path":"/path/to/uberduck_ml_dev/uberduck_ml_dev/text/heteronyms",
-      "phoneme_dict_path":"/path/to/uberduck_ml_dev/uberduck_ml_dev/text/cmudict-0.7b",
+      "heteronyms_path":"/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/heteronyms",
+      "phoneme_dict_path":"/usr/src/app/uberduck_ml_dev/uberduck_ml_dev/text/cmudict-0.7b",
       "p_phoneme":1.0,
       "handle_phoneme":"word",
       "handle_phoneme_ambiguous":"ignore",
@@ -52,10 +52,11 @@
       "betabinom_scaling_factor":1.0,
       "distance_tx_unvoiced":false,
       "mel_noise_scale":0.0,
-      "is_zero_shot":false
+      "is_zero_shot":false,
+      "num_workers":4
    },
    "model_config":{
-      "n_speakers":42,
+      "n_speakers":1,
       "n_speaker_dim":512,
       "n_text":185,
       "n_text_dim":512,
@@ -174,14 +175,15 @@
       }
    },
    "train_config":{
-      "output_directory":"/output/path",
+      "output_directory":"/usr/src/app/uberduck_ml_dev/tutorials/radtts/",
       "epochs":10000000,
       "optim_algo":"RAdam",
       "learning_rate":0.0001,
       "weight_decay":1e-06,
       "sigma":1.0,
       "iters_per_checkpoint":10000,
-      "batch_size":16,
+      "batch_size":4,
+      "n_gpus": 1,
       "seed":1234,
       "checkpoint_path":"",
       "ignore_layers":[
@@ -194,8 +196,8 @@
       "include_layers":[
          
       ],
-      "vocoder_config_path":"/path/to/hifigan_22khz_config.json",
-      "vocoder_checkpoint_path":"/path/to/hifigan_libritts100360_generator0p5.pt",
+      "vocoder_config_path":"/usr/src/app/uberduck_ml_dev/tutorials/radtts/hifigan_22khz_config.json",
+      "vocoder_checkpoint_path":"/usr/src/app/uberduck_ml_dev/tutorials/radtts/hifigan_libritts100360_generator0p5.pt",
       "log_attribute_samples":false,
       "log_decoder_samples":true,
       "warmstart_checkpoint_path":"",

@@ -45,7 +45,7 @@ def train_func(config: dict):
     # NOTE (Sam): what is significance of batch_size=6?  Think this is overriden within the dataloader.
     train_loader, valset, collate_fn = prepare_dataloaders(
         data_config,
-        2,  # 2 gpus by default
+        train_config["n_gpus"],
         train_config["batch_size"],
     )
     train_dataloader = train.torch.prepare_data_loader(train_loader)
@@ -128,4 +128,5 @@ DEFAULTS = {
     "binarization_start_iter": 18000,
     "kl_loss_start_iter": 40000,
     "unfreeze_modules": "all",
+    "n_gpus": 1,
 }

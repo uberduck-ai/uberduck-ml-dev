@@ -20,7 +20,12 @@ if __name__ == "__main__":
         train_loop_per_worker=train_func,
         train_loop_config=config,
         scaling_config=ScalingConfig(
-            num_workers=2, use_gpu=True, resources_per_worker=dict(CPU=8, GPU=1)
+            num_workers=config["train_config"]["n_gpus"],
+            use_gpu=True,
+            resources_per_worker=dict(
+                CPU=2,
+                GPU=config["train_config"]["n_gpus"],
+            ),
         ),
         run_config=RunConfig(sync_config=SyncConfig()),
     )

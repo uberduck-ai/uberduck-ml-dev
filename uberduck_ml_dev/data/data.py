@@ -1028,6 +1028,7 @@ RADTTS_DEFAULTS = {
     "betabinom_scaling_factor": 1.0,
     "distance_tx_unvoiced": False,
     "mel_noise_scale": 0.0,
+    "num_workers": 4,
 }
 
 
