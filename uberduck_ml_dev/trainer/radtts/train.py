@@ -42,7 +42,6 @@ def train_func(config: dict):
     )
 
     start_epoch = 0
-    # NOTE (Sam): what is significance of batch_size=6?  Think this is overriden within the dataloader.
     train_loader, valset, collate_fn = prepare_dataloaders(
         data_config,
         train_config["n_gpus"],

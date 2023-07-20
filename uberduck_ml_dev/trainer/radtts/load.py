@@ -60,7 +60,7 @@ def prepare_dataloaders(data_config, n_gpus, batch_size):
 
     train_loader = DataLoader(
         trainset,
-        num_workers=data_config["num_workers"] - 1,
+        num_workers=data_config["num_workers"],
         shuffle=shuffle,
         sampler=train_sampler,
         batch_size=batch_size,

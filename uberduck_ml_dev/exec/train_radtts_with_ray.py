@@ -23,8 +23,8 @@ if __name__ == "__main__":
             num_workers=config["train_config"]["n_gpus"],
             use_gpu=True,
             resources_per_worker=dict(
-                CPU=2,
-                GPU=config["train_config"]["n_gpus"],
+                CPU=config["data_config"]["num_workers"],
+                GPU=1,
             ),
         ),
         run_config=RunConfig(sync_config=SyncConfig()),

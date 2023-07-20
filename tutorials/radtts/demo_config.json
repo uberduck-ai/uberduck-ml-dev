@@ -53,7 +53,7 @@
       "distance_tx_unvoiced":false,
       "mel_noise_scale":0.0,
       "is_zero_shot":false,
-      "num_workers":4
+      "num_workers":2
    },
    "model_config":{
       "n_speakers":1,
