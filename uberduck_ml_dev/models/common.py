@@ -1643,14 +1643,12 @@ class Invertible1x1ConvLUS(torch.nn.Module):
 
     @amp.autocast(False)
     def forward(self, z, inverse=False):
-        # torch.save(z, "/usr/src/app/z.pt")
         U = torch.triu(self.upper, 1) + torch.diag(self.upper_diag)
         L = torch.tril(self.lower, -1) + torch.diag(self.lower_diag)
         W = torch.mm(self.p, torch.mm(L, U))
         if inverse:
             if not hasattr(self, "W_inverse"):
                 # inverse computation
-                # torch.save(W, "/usr/src/app/W.pt")
                 W_inverse = W.float().inverse()
                 if z.type() == "torch.cuda.HalfTensor":
                     W_inverse = W_inverse.half()
