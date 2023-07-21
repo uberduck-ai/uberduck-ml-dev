@@ -507,7 +507,7 @@ class DataRADTTS(torch.utils.data.Dataset):
                     {
                         "audiopath": os.path.join(wav_folder_prefix, d[0]),
                         "text": d[1],
-                        "speaker": d[2],  # should be unused
+                        "speaker": d[2],  # sometimes is unused
                         "duration": float(duration),
                     }
                 )
@@ -642,7 +642,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         data = self.data[index]
         sub_path = data["audiopath"]
         text = data["text"]
-        audiopath = f"{sub_path}/resampled_unnormalized.wav"
+        audiopath = f"{sub_path}/audio_resampledT_normalized32768T.wav"
         audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
         f0_path = f"{sub_path}/f0.pt"
         mel_path = f"{sub_path}/spectrogram.pt"
@@ -716,8 +716,8 @@ class DataMel(Dataset):
     # NOTE (Sam): assumes data is in a directory structure like:
     # /tmp/{uuid}/resampled_unnormalized.wav
     def _get_data(self, audiopath: str, target_path: str):
-        if os.path.exists(target_path):
-            return
+        # if os.path.exists(target_path):
+        #     return
         rate, audio = read(audiopath)
         # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
         audio = np.asarray(audio / (np.abs(audio).max() * 2))
@@ -1028,6 +1028,7 @@ RADTTS_DEFAULTS = {
     "betabinom_scaling_factor": 1.0,
     "distance_tx_unvoiced": False,
     "mel_noise_scale": 0.0,
+    "num_workers": 4,
 }
 
 
@@ -1276,3 +1277,54 @@ RVC_DEFAULTS = {
     "mel_fmin": 0.0,
     "mel_fmax": None,
 }
+
+from typing import Callable, List, Dict
+
+
+class FunctionalDataProcessor:
+    def __init__(
+        self,
+        paths: List[str],
+        function_: Callable,
+        loading_function: Callable,
+        saving_function: Callable,
+        target_paths: List[
+            str
+        ],  # NOTE (Sam): this is target_folders in certain versions of the code since for example we want to save pitch at f0.pt and pitch mask as f0f.pt.  Have to think of a solution.
+        recompute: bool = True,
+    ):
+        self.paths = paths
+        self.function_ = function_
+        self.target_paths = target_paths
+        self.recompute = recompute
+        self.loading_function = loading_function
+        self.saving_function = saving_function
+
+    def _get_data(self, path, target_path):
+        # NOTE (Sam): we need caching to debug training issues in dev and for speed!
+        # NOTE (Sam): won't catch issues with recomputation using different parameters but name name
+        # TODO (Sam): add hashing
+        if self.recompute or not os.path.exists(target_path):
+            input_ = self.loading_function(path)
+            data = self.function_(input_)
+            self.saving_function(data, target_path)
+        else:
+            pass
+
+    def __getitem__(self, idx):
+        try:
+            self._get_data(
+                path=self.paths[idx],
+                target_path=self.target_paths[idx],
+            )
+
+        except Exception as e:
+            print(f"Error while getting data: index = {idx}")
+            print(e)
+            raise
+        return None
+
+    def __len__(self):
+        nfiles = len(self.paths)
+
+        return nfiles

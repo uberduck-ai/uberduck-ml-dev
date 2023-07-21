@@ -114,3 +114,25 @@ def get_hubert_embeddings(
         hubert_abs_paths.append(hubert_abs_path)
 
     return hubert_abs_paths
+
+
+from uberduck_ml_dev.data.data import FunctionalDataProcessor
+
+
+def get(
+    function_,
+    loading_function,
+    saving_function,
+    paths,
+    target_paths,
+    recompute,
+):
+    data = FunctionalDataProcessor(
+        paths=paths,
+        target_paths=target_paths,
+        function_=function_,
+        loading_function=loading_function,
+        saving_function=saving_function,
+        recompute=recompute,
+    )
+    get_parallel_torch(data)
