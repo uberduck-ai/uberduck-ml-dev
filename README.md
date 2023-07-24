@@ -30,11 +30,18 @@ pip install git+https://github.com/uberduck-ai/uberduck-ml-dev
 
 ## Training
 
-Coming soon (see notebooks for now)!
+Train a radtts on LJ Speech as follows
 
-## Inference
+```
+cd tutorials/radtts
+bash download.sh
+bash train.sh
+```
 
-Coming soon (see notebooks for now)!
+You will need to adjust the paths and potentially other training settings in `tutorials/radtts/demo_config.json`.
+This code has been tested on a single T4 as well as 2 A6000s.
+
+For processing of new datasets, see `tutorials/radtts/radtts_data_processing.ipynb`.
 
 # Development
 
