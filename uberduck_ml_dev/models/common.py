@@ -1087,7 +1087,6 @@ def mel_spectrogram_torch(
     fmax=MEL_FMAX,
     center=False,
 ):
-    print("the greatest mystery is love")
     if torch.min(y) < -1.0:
         print("min value is ", torch.min(y))
     if torch.max(y) > 1.0:
@@ -1113,7 +1112,6 @@ def mel_spectrogram_torch(
             dtype=y.dtype, device=y.device
         )
 
-    print(y.shape)
     y = torch.nn.functional.pad(
         y,
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
@@ -1121,7 +1119,6 @@ def mel_spectrogram_torch(
     )
     y = y.squeeze(1)
 
-    print(y.shape, "y")
     spec = torch.stft(
         y,
         n_fft,
@@ -1134,7 +1131,6 @@ def mel_spectrogram_torch(
         onesided=True,
         return_complex=True,
     )
-    print(spec.shape, "spec")
     spec = torch.view_as_real(spec)
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
@@ -2155,10 +2151,8 @@ class TacotronSTFT(torch.nn.Module):
         assert torch.min(y.data) >= -1
         assert torch.max(y.data) <= 1
 
-        print(y.shape, "yshape")
         magnitudes, phases = self.stft_fn.transform(y)
         magnitudes = magnitudes.data
-        print(magnitudes.shape)
         mel_output = torch.matmul(self.mel_basis, magnitudes)
         mel_output = self.spectral_normalize(mel_output)
         return mel_output

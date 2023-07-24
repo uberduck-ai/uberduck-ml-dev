@@ -33,7 +33,6 @@ def train_step(
 
     # NOTE (Sam): moving to gpu needs to be done here not in the collate function
     batch = batch.to_gpu()
-
     mel_slices, ids_slice = rand_slice_segments(
         batch["mel_padded"],
         batch["mel_lengths"],
@@ -49,6 +48,12 @@ def train_step(
         ids_slice * data_config["hop_length"],
         train_config["segment_size"],
     )
+
+    # print(audio_sliced.shape, "audio shape")
+    from einops import rearrange
+
+    audio_sliced = rearrange(audio_sliced, "c b t -> b c t")
+    # print(audio_hat.shape, "audio hat shape")
     y_d_hat_r, y_d_hat_g, _, _ = discriminator(audio_sliced, audio_hat.detach())
     # with autocast(enabled=False):
     loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
@@ -107,21 +112,29 @@ def train_step(
 
     metrics = {
         "generator_total_loss": loss_gen_all,
-        "generator_feature_loss": feature_loss_weight,
-        "generator_loss_mel": l1_loss_weight,
+        "generator_feature_loss": loss_fm,
+        "generator_loss_mel": loss_mel,
         "discriminator_total_loss": loss_disc,
-        "discriminator_loss_real": losses_disc_r,
-        "discriminator_loss_fake": losses_disc_g,
     }
 
     log(metrics)
 
     if log_sample and session.get_world_rank() == 0:
+        import numpy as np
+
         audios = {
-            "ground_truth": {"audio": audio_sliced[0][0]},
+            "ground_truth": {
+                "audio": audio_sliced[0][0] / np.abs(audio_sliced[0][0].cpu()).max()
+            },
             "generated": {"audio": audio_hat[0][0]},
         }
         images = None
+
+        print(
+            "audios",
+            audios["ground_truth"]["audio"]
+            / np.abs(audios["ground_truth"]["audio"].cpu()).max(),
+        )
         log(audios=audios, images=images)
     if log_checkpoint and session.get_world_rank() == 0:
         checkpoint_path = f"{train_config['output_directory']}/model_{iteration}.pt"

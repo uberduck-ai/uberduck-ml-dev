@@ -821,7 +821,6 @@ def get_f0_pvoiced(
     # NO!  Have to remember to pass ints normalized to MAX_WAV_VALUE / 2
     MAX_WAV_VALUE = 32768.0
     audio_norm = audio / MAX_WAV_VALUE
-    print(audio_norm)
     f0, voiced_mask, p_voiced = pyin(
         y=audio_norm,
         fmin=f0_min,
@@ -831,7 +830,6 @@ def get_f0_pvoiced(
         win_length=frame_length // 2,
         hop_length=hop_length,
     )
-    print(f0)
     f0[~voiced_mask] = 0.0
     f0 = torch.FloatTensor(f0)
     p_voiced = torch.FloatTensor(p_voiced)
@@ -956,7 +954,6 @@ class DataPitch:
                 data = (data * MAX_WAV_VALUE) / (np.abs(data).max() * 2)
             else:
                 rate, data = read(audiopath)
-            print(data)
             if self.method == "radtts":
                 pitch = get_f0_pvoiced(
                     data,
@@ -1355,6 +1352,7 @@ class BasicDataset(torch.utils.data.Dataset):
         if self.audio_suffix is not None:
             audio_path = os.path.join(data_path, self.audio_suffix)
             rate, audio = read(audio_path)
+            # print(audio[:10])
             # if split:
             #     audio_start = mel_start * self.hop_size
             #     audio = audio[audio_start : audio_start + self.segment_size]

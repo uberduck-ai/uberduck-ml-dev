@@ -87,6 +87,7 @@ def train_func(config: dict, project: str = "rvc"):
         pin_memory=True,
         collate_fn=Collate(),
         batch_sampler=None,
+        batch_size=train_config["batch_size"],
         persistent_workers=True,
         prefetch_factor=8,
     )
