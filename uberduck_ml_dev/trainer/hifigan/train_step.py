@@ -3,12 +3,19 @@ from ray.air import session
 from datetime import datetime
 
 from ...models.rvc.commons import clip_grad_value_, slice_segments
-from ...data.utils import mel_spectrogram_torch, spec_to_mel_torch
+from ...data.utils import (
+    mel_spectrogram_torch,
+    spec_to_mel_torch,
+    mel_spectrogram_torch_datamel,
+)
 from ..log import log
 from ..rvc.save import save_checkpoint
 from ...models.rvc.commons import rand_slice_segments
 
+from uberduck_ml_dev.data.data import MAX_WAV_VALUE
 
+
+#
 # TODO (Sam): add config arguments to model / optimization / logging and remove.
 # NOTE (Sam): passing dict arguments to functions is a bit of a code smell.
 def train_step(
@@ -16,7 +23,7 @@ def train_step(
 ):
     data_config = config["data"]
     train_config = config["train"]
-
+    stft = models["stft"]
     generator = models["generator"]
     discriminator = models["discriminator"]
     discriminator_optimizer = optimization_parameters["optimizers"]["discriminator"]
@@ -44,7 +51,7 @@ def train_step(
     # NOTE (Sam): we only train on a portion of the audio determined by the segment_size
     # with autocast(enabled=False):
     audio_sliced = slice_segments(
-        batch["audio_padded"].unsqueeze(0),
+        batch["audio_padded"].unsqueeze(0) / MAX_WAV_VALUE,
         ids_slice * data_config["hop_length"],
         train_config["segment_size"],
     )
@@ -63,17 +70,26 @@ def train_step(
     grad_norm_d = clip_grad_value_(discriminator.parameters(), None)
     scaler.step(discriminator_optimizer)
 
-    # with autocast(enabled=False):
-    y_hat_mel = mel_spectrogram_torch(
-        audio_hat.float().squeeze(1),
-        data_config["filter_length"],
-        data_config["n_mel_channels"],
-        data_config["sampling_rate"],
-        data_config["hop_length"],
-        data_config["win_length"],
-        data_config["mel_fmin"],
-        data_config["mel_fmax"],
+    print(audio_hat.shape, "audio_hat shape")
+    # y_hat_mel = mel_spectrogram_torch_datamel(
+    #     audio_hat.float().squeeze(1).cpu().detach().numpy(), models["stft"]
+    # )
+    y_hat_mel = mel_spectrogram_torch_datamel(
+        audio_hat.float().squeeze(1).detach(), models["stft"]
     )
+    print(y_hat_mel.shape, "y_hat_mel shape")
+    print(mel_slices.shape, "mel_slices shape")
+    # with autocast(enabled=False):
+    # y_hat_mel = mel_spectrogram_torch(
+    #     audio_hat.float().squeeze(1),
+    #     data_config["filter_length"],
+    #     data_config["n_mel_channels"],
+    #     data_config["sampling_rate"],
+    #     data_config["hop_length"],
+    #     data_config["win_length"],
+    #     data_config["mel_fmin"],
+    #     data_config["mel_fmax"],
+    # )
     # NOTE (Sam): RVC training also compares reconstructed spectrograms to ground truth, mod buffering issues.
     # I'm not sure if this makes sense for Hifigan, since the source values are themselves spectrograms, as opposed to hubert embeddings.
 

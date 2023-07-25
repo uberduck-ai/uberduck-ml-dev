@@ -746,7 +746,7 @@ class DataMel(Dataset):
             self._get_data(
                 audiopath=self.audiopaths[idx],
                 target_path=self.target_paths[idx],
-                sampling_rate=self.sampling_rate,
+                # sampling_rate=self.sampling_rate,
             )
 
         except Exception as e:
