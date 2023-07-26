@@ -71,7 +71,6 @@ def train_step(
     grad_norm_d = clip_grad_value_(discriminator.parameters(), None)
     scaler.step(discriminator_optimizer)
 
-    print(audio_hat.shape, "audio_hat shape")
     # y_hat_mel = mel_spectrogram_torch_datamel(
     #     audio_hat.float().squeeze(1).cpu().detach().numpy(), models["stft"]
     # )
@@ -147,11 +146,6 @@ def train_step(
         }
         images = None
 
-        print(
-            "audios",
-            audios["ground_truth"]["audio"]
-            / np.abs(audios["ground_truth"]["audio"].cpu()).max(),
-        )
         log(audios=audios, images=images)
     if log_checkpoint and session.get_world_rank() == 0:
         checkpoint_path = f"{train_config['output_directory']}/model_{iteration}.pt"
