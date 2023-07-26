@@ -35,13 +35,14 @@ saving_function = lambda data, filename: write(
     filename, 22050, data
 )  # must be in this order
 
+
 get(
     processing_function,
     saving_function,
     loading_function,
     ground_truth_abs_paths,
     resampled_normalized_abs_paths,
-    False,
+    True,
 )
 
 
@@ -51,16 +52,23 @@ spectrogram_abs_paths = [
     ground_truth_abs_path.replace("gt.wav", "spectrogram.pt")
     for ground_truth_abs_path in ground_truth_abs_paths
 ]
+
+
 processing_function = lambda x: mel_spectrogram_torch(
     x,
     DEFAULTS["n_fft"],
+    DEFAULTS["num_mels"],
     DEFAULTS["sampling_rate"],
     DEFAULTS["hop_size"],
     DEFAULTS["win_size"],
+    DEFAULTS["fmin"],
+    DEFAULTS["fmax"],
     True,
 )
-loading_function = lambda source_path: read(source_path)[1]
-saving_function = lambda data, target_path: torch.save(target_path, data)
+loading_function = lambda source_path: torch.Tensor(
+    read(source_path)[1] / MAX_WAV_VALUE
+).unsqueeze(0)
+saving_function = lambda data, target_path: torch.save(data, target_path)
 
 get(
     processing_function,
@@ -68,5 +76,5 @@ get(
     loading_function,
     resampled_normalized_abs_paths,
     spectrogram_abs_paths,
-    False,
+    True,
 )
