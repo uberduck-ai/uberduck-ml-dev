@@ -74,6 +74,7 @@ class Collate:
             gate_padded.zero_()
             for i, sample in enumerate(batch):
                 mel = sample["mel"]
+                # print(mel.shape, "\n\n\n\n asdf")
                 mel_padded[i, :, : mel.size(1)] = mel
                 gate_padded[i, mel.size(1) - 1 :] = 1
                 mel_lengths[i] = mel.size(1)

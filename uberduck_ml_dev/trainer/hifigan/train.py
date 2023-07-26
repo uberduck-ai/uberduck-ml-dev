@@ -19,7 +19,8 @@ from ...losses_rvc import (
 from .train_epoch import train_epoch
 from .train_step import train_step
 from ..rvc.train import DEFAULTS as DEFAULTS
-from ...models.common import TacotronSTFT
+
+# from ...models.common import TacotronSTFT
 
 
 def train_func(config: dict, project: str = "rvc"):
@@ -72,18 +73,18 @@ def train_func(config: dict, project: str = "rvc"):
 
     generator = generator.cuda()
     discriminator = discriminator.cuda()
-    stft = TacotronSTFT(
-        filter_length=data_config["filter_length"],
-        hop_length=data_config["hop_length"],
-        win_length=data_config["win_length"],
-        sampling_rate=data_config["sampling_rate"],
-        n_mel_channels=data_config["n_mel_channels"],
-        mel_fmin=data_config["mel_fmin"],
-        mel_fmax=data_config["mel_fmax"],
-    )
-    stft = stft.cuda()
-    models = {"generator": generator, "discriminator": discriminator, "stft": stft}
-
+    # stft = TacotronSTFT(
+    #     filter_length=data_config["filter_length"],
+    #     hop_length=data_config["hop_length"],
+    #     win_length=data_config["win_length"],
+    #     sampling_rate=data_config["sampling_rate"],
+    #     n_mel_channels=data_config["n_mel_channels"],
+    #     mel_fmin=data_config["mel_fmin"],
+    #     mel_fmax=data_config["mel_fmax"],
+    # )
+    # stft = stft.cuda()
+    # models = {"generator": generator, "discriminator": discriminator, "stft": stft}
+    models = {"generator": generator, "discriminator": discriminator}
     print("Loading dataset")
 
     train_dataset = BasicDataset(
