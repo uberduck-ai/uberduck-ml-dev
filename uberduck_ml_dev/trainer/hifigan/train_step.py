@@ -11,7 +11,7 @@ from ..log import log
 from ..rvc.save import save_checkpoint
 from ...models.rvc.commons import rand_slice_segments
 
-from uberduck_ml_dev.data.data import MAX_WAV_VALUE
+from ...data.data import MAX_WAV_VALUE
 
 
 #
@@ -87,8 +87,8 @@ def train_step(
         data_config["sampling_rate"],
         data_config["hop_size"],
         data_config["win_size"],
-        data_config["fmax"],
         data_config["fmin"],
+        data_config["fmax"],
     )
     # NOTE (Sam): RVC training also compares reconstructed spectrograms to ground truth, mod buffering issues.
     # I'm not sure if this makes sense for Hifigan, since the source values are themselves spectrograms, as opposed to hubert embeddings.

@@ -71,6 +71,13 @@ def train_func(config: dict, project: str = "rvc"):
         )["model"]
         discriminator.load_state_dict(discriminator_checkpoint)
 
+    # for testing purposes
+    hifigan_path = (
+        "/usr/src/app/uberduck_ml_exp/models/hifigan_libritts100360_generator0p5.pt"
+    )
+    hifigan_state_dict = torch.load(hifigan_path)["generator"]
+    generator.load_state_dict(hifigan_state_dict)
+
     generator = generator.cuda()
     discriminator = discriminator.cuda()
     # stft = TacotronSTFT(
