@@ -112,10 +112,15 @@ def train_func(config: dict, project: str = "rvc"):
         # NOTE (Sam): need to pass names rather than vector of losses since arguments differ
         "losses": {
             "l1": {"loss": F.l1_loss, "weight": 1.0},
-            "kl": {"loss": kl_loss, "weight": 1.0},
-            "feature": {"loss": feature_loss, "weight": 1.0},
-            "generator": {"loss": generator_loss, "weight": 1.0},
-            "discriminator": {"loss": discriminator_loss, "weight": 1},
+            "kl": {"loss": kl_loss, "weight": 0.0},
+            "feature": {"loss": feature_loss, "weight": 0.0},
+            "generator": {"loss": generator_loss, "weight": 0.0},
+            "discriminator": {"loss": discriminator_loss, "weight": 0.0},
+            # "l1": {"loss": F.l1_loss, "weight": 1.0},
+            # "kl": {"loss": kl_loss, "weight": 1.0},
+            # "feature": {"loss": feature_loss, "weight": 1.0},
+            # "generator": {"loss": generator_loss, "weight": 1.0},
+            # "discriminator": {"loss": discriminator_loss, "weight": 1},
         },
     }
 
