@@ -17,7 +17,7 @@ def get_parallel_torch(data):
         pass
 
 
-from uberduck_ml_dev.data.data import FunctionalDataProcessor
+from uberduck_ml_dev.data.processor import Processor
 
 
 def get(
@@ -29,7 +29,7 @@ def get(
     recompute,
     function_kwargs,
 ):
-    data = FunctionalDataProcessor(
+    data = Processor(
         paths=paths,
         target_paths=target_paths,
         function_=function_,
@@ -146,23 +146,24 @@ def get_hubert_embeddings(
     return hubert_abs_paths
 
 
-from uberduck_ml_dev.data.data import FunctionalDataProcessor
+from uberduck_ml_dev.data.processor import Processor
 
 
 def get(
-    function_,
-    loading_function,
+    processing_function,
     saving_function,
-    paths,
+    loading_function,
+    source_paths,
     target_paths,
     recompute,
 ):
-    data = FunctionalDataProcessor(
-        paths=paths,
-        target_paths=target_paths,
+    function_ = lambda source_path, target_path: saving_function(
+        processing_function(loading_function(source_path)), target_path
+    )
+    processor = Processor(
         function_=function_,
-        loading_function=loading_function,
-        saving_function=saving_function,
+        source_paths=source_paths,
+        target_paths=target_paths,
         recompute=recompute,
     )
-    get_parallel_torch(data)
+    get_parallel_torch(processor)

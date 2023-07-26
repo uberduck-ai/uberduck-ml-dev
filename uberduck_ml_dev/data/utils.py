@@ -234,30 +234,36 @@ def mel_spectrogram_torch(
 
 
 # NOTE (Sam): this has the type of normalization used in the DataMel class, which should be deprecated for the functional data processor.
-def mel_spectrogram_torch_datamel(audio, stft):
-    # print(audio.shape, "audioshp")
-    # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
-    print(audio.shape, "audio shape")
-    print(torch.max(torch.abs(audio), dim=1).values.shape, "qwqwq")
-    # audio = np.einsum("b t, b -> b t", audio, (np.abs(audio).max(axis=1) * 2) ** (-1))
-    audio = torch.einsum(
-        "b t, b -> b t", audio, (torch.abs(audio).max(dim=1).values * 2) ** (-1)
-    )
+# def mel_spectrogram_torch_datamel(audio, stft):
+#     # print(audio.shape, "audioshp")
+#     # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
+#     print(audio.shape, "audio shape")
+#     print(torch.max(torch.abs(audio), dim=1).values.shape, "qwqwq")
+#     # audio = np.einsum("b t, b -> b t", audio, (np.abs(audio).max(axis=1) * 2) ** (-1))
+#     audio = torch.einsum(
+#         "b t, b -> b t", audio, (torch.abs(audio).max(dim=1).values * 2) ** (-1)
+#     )
 
-    print(audio.shape, "in here")
-    audio_norm = torch.tensor(audio, dtype=torch.float32)
-    # audio_norm = audio_norm.unsqueeze(0)
-    audio_norm = torch.nn.functional.pad(
-        audio_norm.unsqueeze(1),
-        # NOTE (Sam): combinining n_fft (filter_length) with hop_size reeks of either a bug or sophisticated asympotitc analysis.
-        # janky hardcoding of padding for now.
-        (int((80 - 256) / 2), int((80 - 256) / 2)),
-        mode="reflect",
-    )
-    audio_norm = audio_norm.squeeze(1)
+#     print(audio.shape, "in here")
+#     audio_norm = torch.tensor(audio, dtype=torch.float32)
+#     # audio_norm = audio_norm.unsqueeze(0)
+#     audio_norm = torch.nn.functional.pad(
+#         audio_norm.unsqueeze(1),
+#         # NOTE (Sam): combinining n_fft (filter_length) with hop_size reeks of either a bug or sophisticated asympotitc analysis.
+#         # janky hardcoding of padding for now.
+#         (int((80 - 256) / 2), int((80 - 256) / 2)),
+#         mode="reflect",
+#     )
+#     audio_norm = audio_norm.squeeze(1)
 
-    melspec = stft.mel_spectrogram(audio_norm)
-    print(melspec.shape, "mps")
-    melspec = torch.squeeze(melspec, 0)
-    melspec = (melspec + 5.5) / 2
-    return melspec
+#     melspec = stft.mel_spectrogram(audio_norm)
+#     print(melspec.shape, "mps")
+#     melspec = torch.squeeze(melspec, 0)
+#     melspec = (melspec + 5.5) / 2
+#     return melspec
+
+
+def find_rel_paths(directory, filename):
+    for root, dirs, files in os.walk(directory):
+        if filename in files:
+            yield os.path.relpath(os.path.join(root, filename), directory)
