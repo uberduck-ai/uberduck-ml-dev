@@ -38,7 +38,7 @@ def train_func(config: dict, project: str = "rvc"):
 
     # RVC uses MultiPeriodDiscrimator that has a single scale discriminator
     # multi_period_discriminator = MultiPeriodDiscriminator().to("cuda")
-    discriminator = MultiPeriodDiscriminator().to("cuda")
+    # discriminator = MultiPeriodDiscriminator().to("cuda")
     # msd = MultiScaleDiscriminator().to(device)
 
     generator_optimizer = torch.optim.AdamW(
@@ -72,11 +72,11 @@ def train_func(config: dict, project: str = "rvc"):
         discriminator.load_state_dict(discriminator_checkpoint)
 
     # for testing purposes
-    # hifigan_path = (
-    #     "/usr/src/app/uberduck_ml_exp/models/hifigan_libritts100360_generator0p5.pt"
-    # )
-    # hifigan_state_dict = torch.load(hifigan_path)["generator"]
-    # generator.load_state_dict(hifigan_state_dict)
+    hifigan_path = (
+        "/usr/src/app/uberduck_ml_exp/models/hifigan_libritts100360_generator0p5.pt"
+    )
+    hifigan_state_dict = torch.load(hifigan_path)["generator"]
+    generator.load_state_dict(hifigan_state_dict)
 
     generator = generator.cuda()
     discriminator = discriminator.cuda()
