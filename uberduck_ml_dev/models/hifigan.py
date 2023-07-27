@@ -427,6 +427,50 @@ class MultiScaleDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 
+class MultiDiscriminator(torch.nn.Module):
+    def __init__(self, use_spectral_norm=False):
+        super(MultiDiscriminator, self).__init__()
+        periods = [2, 3, 5, 7, 11]
+        scale_discs = [
+            DiscriminatorS(use_spectral_norm=use_spectral_norm),
+            DiscriminatorS(),
+            DiscriminatorS(),
+        ]
+
+        period_discs = [
+            DiscriminatorP(i, use_spectral_norm=False) for i in periods
+        ]  # False is hifigan setting, parameterizable in rvc
+        # discs = scale_discs + period_discs
+
+        self.mpd = nn.ModuleList(period_discs)
+        self.msd = nn.ModuleList(scale_discs)
+        self.scale_meanpools = nn.ModuleList(
+            [AvgPool1d(4, 2, padding=2), AvgPool1d(4, 2, padding=2)]
+        )
+        # self.n_scale_discs = len(scale_discs)
+        # self.n_period_discs = len(period_discs)
+
+    def forward(self, y, y_hat):
+        y_d_rs = []  #
+        y_d_gs = []
+        fmap_rs = []
+        fmap_gs = []
+        for i, d in enumerate(self.msd + self.mpd):
+            if i in [1, 2]:  # hacky, matches OG hifigan
+                y = self.scale_meanpools[i - 1](y)
+                y_hat = self.scale_meanpools[i - 1](y_hat)
+            y_d_r, fmap_r = d(y)
+            y_d_g, fmap_g = d(y_hat)
+            # for j in range(len(fmap_r)):
+            #     print(i,j,y.shape,y_hat.shape,fmap_r[j].shape,fmap_g[j].shape)
+            y_d_rs.append(y_d_r)
+            y_d_gs.append(y_d_g)
+            fmap_rs.append(fmap_r)
+            fmap_gs.append(fmap_g)
+
+        return y_d_rs, y_d_gs, fmap_rs, fmap_gs
+
+
 def feature_loss(fmap_r, fmap_g):
     loss = 0
     for dr, dg in zip(fmap_r, fmap_g):

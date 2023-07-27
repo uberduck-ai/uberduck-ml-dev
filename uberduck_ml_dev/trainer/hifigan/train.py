@@ -5,9 +5,8 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
 from ...data.data import BasicDataset
-from ...models.rvc.rvc import (
-    MultiPeriodDiscriminator,
-)
+from ...models.rvc.rvc import MultiPeriodDiscriminator
+from ...models.hifigan import MultiDiscriminator
 
 from ...data.collate import Collate
 from ...losses_rvc import (
@@ -35,7 +34,9 @@ def train_func(config: dict, project: str = "rvc"):
     generator = _load_uninitialized(config_overrides=model_config)
 
     # discriminator = MultiPeriodDiscriminator(model_config["use_spectral_norm"])
-
+    discriminator = MultiDiscriminator(True)
+    # discriminator = MultiDiscriminator()
+    discriminator = discriminator.to("cuda")
     # RVC uses MultiPeriodDiscrimator that has a single scale discriminator
     # multi_period_discriminator = MultiPeriodDiscriminator().to("cuda")
     # discriminator = MultiPeriodDiscriminator().to("cuda")
@@ -72,11 +73,23 @@ def train_func(config: dict, project: str = "rvc"):
         discriminator.load_state_dict(discriminator_checkpoint)
 
     # for testing purposes
-    hifigan_path = (
-        "/usr/src/app/uberduck_ml_exp/models/hifigan_libritts100360_generator0p5.pt"
-    )
-    hifigan_state_dict = torch.load(hifigan_path)["generator"]
-    generator.load_state_dict(hifigan_state_dict)
+    hifigan_path = "/usr/src/app/uberduck_ml_exp/models/g_hifi_crust"
+    hifigan_state_dict = torch.load(hifigan_path)
+    generator.load_state_dict(hifigan_state_dict["generator"])
+    hifigan_path = "/usr/src/app/uberduck_ml_exp/models/do_00000000"
+    hifigan_state_dict = torch.load(hifigan_path)
+    mpd_dict = hifigan_state_dict["mpd"]
+    new_dict = {
+        key.replace("discriminators.", ""): value for key, value in mpd_dict.items()
+    }
+    discriminator.mpd.load_state_dict(new_dict)
+    msd_dict = hifigan_state_dict["msd"]
+    new_dict = {
+        key.replace("discriminators.", ""): value for key, value in msd_dict.items()
+    }
+    discriminator.msd.load_state_dict(new_dict)
+    # dict1 = hifigan_state_dict["mpd"]
+    # dict1.update(hifigan_state_dict["msd"])
 
     generator = generator.cuda()
     discriminator = discriminator.cuda()
