@@ -74,7 +74,6 @@ class Collate:
             gate_padded.zero_()
             for i, sample in enumerate(batch):
                 mel = sample["mel"]
-                # print(mel.shape, "\n\n\n\n asdf")
                 mel_padded[i, :, : mel.size(1)] = mel
                 gate_padded[i, mel.size(1) - 1 :] = 1
                 mel_lengths[i] = mel.size(1)
@@ -111,15 +110,13 @@ class Collate:
             )
             output["audio_encodings"] = audio_encodings
 
-        # NOTE (Sam): don't think we can always call cuda here due to "forked subprocess" error.
-        # update - we always call to_gpu in the train step for ray multiprocessing at least.
-        # Removing this may have broken Tacotron training.
-        # if self.cudnn_enabled:
-        #     output = output.to_gpu()
+        # NOTE (Sam): Removing output.to_gpu() here may have broken Tacotron training but having it here was an antipattern.
+        # it breaks "forked subprocess" error / ray multiprocessing
+
         return output
 
 
-# TODO (Sam): combine Collate with DataCollateRADTTS
+# TODO (Sam): subsume into Collate
 class DataCollateRADTTS:
     """Zero-pads model inputs and targets given number of steps"""
 

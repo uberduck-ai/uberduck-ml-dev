@@ -5,8 +5,9 @@ from tqdm import tqdm
 import torch
 import os
 
-from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
-from uberduck_ml_dev.data.collate import CollateBlank
+from ..data.data import DataMel, DataPitch, DataEmbedding
+from ..data.collate import CollateBlank
+from ..data.processor import Processor
 
 
 def get_parallel_torch(data):
@@ -15,9 +16,6 @@ def get_parallel_torch(data):
     )
     for batch in data_loader:
         pass
-
-
-from uberduck_ml_dev.data.processor import Processor
 
 
 def get(
@@ -86,9 +84,8 @@ def get_embeddings(
 
 # NOTE (Sam): pitch, pitchf == f0 coarse, f0bak in rvc parlance.
 # NOTE (Sam): sample_rate is also passed as part of data_config
-# TODO (Sam): remove as an independent argument?
 # TODO (Sam): decide on sample_rate v sampling_rate
-# NOTE (Sam): radtts and parselmouth pitch methods seem to generate pitches of different lengths.
+# NOTE (Sam): pyin (radtts) and parselmouth (rvc) methods seem to generate pitches of different lengths.
 def get_pitches(
     paths,
     data_config=None,
@@ -144,9 +141,6 @@ def get_hubert_embeddings(
         hubert_abs_paths.append(hubert_abs_path)
 
     return hubert_abs_paths
-
-
-from uberduck_ml_dev.data.processor import Processor
 
 
 def get(

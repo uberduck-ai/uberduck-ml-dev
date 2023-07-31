@@ -4,7 +4,7 @@ from ray.air.integrations.wandb import setup_wandb
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 
-from ...data.data import BasicDataset
+from ...data.data import Dataset
 from ...models.rvc.rvc import MultiPeriodDiscriminator
 from ...models.hifigan import MultiDiscriminator
 

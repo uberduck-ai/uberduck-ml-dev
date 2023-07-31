@@ -1,9 +1,12 @@
+# TODO (Sam): all collation and dataloaders based on the pricipals that recomputation in training is wasteful and preprocessing should be functionalized.
+
 import torch
 import os
 from typing import List, Optional
 import lmdb
 import pickle as pkl
 
+import pandas as pd
 from torch.utils.data import Dataset
 from einops import rearrange
 from scipy.io.wavfile import read
@@ -36,6 +39,13 @@ from ..models.common import (
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 from ..trainer.rvc.utils import load_wav_to_torch
 from .utils import spectrogram_torch
+
+
+from ..models.tacotron2 import MAX_WAV_VALUE
+from ..models.components.encoders.resnet_speaker_encoder import (
+    get_pretrained_model,
+)
+
 
 F0_MIN = 80
 F0_MAX = 640
@@ -712,27 +722,14 @@ class DataMel(Dataset):
             mel_fmax=data_config["mel_fmax"],
         )
         self.stft = stft
-        # NOTE (Sam): we will frequently end up using librosa load rather than scipy
-        # its not clear if this is actually slower if the native rate of the .wav = the provided rate
+        # NOTE (Sam): using librosa load to resample rather than scipy automatically float normalizes
         self.sampling_rate = data_config["sampling_rate"]
 
-    # NOTE (Sam): assumes data is in a directory structure like:
-    # /tmp/{uuid}/resampled_unnormalized.wav
-    # def _get_data(self, audiopath: str, target_path: str, sampling_rate: int = None):
-    #     if sampling_rate is None:
-    #         rate, audio = read(audiopath)
-    #     else:
-    #         rate = sampling_rate
-    #         audio, _ = librosa.load(
-    #             audiopath, sr=rate
-    #         )  # NOTE (Sam): this destroys the normalization.
-
-    # NOTE (Sam): we should already be normalized by the time we are computing mels.
+    # NOTE (Sam): we should already be normalized by the time we are computing mels but unfortunately thats not done yet here.
     def _get_data(self, audiopath: str, target_path: str):
         # if os.path.exists(target_path):
         #     return
         rate, audio = read(audiopath)
-        # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
         audio = np.asarray(audio / (np.abs(audio).max() * 2))
         audio_norm = torch.tensor(audio, dtype=torch.float32)
         audio_norm = audio_norm.unsqueeze(0)
@@ -746,7 +743,6 @@ class DataMel(Dataset):
             self._get_data(
                 audiopath=self.audiopaths[idx],
                 target_path=self.target_paths[idx],
-                # sampling_rate=self.sampling_rate,
             )
 
         except Exception as e:
@@ -759,14 +755,6 @@ class DataMel(Dataset):
         nfiles = len(self.audiopaths)
 
         return nfiles
-
-
-# NOTE (Sam): this is the radtts preprocessing.
-# TODO (Sam): synthesize with other dataloaders using functional arguments.
-from uberduck_ml_dev.models.tacotron2 import MAX_WAV_VALUE
-from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
-    get_pretrained_model,
-)
 
 
 class DataEmbedding:
@@ -817,8 +805,7 @@ def get_f0_pvoiced(
     f0_min=100,
     f0_max=300,
 ):
-    # NOTE (Sam): is this normalization kosher?
-    # NO!  Have to remember to pass ints normalized to MAX_WAV_VALUE / 2
+    # NOTE (Sam): this normalization is fragile: have to remember to pass ints normalized to MAX_WAV_VALUE / 2
     MAX_WAV_VALUE = 32768.0
     audio_norm = audio / MAX_WAV_VALUE
     f0, voiced_mask, p_voiced = pyin(
@@ -837,7 +824,7 @@ def get_f0_pvoiced(
     return f0, voiced_mask, p_voiced
 
 
-# NOTE (Sam): Cris recommends harvest with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
+# NOTE (Sam): Cris recommends harvest (pyworld) with rvc and crepe with sovits, and says parselmouth is good for speech but not singing.
 # He hasn't used pyin. I'm removing this unused pyworld method to remove the dependency.
 # import pyworld
 # import scipy.signal as signal
@@ -883,8 +870,7 @@ def get_f0_parselmouth(
     x, hop_length, f0_up_key=0, f0_min=50, f0_max=1100, sampling_rate=16000
 ):
     p_len = x.shape[0] // hop_length
-    # TODO (Sam): figure out what the data_config parameter that corresponds to time_step is.
-    # at 16k its at 1 / 100 of a second.
+    # TODO (Sam): set a config parameter that corresponds to time_step (1 / 100 of a second at 16khz)
     time_step = 160 / sampling_rate
     f0_mel_min = 1127 * np.log(1 + f0_min / 700)
     f0_mel_max = 1127 * np.log(1 + f0_max / 700)
@@ -1316,17 +1302,10 @@ HIFIGAN_DEFAULTS = {
     "fmax_for_loss": None,
 }
 
-# HIFIGAn
 
-import math
-from .hifigan import mel_spectrogram, load_wav
-import random
-from librosa.util import normalize
+class Dataset(torch.utils.data.Dataset):
+    """A pure abstract class representing a speech Dataset with no computation or excessive filelist entries."""
 
-import pandas as pd
-
-
-class BasicDataset(torch.utils.data.Dataset):
     def __init__(
         self, filelist_path, mel_suffix=None, audio_suffix=None, f0_suffix=None
     ):
@@ -1337,45 +1316,18 @@ class BasicDataset(torch.utils.data.Dataset):
         self.audio_suffix = audio_suffix
         self.f0_suffix = f0_suffix
 
-    #     self._filter()
-
-    # def _filter(self):
-    #     """
-    #     Filter text & store spec lengths
-    #     """
-    #     # Store spectrogram lengths for Bucketing
-    #     # wav_length ~= file_size / (wav_channels * Bytes per dim) = file_size / (1 * 2)
-    #     # spec_length = wav_length // hop_length
-    #     audiopaths_and_text_new = []
-    #     lengths = []
-    #     for data_path in self.data_paths:
-    #         lengths.append(
-    #             os.path.getsize(os.path.join(data_path, self.mel_suffix)) // (2 * 256)
-    #         )  # self.hop_length))
-    #     self.lengths = lengths
-
     def __getitem__(self, index):
         data_path = self.data_paths[index]
 
-        # if split:
-        #     frames_per_seg = math.ceil(self.segment_size / self.hop_size)
         output = {}
         if self.mel_suffix is not None:
             mel_path = os.path.join(data_path, self.mel_suffix)
             mel = torch.load(mel_path)
-
-            # if split:
-            #     mel_start = random.randint(0, mel.size(2) - frames_per_seg - 1)
             output["mel"] = mel
 
         if self.audio_suffix is not None:
             audio_path = os.path.join(data_path, self.audio_suffix)
             rate, audio = read(audio_path)
-            # print(audio[:10])
-            # if split:
-            #     audio_start = mel_start * self.hop_size
-            #     audio = audio[audio_start : audio_start + self.segment_size]
-
             output["audio"] = torch.tensor(audio)
 
         if self.f0_suffix is not None:
@@ -1387,57 +1339,3 @@ class BasicDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.data_paths)
-
-
-from typing import Callable, List, Dict
-
-
-# TODO (Sam): don't need loading, saving, and function_ if we just create a single lambda.
-# These usually have to be lambdas anyway.
-# class FunctionalDataProcessor:
-#     def __init__(
-#         self,
-#         paths: List[str],
-#         function_: Callable,
-#         loading_function: Callable,
-#         saving_function: Callable,
-#         target_paths: List[
-#             str
-#         ],  # NOTE (Sam): this is target_folders in certain versions of the code since for example we want to save pitch at f0.pt and pitch mask as f0f.pt.  Have to think of a solution.
-#         recompute: bool = True,
-#     ):
-#         self.paths = paths
-#         self.function_ = function_
-#         self.target_paths = target_paths
-#         self.recompute = recompute
-#         self.loading_function = loading_function
-#         self.saving_function = saving_function
-
-#     def _get_data(self, path, target_path):
-#         # NOTE (Sam): we need caching to debug training issues in dev and for speed!
-#         # NOTE (Sam): won't catch issues with recomputation using different parameters but name name
-#         # TODO (Sam): add hashing
-#         if self.recompute or not os.path.exists(target_path):
-#             input_ = self.loading_function(path)
-#             data = self.function_(input_)
-#             self.saving_function(data, target_path)
-#         else:
-#             pass
-
-#     def __getitem__(self, idx):
-#         try:
-#             self._get_data(
-#                 path=self.paths[idx],
-#                 target_path=self.target_paths[idx],
-#             )
-
-#         except Exception as e:
-#             print(f"Error while getting data: index = {idx}")
-#             print(e)
-#             raise
-#         return None
-
-#     def __len__(self):
-#         nfiles = len(self.paths)
-
-#         return nfiles

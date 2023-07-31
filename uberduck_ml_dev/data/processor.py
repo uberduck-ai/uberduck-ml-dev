@@ -2,6 +2,7 @@ from typing import Callable, List, Dict
 import os
 
 
+# NOTE (Sam): this torch processor appears to be 10% faster than standard multiprocessing - perhaps this is overkill
 class Processor:
     def __init__(
         self,
