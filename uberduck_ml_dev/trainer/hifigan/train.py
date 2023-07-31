@@ -13,7 +13,6 @@ from ...losses_rvc import (
     generator_loss,
     discriminator_loss,
     feature_loss,
-    kl_loss,
 )
 from .train_epoch import train_epoch
 from .train_step import train_step
@@ -112,6 +111,16 @@ def train_func(config: dict, project: str = "rvc"):
         mel_suffix=data_config["mel_suffix"],
         audio_suffix=data_config["audio_suffix"],
     )
+    from ...data.data import DistributedBucketSampler
+
+    # train_sampler = DistributedBucketSampler(
+    #     train_dataset,
+    #     train_config["batch_size"] * 1,
+    #     [100, 200, 300, 400, 500, 600, 700, 800, 900],  # 16s
+    #     num_replicas=1,
+    #     rank=0,
+    #     shuffle=True,
+    # )
     train_loader = DataLoader(
         train_dataset,
         num_workers=1,
@@ -119,6 +128,7 @@ def train_func(config: dict, project: str = "rvc"):
         pin_memory=True,
         collate_fn=Collate(),
         batch_sampler=None,
+        # batch_sampler=train_sampler,
         batch_size=train_config["batch_size"],
         persistent_workers=True,
         prefetch_factor=8,
@@ -137,7 +147,6 @@ def train_func(config: dict, project: str = "rvc"):
             # "generator": {"loss": generator_loss, "weight": 0.0},
             # "discriminator": {"loss": discriminator_loss, "weight": 0.0},
             "l1": {"loss": F.l1_loss, "weight": 1.0},
-            "kl": {"loss": kl_loss, "weight": 1.0},
             "feature": {"loss": feature_loss, "weight": 1.0},
             "generator": {"loss": generator_loss, "weight": 1.0},
             "discriminator": {"loss": discriminator_loss, "weight": 1},

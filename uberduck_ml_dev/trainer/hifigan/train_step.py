@@ -128,9 +128,10 @@ def train_step(
 
     metrics = {
         "generator_total_loss": loss_gen_all,
+        "generator_loss": loss_gen,
         "generator_feature_loss": loss_fm,
         "generator_loss_mel": loss_mel,
-        "discriminator_total_loss": loss_disc,
+        # "discriminator_total_loss": loss_disc,
     }
 
     log(metrics)

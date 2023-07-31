@@ -82,11 +82,11 @@ def _train_step(
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
             y_d_hat_r, y_d_hat_g
         )
-    discriminator_optimizer.zero_grad()
-    scaler.scale(loss_disc).backward()
-    scaler.unscale_(discriminator_optimizer)
-    grad_norm_d = clip_grad_value_(discriminator.parameters(), None)
-    scaler.step(discriminator_optimizer)
+    # discriminator_optimizer.zero_grad()
+    # scaler.scale(loss_disc).backward()
+    # scaler.unscale_(discriminator_optimizer)
+    # grad_norm_d = clip_grad_value_(discriminator.parameters(), None)
+    # scaler.step(discriminator_optimizer)
 
     # TODO (Sam): just compute mels directly in precompute like for RADTTS
     mel = spec_to_mel_torch(
@@ -133,7 +133,16 @@ def _train_step(
     scaler.step(generator_optimizer)
     scaler.update()
 
-    metrics = {"generator loss": loss_gen_all}
+    metrics = {
+        "generator_total_loss": loss_gen_all,
+        "generator_loss": loss_gen,
+        "generator_feature_loss": loss_fm,
+        "generator_loss_mel": loss_mel,
+        "discriminator_total_loss": loss_disc,
+        "kl_loss": loss_kl,
+    }
+
+    log(metrics)
 
     print("iteration: ", iteration, datetime.now())
     log_sample = iteration % train_config["steps_per_sample"] == 0

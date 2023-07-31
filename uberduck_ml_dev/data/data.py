@@ -1138,7 +1138,9 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         pitchf = pitchf[:n_num]
         phone = torch.from_numpy(phone)
         pitch = torch.LongTensor(pitch)
-        pitchf = pitchf.float()
+        pitchf = torch.Tensor(
+            pitchf
+        ).float()  # NOTE (Sam): unclear why torch Tensor now needs to be called here.
         return phone, pitch, pitchf
 
     def get_audio(self, filename):
@@ -1335,6 +1337,23 @@ class BasicDataset(torch.utils.data.Dataset):
         self.audio_suffix = audio_suffix
         self.f0_suffix = f0_suffix
 
+    #     self._filter()
+
+    # def _filter(self):
+    #     """
+    #     Filter text & store spec lengths
+    #     """
+    #     # Store spectrogram lengths for Bucketing
+    #     # wav_length ~= file_size / (wav_channels * Bytes per dim) = file_size / (1 * 2)
+    #     # spec_length = wav_length // hop_length
+    #     audiopaths_and_text_new = []
+    #     lengths = []
+    #     for data_path in self.data_paths:
+    #         lengths.append(
+    #             os.path.getsize(os.path.join(data_path, self.mel_suffix)) // (2 * 256)
+    #         )  # self.hop_length))
+    #     self.lengths = lengths
+
     def __getitem__(self, index):
         data_path = self.data_paths[index]
 
@@ -1422,5 +1441,3 @@ from typing import Callable, List, Dict
 #         nfiles = len(self.paths)
 
 #         return nfiles
-
-
