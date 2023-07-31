@@ -72,21 +72,21 @@ def train_func(config: dict, project: str = "rvc"):
         discriminator.load_state_dict(discriminator_checkpoint)
 
     # for testing purposes
-    hifigan_path = "/usr/src/app/uberduck_ml_exp/models/g_hifi_crust"
-    hifigan_state_dict = torch.load(hifigan_path)
-    generator.load_state_dict(hifigan_state_dict["generator"])
-    hifigan_path = "/usr/src/app/uberduck_ml_exp/models/do_00000000"
-    hifigan_state_dict = torch.load(hifigan_path)
-    mpd_dict = hifigan_state_dict["mpd"]
-    new_dict = {
-        key.replace("discriminators.", ""): value for key, value in mpd_dict.items()
-    }
-    discriminator.mpd.load_state_dict(new_dict)
-    msd_dict = hifigan_state_dict["msd"]
-    new_dict = {
-        key.replace("discriminators.", ""): value for key, value in msd_dict.items()
-    }
-    discriminator.msd.load_state_dict(new_dict)
+    # hifigan_path = "/usr/src/app/uberduck_ml_exp/models/g_hifi_crust"
+    # hifigan_state_dict = torch.load(hifigan_path)
+    # generator.load_state_dict(hifigan_state_dict["generator"])
+    # hifigan_path = "/usr/src/app/uberduck_ml_exp/models/do_00000000"
+    # hifigan_state_dict = torch.load(hifigan_path)
+    # mpd_dict = hifigan_state_dict["mpd"]
+    # new_dict = {
+    #     key.replace("discriminators.", ""): value for key, value in mpd_dict.items()
+    # }
+    # discriminator.mpd.load_state_dict(new_dict)
+    # msd_dict = hifigan_state_dict["msd"]
+    # new_dict = {
+    #     key.replace("discriminators.", ""): value for key, value in msd_dict.items()
+    # }
+    # discriminator.msd.load_state_dict(new_dict)
     # dict1 = hifigan_state_dict["mpd"]
     # dict1.update(hifigan_state_dict["msd"])
 
