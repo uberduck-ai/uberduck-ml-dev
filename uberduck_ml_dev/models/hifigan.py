@@ -32,14 +32,14 @@ import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
-from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
-from uberduck_ml_dev.models.rvc.rvc import (
+from .common import ResBlock1, ResBlock2
+from .rvc.rvc import (
     SourceModuleHnNSF,
 )  # TODO (Sam): we should switch the direction of this import
-
+from .utils import load_pretrained
 
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
-# TODO (Sam): try the facebook config.
+# TODO (Sam): try the config from https://dl.fbaipublicfiles.com/voicebox/paper.pdf
 DEFAULTS = {
     "resblock": "1",
     "upsample_rates": [8, 8, 2, 2],  # RVC is 10,10,2,2
@@ -54,32 +54,11 @@ DEFAULTS = {
 def _load_uninitialized(device="cpu", config_overrides=None):
     dev = torch.device(device)
     config_dict = DEFAULTS
-    # print(config_dict)
     if config_overrides is not None:
         config_dict.update(config_overrides)
     print(config_dict)
     generator = Generator(**config_dict).to(dev)
     return generator
-
-
-# NOTE (Sam): denoiser not used here in contrast with radtts repo
-# def load_vocoder(vocoder_state_dict, vocoder_config, device="cuda"):
-#     h = AttrDict(vocoder_config)
-#     if "gaussian_blur" in vocoder_config:
-#         vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
-#     else:
-#         vocoder_config["gaussian_blur"] = {"p_blurring": 0.0}
-#         h["gaussian_blur"] = {"p_blurring": 0.0}
-
-#     vocoder = Generator(h)
-#     vocoder.load_state_dict(vocoder_state_dict)
-#     vocoder.to(device)
-
-#     vocoder.eval()
-
-#     return vocoder
-
-from .utils import load_pretrained
 
 
 # NOTE (Sam): this is the loading method used by radtts
@@ -440,15 +419,12 @@ class MultiDiscriminator(torch.nn.Module):
         period_discs = [
             DiscriminatorP(i, use_spectral_norm=False) for i in periods
         ]  # False is hifigan setting, parameterizable in rvc
-        # discs = scale_discs + period_discs
 
         self.mpd = nn.ModuleList(period_discs)
         self.msd = nn.ModuleList(scale_discs)
         self.scale_meanpools = nn.ModuleList(
             [AvgPool1d(4, 2, padding=2), AvgPool1d(4, 2, padding=2)]
         )
-        # self.n_scale_discs = len(scale_discs)
-        # self.n_period_discs = len(period_discs)
 
     def forward(self, y, y_hat):
         y_d_rs = []  #
@@ -461,8 +437,6 @@ class MultiDiscriminator(torch.nn.Module):
                 y_hat = self.scale_meanpools[i - 1](y_hat)
             y_d_r, fmap_r = d(y)
             y_d_g, fmap_g = d(y_hat)
-            # for j in range(len(fmap_r)):
-            #     print(i,j,y.shape,y_hat.shape,fmap_r[j].shape,fmap_g[j].shape)
             y_d_rs.append(y_d_r)
             y_d_gs.append(y_d_g)
             fmap_rs.append(fmap_r)

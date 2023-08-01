@@ -1,6 +1,3 @@
-# NOTE (Sam): we should pass functional arguments like this for all models
-
-
 def train_epoch(
     _train_step,
     dataloader,

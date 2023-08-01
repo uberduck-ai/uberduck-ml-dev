@@ -65,25 +65,9 @@ def train_func(config: dict, project: str = "rvc"):
     discriminator.load_state_dict(discriminator_checkpoint)
     generator.load_state_dict(
         generator_checkpoint, strict=False
-    )  # NOTE (Sam): a handful of "enc_q" decoder states not present - doesn't seem to cause an issue
+    )  # NOTE (Sam): a handful of "enc_q" decoder states not present
     generator = generator.cuda()
     discriminator = discriminator.cuda()
-
-    # # lets just train the hifi part
-    # for p in discriminator.parameters():
-    #     p.requires_grad = False
-
-    # for p in generator.enc_q.parameters():
-    #     p.requires_grad = False
-
-    # for p in generator.enc_p.parameters():
-    #     p.requires_grad = False
-
-    # for p in generator.emb_g.parameters():
-    #     p.requires_grad = False
-
-    # for p in generator.flow.parameters():
-    #     p.requires_grad = False
 
     models = {"generator": generator, "discriminator": discriminator}
 

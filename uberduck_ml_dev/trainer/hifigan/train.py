@@ -17,8 +17,7 @@ from ...losses_rvc import (
 from .train_epoch import train_epoch
 from .train_step import train_step
 from ..rvc.train import DEFAULTS as DEFAULTS
-
-# from ...models.common import TacotronSTFT
+from ...models.hifigan import _load_uninitialized
 
 
 def train_func(config: dict, project: str = "rvc"):
@@ -28,18 +27,13 @@ def train_func(config: dict, project: str = "rvc"):
     model_config = config["model"]
     data_config = config["data"]
 
-    from uberduck_ml_dev.models.hifigan import _load_uninitialized
-
     generator = _load_uninitialized(config_overrides=model_config)
 
-    # discriminator = MultiPeriodDiscriminator(model_config["use_spectral_norm"])
+    # NOTE (Sam): RVC uses MultiPeriodDiscrimator that has a single scale discriminator
+    # HiFi++ paper indicates that the precise discriminator structure is not important and that reweighting the loss is sufficient
+    # Vocos uses additional strcuture.
     discriminator = MultiDiscriminator(True)
-    # discriminator = MultiDiscriminator()
     discriminator = discriminator.to("cuda")
-    # RVC uses MultiPeriodDiscrimator that has a single scale discriminator
-    # multi_period_discriminator = MultiPeriodDiscriminator().to("cuda")
-    # discriminator = MultiPeriodDiscriminator().to("cuda")
-    # msd = MultiScaleDiscriminator().to(device)
 
     generator_optimizer = torch.optim.AdamW(
         generator.parameters(),
@@ -59,11 +53,10 @@ def train_func(config: dict, project: str = "rvc"):
     # TODO (Sam): move to "warmstart" or "load_checkpoint" functions
     if train_config["warmstart_G_checkpoint_path"] is not None:
         generator_checkpoint = torch.load(train_config["warmstart_G_checkpoint_path"])[
-            # "model"
             "generator"
         ]
         generator.load_state_dict(
-            generator_checkpoint  # , False
+            generator_checkpoint
         )  # NOTE (Sam): a handful of "enc_q" decoder states not present - doesn't seem to cause an issue
     if train_config["warmstart_D_checkpoint_path"] is not None:
         discriminator_checkpoint = torch.load(
@@ -71,47 +64,17 @@ def train_func(config: dict, project: str = "rvc"):
         )["model"]
         discriminator.load_state_dict(discriminator_checkpoint)
 
-    # for testing purposes
-    # hifigan_path = "/usr/src/app/uberduck_ml_exp/models/g_hifi_crust"
-    # hifigan_state_dict = torch.load(hifigan_path)
-    # generator.load_state_dict(hifigan_state_dict["generator"])
-    # hifigan_path = "/usr/src/app/uberduck_ml_exp/models/do_00000000"
-    # hifigan_state_dict = torch.load(hifigan_path)
-    # mpd_dict = hifigan_state_dict["mpd"]
-    # new_dict = {
-    #     key.replace("discriminators.", ""): value for key, value in mpd_dict.items()
-    # }
-    # discriminator.mpd.load_state_dict(new_dict)
-    # msd_dict = hifigan_state_dict["msd"]
-    # new_dict = {
-    #     key.replace("discriminators.", ""): value for key, value in msd_dict.items()
-    # }
-    # discriminator.msd.load_state_dict(new_dict)
-    # dict1 = hifigan_state_dict["mpd"]
-    # dict1.update(hifigan_state_dict["msd"])
-
     generator = generator.cuda()
     discriminator = discriminator.cuda()
-    # stft = TacotronSTFT(
-    #     filter_length=data_config["filter_length"],
-    #     hop_length=data_config["hop_length"],
-    #     win_length=data_config["win_length"],
-    #     sampling_rate=data_config["sampling_rate"],
-    #     n_mel_channels=data_config["n_mel_channels"],
-    #     mel_fmin=data_config["mel_fmin"],
-    #     mel_fmax=data_config["mel_fmax"],
-    # )
-    # stft = stft.cuda()
-    # models = {"generator": generator, "discriminator": discriminator, "stft": stft}
+
     models = {"generator": generator, "discriminator": discriminator}
     print("Loading dataset")
 
-    train_dataset = BasicDataset(
+    train_dataset = Dataset(
         filelist_path=data_config["filelist_path"],
         mel_suffix=data_config["mel_suffix"],
         audio_suffix=data_config["audio_suffix"],
     )
-    from ...data.data import DistributedBucketSampler
 
     # train_sampler = DistributedBucketSampler(
     #     train_dataset,
@@ -141,11 +104,6 @@ def train_func(config: dict, project: str = "rvc"):
         "scaler": GradScaler(),
         # NOTE (Sam): need to pass names rather than vector of losses since arguments differ
         "losses": {
-            # "l1": {"loss": F.l1_loss, "weight": 1.0},
-            # "kl": {"loss": kl_loss, "weight": 0.0},
-            # "feature": {"loss": feature_loss, "weight": 0.0},
-            # "generator": {"loss": generator_loss, "weight": 0.0},
-            # "discriminator": {"loss": discriminator_loss, "weight": 0.0},
             "l1": {"loss": F.l1_loss, "weight": 1.0},
             "feature": {"loss": feature_loss, "weight": 1.0},
             "generator": {"loss": generator_loss, "weight": 1.0},
