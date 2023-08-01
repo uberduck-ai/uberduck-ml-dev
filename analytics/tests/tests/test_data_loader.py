@@ -31,7 +31,7 @@ class TestTextMelCollation:
         collate_fn = Collate()
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
-            assert len(batch) == 9
+            assert len(batch) == 6
 
     def test_batch_dimensions(self):
         ds = Data(
@@ -45,12 +45,12 @@ class TestTextMelCollation:
         dl = DataLoader(ds, 12, collate_fn=collate_fn)
         for i, batch in enumerate(dl):
             output_lengths = batch["mel_lengths"]
-            gate_target = batch["gate_target"]
+            gate_target = batch["gate_padded"]
             mel_padded = batch["mel_padded"]
             assert output_lengths.item() == 566
             assert gate_target.size(1) == 566
             assert mel_padded.size(2) == 566
-            assert len(batch) == 9
+            assert len(batch) == 6
 
     def test_batch_dimensions_partial(self):
         ds = Data(
@@ -67,5 +67,5 @@ class TestTextMelCollation:
             assert (
                 batch["mel_padded"].size(2) == 566
             )  # I'm not sure why this was 570 - maybe 566 + 5 (i.e. the n_frames_per_step)
-            assert batch["gate_target"].size(1) == 566
-            assert len(batch) == 9
+            assert batch["gate_padded"].size(1) == 566
+            assert len(batch) == 6

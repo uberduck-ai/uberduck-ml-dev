@@ -20,11 +20,9 @@ class TestTacotron2Model:
         with open("analytics/tests/fixtures/ljtest/taco2_lj2lj.json") as f:
             config.update(json.load(f))
         hparams = HParams(**config)
-        if torch.cuda.is_available():
-            hparams.cudnn_enabled = True
+
+        hparams.cudnn_enabled = False
         model = Tacotron2(hparams)
-        if torch.cuda.is_available():
-            model.cuda()
 
         trainer = Tacotron2Trainer(hparams, rank=0, world_size=0)
         (
@@ -43,16 +41,16 @@ class TestTacotron2Model:
                 "speaker_ids",
                 "gst",
                 "mel_padded",
-                "output_lengths",
+                "mel_lengths",
             ]
         )
         model_output = model(
             input_text=model_input["text_int_padded"],
             input_lengths=model_input["input_lengths"],
             speaker_ids=model_input["speaker_ids"],
-            embedded_gst=model_input["gst"],
+            embedded_gst=model_input.get("gst", None),
             targets=model_input["mel_padded"],
-            output_lengths=model_input["output_lengths"],
+            output_lengths=model_input["mel_lengths"],
         )
 
         # 'mel_outputs', 'mel_outputs_postnet', 'gate_predicted', 'output_lengths', 'alignments'

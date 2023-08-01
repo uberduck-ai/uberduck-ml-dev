@@ -51,9 +51,7 @@ F0_MIN = 80
 F0_MAX = 640
 
 
-# NOTE (Sam): generic dataset class for all purposes avoids writing redundant methods (e.g. get pitch when text isn't available).
-# However, functional factorization of this dataloader (e.g. get_mels) and merging classes as needed would be preferable.
-# NOTE (Sam): "load" means load from file. "return" means return to collate. "get" is a functional element.  "has" and "with" are tbd equivalent in trainer/model.
+# TODO (Sam): replace with Dataset.
 class Data(Dataset):
     def __init__(
         self,

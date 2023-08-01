@@ -1,8 +1,10 @@
-from uberduck_ml_dev.trainer.base import TTSTrainer
 import torch
 import math
+
 from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 from uberduck_ml_dev.trainer.base import DEFAULTS as TRAINER_DEFAULTS
+from uberduck_ml_dev.trainer.base import TTSTrainer
+from uberduck_ml_dev.models.common import MelSTFT
 
 
 class TestTrainer:
@@ -22,7 +24,8 @@ class TestTrainer:
 
         assert trainer.cudnn_enabled == True
         mel = torch.load("analytics/tests/fixtures/stevejobs-1.pt")
-        audio = trainer.sample(mel)
+        mel_stft = MelSTFT()
+        audio = mel_stft.griffin_lim(mel)
         assert audio.size(0) == 1
 
 
