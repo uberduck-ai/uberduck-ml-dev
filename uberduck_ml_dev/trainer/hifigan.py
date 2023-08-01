@@ -16,7 +16,7 @@ import torch.multiprocessing as mp
 from torch.distributed import init_process_group
 from torch.nn.parallel import DistributedDataParallel
 from ..data.hifigan import MelDataset, mel_spectrogram, get_dataset_filelist
-from ..vocoders.hifigan import (
+from ..models.hifigan import (
     Generator,
     MultiPeriodDiscriminator,
     MultiScaleDiscriminator,

@@ -1,3 +1,5 @@
+# NOTE (Sam): this was used for radtts training inference and inference on uberduck
+# the main differences is in how parameters are passed
 __all__ = [
     "HiFiGanGenerator",
     "ResBlock1",
@@ -18,60 +20,48 @@ __all__ = [
     "get_padding",
 ]
 
-
-""" from https://github.com/jik876/hifi-gan """
-
 import json
-import datetime as dt
 import numpy as np
-from scipy.io.wavfile import write
 
+import os
+import shutil
+from torch.nn.utils import weight_norm
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
+from .common import ResBlock1, ResBlock2
+from .rvc.rvc import (
+    SourceModuleHnNSF,
+)  # TODO (Sam): we should switch the direction of this import
+from .utils import load_pretrained
+
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
+# TODO (Sam): try the config from https://dl.fbaipublicfiles.com/voicebox/paper.pdf
 DEFAULTS = {
     "resblock": "1",
-    "upsample_rates": [8, 8, 2, 2],
+    "upsample_rates": [8, 8, 2, 2],  # RVC is 10,10,2,2
     "upsample_kernel_sizes": [16, 16, 4, 4],
     "upsample_initial_channel": 512,
     "resblock_kernel_sizes": [3, 7, 11],
     "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-    "segment_size": 8192,
-    "num_mels": 80,
-    "num_freq": 1025,
-    "n_fft": 1024,
-    "hop_size": 256,
-    "win_size": 1024,
-    "sampling_rate": 22050,
-    "fmin": 0,
-    "fmax": 8000,
-    "fmax_for_loss": None,
+    "p_blur": 0.0,
 }
 
 
-# NOTE (Sam): denoiser not used here in contrast with radtts repo
-def load_vocoder(vocoder_state_dict, vocoder_config, to_cuda=True):
-    h = AttrDict(vocoder_config)
-    if "gaussian_blur" in vocoder_config:
-        vocoder_config["gaussian_blur"]["p_blurring"] = 0.0
-    else:
-        vocoder_config["gaussian_blur"] = {"p_blurring": 0.0}
-        h["gaussian_blur"] = {"p_blurring": 0.0}
-
-    vocoder = Generator(h)
-    vocoder.load_state_dict(vocoder_state_dict)
-    if to_cuda:
-        vocoder.cuda()
-
-    vocoder.eval()
-
-    return vocoder
+def _load_uninitialized(device="cpu", config_overrides=None):
+    dev = torch.device(device)
+    config_dict = DEFAULTS
+    if config_overrides is not None:
+        config_dict.update(config_overrides)
+    print(config_dict)
+    generator = Generator(**config_dict).to(dev)
+    return generator
 
 
+# NOTE (Sam): this is the loading method used by radtts
 # TODO (Sam): combine loading methods
 def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     print("Getting vocoder")
@@ -80,12 +70,8 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
         hifigan_config = json.load(f)
 
     h = AttrDict(hifigan_config)
-    if "gaussian_blur" in hifigan_config:
-        hifigan_config["gaussian_blur"]["p_blurring"] = 0.0
-    else:
-        hifigan_config["gaussian_blur"] = {"p_blurring": 0.0}
-        h["gaussian_blur"] = {"p_blurring": 0.0}
-    model = Generator(h)
+    hifigan_config["p_blur"] = 0.0
+    model = Generator(**h)
     print("Loading pretrained model...")
     load_pretrained(model, hifi_gan_checkpoint_path)
     print("Got pretrained model...")
@@ -93,243 +79,116 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     return model
 
 
-def load_pretrained(model, hifi_gan_checkpoint_path):
-    # NOTE (Sam): uncomment for download on anyscale
-    # response = requests.get(HIFI_GAN_GENERATOR_URL, stream=True)
-    # bio = BytesIO(response.content)
-    loaded = torch.load(hifi_gan_checkpoint_path)
-    model.load_state_dict(loaded["generator"])
-
-
-class HiFiGanGenerator(nn.Module):
-    def __init__(self, config, checkpoint, cudnn_enabled=False):
-        super().__init__()
-        self.config = config
-        self.checkpoint = checkpoint
-        self.device = "cuda" if torch.cuda.is_available() and cudnn_enabled else "cpu"
-        self.vocoder = self.load_checkpoint().eval()
-        self.vocoder.remove_weight_norm()
-
-    @torch.no_grad()
-    def load_checkpoint(self):
-        h = self.load_config()
-        vocoder = Generator(h)
-        vocoder.load_state_dict(
-            torch.load(
-                self.checkpoint,
-                map_location="cuda" if self.device == "cuda" else "cpu",
-            )["generator"]
-        )
-        if self.device == "cuda":
-            vocoder = vocoder.cuda()
-        return vocoder
-
-    @torch.no_grad()
-    def load_config(self):
-        if isinstance(self.config, dict):
-            return AttrDict(self.config)
-        with open(self.config) as f:
-            h = AttrDict(json.load(f))
-        return h
-
-    def forward(self, mel, max_wav_value=32768):
-        return self.infer(mel, max_wav_value=max_wav_value)
-
-    @torch.no_grad()
-    def infer(self, mel, max_wav_value=32768):
-        audio = (
-            self.vocoder.forward(mel).cpu().squeeze().clamp(-1, 1).numpy()
-            * max_wav_value
-        ).astype(np.int16)
-        return audio
-
-
 LRELU_SLOPE = 0.1
-
-
-class ResBlock1(torch.nn.Module):
-    def __init__(self, h, channels, kernel_size=3, dilation=(1, 3, 5)):
-        super(ResBlock1, self).__init__()
-        self.h = h
-        self.convs1 = nn.ModuleList(
-            [
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[0],
-                        padding=get_padding(kernel_size, dilation[0]),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[1],
-                        padding=get_padding(kernel_size, dilation[1]),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[2],
-                        padding=get_padding(kernel_size, dilation[2]),
-                    )
-                ),
-            ]
-        )
-        self.convs1.apply(init_weights)
-
-        self.convs2 = nn.ModuleList(
-            [
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=1,
-                        padding=get_padding(kernel_size, 1),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=1,
-                        padding=get_padding(kernel_size, 1),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=1,
-                        padding=get_padding(kernel_size, 1),
-                    )
-                ),
-            ]
-        )
-        self.convs2.apply(init_weights)
-
-    def forward(self, x):
-        for c1, c2 in zip(self.convs1, self.convs2):
-            xt = F.leaky_relu(x, LRELU_SLOPE)
-            xt = c1(xt)
-            xt = F.leaky_relu(xt, LRELU_SLOPE)
-            xt = c2(xt)
-            x = xt + x
-        return x
-
-    def remove_weight_norm(self):
-        for l in self.convs1:
-            remove_weight_norm(l)
-        for l in self.convs2:
-            remove_weight_norm(l)
-
-
-class ResBlock2(torch.nn.Module):
-    def __init__(self, h, channels, kernel_size=3, dilation=(1, 3)):
-        super(ResBlock2, self).__init__()
-        self.h = h
-        self.convs = nn.ModuleList(
-            [
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[0],
-                        padding=get_padding(kernel_size, dilation[0]),
-                    )
-                ),
-                weight_norm(
-                    Conv1d(
-                        channels,
-                        channels,
-                        kernel_size,
-                        1,
-                        dilation=dilation[1],
-                        padding=get_padding(kernel_size, dilation[1]),
-                    )
-                ),
-            ]
-        )
-        self.convs.apply(init_weights)
-
-    def forward(self, x):
-        for c in self.convs:
-            xt = F.leaky_relu(x, LRELU_SLOPE)
-            xt = c(xt)
-            x = xt + x
-        return x
-
-    def remove_weight_norm(self):
-        for l in self.convs:
-            remove_weight_norm(l)
 
 
 class Generator(torch.nn.Module):
     __constants__ = ["lrelu_slope", "num_kernels", "num_upsamples", "p_blur"]
 
-    def __init__(self, h):
+    def __init__(
+        self,
+        resblock,
+        resblock_kernel_sizes,
+        resblock_dilation_sizes,
+        upsample_rates,
+        upsample_initial_channel,
+        upsample_kernel_sizes,
+        p_blur,
+        weight_norm_conv=True,
+        initial_channel=80,
+        conv_post_bias=True,
+        use_noise_convs=False,
+        sr=22050,
+        is_half=False,
+        gin_channels=0,
+    ):
         super(Generator, self).__init__()
-        self.num_kernels = len(h.resblock_kernel_sizes)
-        self.num_upsamples = len(h.upsample_rates)
-        self.conv_pre = weight_norm(
-            Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3)
-        )
-        self.p_blur = h.gaussian_blur["p_blurring"]
+        self.num_kernels = len(resblock_kernel_sizes)
+        self.num_upsamples = len(upsample_rates)
+        self.conv_post_bias = conv_post_bias
+        self.use_noise_convs = use_noise_convs
+        # TODO (Sam): detect this automatically
+        if weight_norm_conv:
+            self.conv_pre = weight_norm(
+                Conv1d(initial_channel, upsample_initial_channel, 7, 1, padding=3)
+            )
+        else:
+            self.conv_pre = Conv1d(
+                initial_channel, upsample_initial_channel, 7, 1, padding=3
+            )
+        if use_noise_convs:
+            self.noise_convs = nn.ModuleList()
+            self.m_source = SourceModuleHnNSF(
+                sampling_rate=sr, harmonic_num=0, is_half=is_half
+            )
+            self.upp = np.prod(upsample_rates)
+
+        self.p_blur = p_blur
         self.gaussian_blur_fn = None
         if self.p_blur > 0.0:
-            self.gaussian_blur_fn = GaussianBlurAugmentation(
-                h.gaussian_blur["kernel_size"], h.gaussian_blur["sigmas"], self.p_blur
+            # self.gaussian_blur_fn = GaussianBlurAugmentation(
+            #     h.gaussian_blur["kernel_size"], h.gaussian_blur["sigmas"], self.p_blur
+            # )
+            raise Exception(
+                "Gaussian blur is not supported in this version of the code."
             )
+
         else:
             self.gaussian_blur_fn = nn.Identity()
         self.lrelu_slope = LRELU_SLOPE
 
-        resblock = ResBlock1 if h.resblock == "1" else ResBlock2
+        resblock = ResBlock1 if resblock == "1" else ResBlock2
 
         self.ups = nn.ModuleList()
-        for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
+        for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
             self.ups.append(
                 weight_norm(
                     ConvTranspose1d(
-                        h.upsample_initial_channel // (2**i),
-                        h.upsample_initial_channel // (2 ** (i + 1)),
+                        upsample_initial_channel // (2**i),
+                        upsample_initial_channel // (2 ** (i + 1)),
                         k,
                         u,
                         padding=(k - u) // 2,
                     )
                 )
             )
+            if use_noise_convs:
+                c_cur = upsample_initial_channel // (2 ** (i + 1))
+                if i + 1 < len(upsample_rates):
+                    stride_f0 = np.prod(upsample_rates[i + 1 :])
+                    self.noise_convs.append(
+                        Conv1d(
+                            1,
+                            c_cur,
+                            kernel_size=stride_f0 * 2,
+                            stride=stride_f0,
+                            padding=stride_f0 // 2,
+                        )
+                    )
+                else:
+                    self.noise_convs.append(Conv1d(1, c_cur, kernel_size=1))
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
             resblock_list = nn.ModuleList()
-            ch = h.upsample_initial_channel // (2 ** (i + 1))
+            ch = upsample_initial_channel // (2 ** (i + 1))
             for j, (k, d) in enumerate(
-                zip(h.resblock_kernel_sizes, h.resblock_dilation_sizes)
+                zip(resblock_kernel_sizes, resblock_dilation_sizes)
             ):
-                resblock_list.append(resblock(h, ch, k, d))
+                resblock_list.append(resblock(ch, k, d))
             self.resblocks.append(resblock_list)
 
-        self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
+        if weight_norm_conv:
+            self.conv_post = weight_norm(
+                Conv1d(ch, 1, 7, 1, padding=3, bias=conv_post_bias)
+            )
+        else:
+            self.conv_post = Conv1d(ch, 1, 7, 1, padding=3, bias=conv_post_bias)
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
+
+        if gin_channels != 0:
+            self.cond = nn.Conv1d(gin_channels, upsample_initial_channel, 1)
 
     def load_state_dict(self, state_dict):
         new_state_dict = {}
@@ -345,13 +204,22 @@ class Generator(torch.nn.Module):
             new_state_dict[new_k] = v
         super().load_state_dict(new_state_dict)
 
-    def forward(self, x):
+    def forward(self, x, f0=None, g=None):
+        if self.use_noise_convs:
+            har_source, noi_source, uv = self.m_source(f0, self.upp)
+            har_source = har_source.transpose(1, 2)
         if self.p_blur > 0.0:
             x = self.gaussian_blur_fn(x)
         x = self.conv_pre(x)
-        for upsample_layer, resblock_group in zip(self.ups, self.resblocks):
+        if g is not None:
+            x = x + self.cond(g)
+        for i, (upsample_layer, resblock_group) in enumerate(
+            zip(self.ups, self.resblocks)
+        ):
             x = F.leaky_relu(x, self.lrelu_slope)
             x = upsample_layer(x)
+            if self.use_noise_convs:
+                x += self.noise_convs[i](har_source)
             xs = torch.zeros(x.shape, dtype=x.dtype, device=x.device)
             for resblock in resblock_group:
                 xs += resblock(x)
@@ -472,6 +340,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 
+# NOTE (Sam): quite different from rvc parameters here
 class DiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
         super(DiscriminatorS, self).__init__()
@@ -535,6 +404,45 @@ class MultiScaleDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 
+class MultiDiscriminator(torch.nn.Module):
+    def __init__(self, use_spectral_norm=False):
+        super(MultiDiscriminator, self).__init__()
+        periods = [2, 3, 5, 7, 11]
+        scale_discs = [
+            DiscriminatorS(use_spectral_norm=use_spectral_norm),
+            DiscriminatorS(),
+            DiscriminatorS(),
+        ]
+
+        period_discs = [
+            DiscriminatorP(i, use_spectral_norm=False) for i in periods
+        ]  # False is hifigan setting, parameterizable in rvc
+
+        self.mpd = nn.ModuleList(period_discs)
+        self.msd = nn.ModuleList(scale_discs)
+        self.scale_meanpools = nn.ModuleList(
+            [AvgPool1d(4, 2, padding=2), AvgPool1d(4, 2, padding=2)]
+        )
+
+    def forward(self, y, y_hat):
+        y_d_rs = []  #
+        y_d_gs = []
+        fmap_rs = []
+        fmap_gs = []
+        for i, d in enumerate(self.msd + self.mpd):
+            if i in [1, 2]:  # hacky, matches OG hifigan
+                y = self.scale_meanpools[i - 1](y)
+                y_hat = self.scale_meanpools[i - 1](y_hat)
+            y_d_r, fmap_r = d(y)
+            y_d_g, fmap_g = d(y_hat)
+            y_d_rs.append(y_d_r)
+            y_d_gs.append(y_d_g)
+            fmap_rs.append(fmap_r)
+            fmap_gs.append(fmap_g)
+
+        return y_d_rs, y_d_gs, fmap_rs, fmap_gs
+
+
 def feature_loss(fmap_r, fmap_g):
     loss = 0
     for dr, dg in zip(fmap_r, fmap_g):
@@ -569,10 +477,6 @@ def generator_loss(disc_outputs):
     return loss, gen_losses
 
 
-import os
-import shutil
-
-
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
@@ -584,9 +488,6 @@ def build_env(config, config_name, path):
     if config != t_path:
         os.makedirs(path, exist_ok=True)
         shutil.copyfile(config, os.path.join(path, config_name))
-
-
-from torch.nn.utils import weight_norm
 
 
 def init_weights(m, mean=0.0, std=0.01):

@@ -7,102 +7,101 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 import numpy as np
 
 from .commons import init_weights, get_padding
-from ...models.common import ResBlock1, ResBlock2
 from . import modules
 from . import attentions
 from . import commons
 
 
-class TextEncoder256(nn.Module):
-    def __init__(
-        self,
-        out_channels,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size,
-        p_dropout,
-        f0=True,
-    ):
-        super().__init__()
-        self.out_channels = out_channels
-        self.hidden_channels = hidden_channels
-        self.filter_channels = filter_channels
-        self.n_heads = n_heads
-        self.n_layers = n_layers
-        self.kernel_size = kernel_size
-        self.p_dropout = p_dropout
-        self.emb_phone = nn.Linear(256, hidden_channels)
-        self.lrelu = nn.LeakyReLU(0.1, inplace=True)
-        if f0 == True:
-            self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
-        self.encoder = attentions.Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
-        )
-        self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
+# class TextEncoder256(nn.Module):
+#     def __init__(
+#         self,
+#         out_channels,
+#         hidden_channels,
+#         filter_channels,
+#         n_heads,
+#         n_layers,
+#         kernel_size,
+#         p_dropout,
+#         f0=True,
+#     ):
+#         super().__init__()
+#         self.out_channels = out_channels
+#         self.hidden_channels = hidden_channels
+#         self.filter_channels = filter_channels
+#         self.n_heads = n_heads
+#         self.n_layers = n_layers
+#         self.kernel_size = kernel_size
+#         self.p_dropout = p_dropout
+#         self.emb_phone = nn.Linear(256, hidden_channels)
+#         self.lrelu = nn.LeakyReLU(0.1, inplace=True)
+#         if f0 == True:
+#             self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
+#         self.encoder = attentions.Encoder(
+#             hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
+#         )
+#         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, phone, pitch, lengths):
-        if pitch == None:
-            x = self.emb_phone(phone)
-        else:
-            x = self.emb_phone(phone) + self.emb_pitch(pitch)
-        x = x * math.sqrt(self.hidden_channels)  # [b, t, h]
-        x = self.lrelu(x)
-        x = torch.transpose(x, 1, -1)  # [b, h, t]
-        x_mask = torch.unsqueeze(commons.sequence_mask(lengths, x.size(2)), 1).to(
-            x.dtype
-        )
-        x = self.encoder(x * x_mask, x_mask)
-        stats = self.proj(x) * x_mask
+#     def forward(self, phone, pitch, lengths):
+#         if pitch == None:
+#             x = self.emb_phone(phone)
+#         else:
+#             x = self.emb_phone(phone) + self.emb_pitch(pitch)
+#         x = x * math.sqrt(self.hidden_channels)  # [b, t, h]
+#         x = self.lrelu(x)
+#         x = torch.transpose(x, 1, -1)  # [b, h, t]
+#         x_mask = torch.unsqueeze(commons.sequence_mask(lengths, x.size(2)), 1).to(
+#             x.dtype
+#         )
+#         x = self.encoder(x * x_mask, x_mask)
+#         stats = self.proj(x) * x_mask
 
-        m, logs = torch.split(stats, self.out_channels, dim=1)
-        return m, logs, x_mask
+#         m, logs = torch.split(stats, self.out_channels, dim=1)
+#         return m, logs, x_mask
 
 
-class TextEncoder256Sim(nn.Module):
-    def __init__(
-        self,
-        out_channels,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size,
-        p_dropout,
-        f0=True,
-    ):
-        super().__init__()
-        self.out_channels = out_channels
-        self.hidden_channels = hidden_channels
-        self.filter_channels = filter_channels
-        self.n_heads = n_heads
-        self.n_layers = n_layers
-        self.kernel_size = kernel_size
-        self.p_dropout = p_dropout
-        self.emb_phone = nn.Linear(256, hidden_channels)
-        self.lrelu = nn.LeakyReLU(0.1, inplace=True)
-        if f0 == True:
-            self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
-        self.encoder = attentions.Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
-        )
-        self.proj = nn.Conv1d(hidden_channels, out_channels, 1)
+# class TextEncoder256Sim(nn.Module):
+#     def __init__(
+#         self,
+#         out_channels,
+#         hidden_channels,
+#         filter_channels,
+#         n_heads,
+#         n_layers,
+#         kernel_size,
+#         p_dropout,
+#         f0=True,
+#     ):
+#         super().__init__()
+#         self.out_channels = out_channels
+#         self.hidden_channels = hidden_channels
+#         self.filter_channels = filter_channels
+#         self.n_heads = n_heads
+#         self.n_layers = n_layers
+#         self.kernel_size = kernel_size
+#         self.p_dropout = p_dropout
+#         self.emb_phone = nn.Linear(256, hidden_channels)
+#         self.lrelu = nn.LeakyReLU(0.1, inplace=True)
+#         if f0 == True:
+#             self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
+#         self.encoder = attentions.Encoder(
+#             hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
+#         )
+#         self.proj = nn.Conv1d(hidden_channels, out_channels, 1)
 
-    def forward(self, phone, pitch, lengths):
-        if pitch == None:
-            x = self.emb_phone(phone)
-        else:
-            x = self.emb_phone(phone) + self.emb_pitch(pitch)
-        x = x * math.sqrt(self.hidden_channels)  # [b, t, h]
-        x = self.lrelu(x)
-        x = torch.transpose(x, 1, -1)  # [b, h, t]
-        x_mask = torch.unsqueeze(commons.sequence_mask(lengths, x.size(2)), 1).to(
-            x.dtype
-        )
-        x = self.encoder(x * x_mask, x_mask)
-        x = self.proj(x) * x_mask
-        return x, x_mask
+#     def forward(self, phone, pitch, lengths):
+#         if pitch == None:
+#             x = self.emb_phone(phone)
+#         else:
+#             x = self.emb_phone(phone) + self.emb_pitch(pitch)
+#         x = x * math.sqrt(self.hidden_channels)  # [b, t, h]
+#         x = self.lrelu(x)
+#         x = torch.transpose(x, 1, -1)  # [b, h, t]
+#         x_mask = torch.unsqueeze(commons.sequence_mask(lengths, x.size(2)), 1).to(
+#             x.dtype
+#         )
+#         x = self.encoder(x * x_mask, x_mask)
+#         x = self.proj(x) * x_mask
+#         return x, x_mask
 
 
 class ResidualCouplingBlock(nn.Module):
@@ -291,6 +290,7 @@ class SineGen(torch.nn.Module):
         return sine_waves, uv, noise
 
 
+# has half precision and no noise
 class SourceModuleHnNSF(torch.nn.Module):
     """SourceModule for hn-nsf
     SourceModule(sampling_rate, harmonic_num=0, sine_amp=0.1,
@@ -338,6 +338,9 @@ class SourceModuleHnNSF(torch.nn.Module):
             sine_wavs = sine_wavs.half()
         sine_merge = self.l_tanh(self.l_linear(sine_wavs))
         return sine_merge, None, None  # noise, uv
+
+
+from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
 
 
 class GeneratorNSF(torch.nn.Module):
@@ -535,7 +538,6 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         self.flow.remove_weight_norm()
         self.enc_q.remove_weight_norm()
 
-    # TODO (Sam): combine forward and infer for jit compilation
     def forward(self, phone, phone_lengths, pitch, pitchf, y, y_lengths, ds):
         g = self.emb_g(ds).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths)
@@ -561,6 +563,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
         super(MultiPeriodDiscriminator, self).__init__()
         periods = [2, 3, 5, 7, 11, 17]
+        # periods = [3, 5, 7, 11, 17, 23, 37]
 
         discs = [DiscriminatorS(use_spectral_norm=use_spectral_norm)]
         discs = discs + [

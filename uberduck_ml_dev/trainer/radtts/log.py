@@ -32,6 +32,7 @@ def get_log_audio(
         oos_name is None
     ), "must provide both or neither of audio_embedding_oos and oos_name"
 
+    # TODO (Sam): use batch.to_gpu() method here.
     mel = to_gpu(batch_dict["mel"])
     speaker_ids = to_gpu(batch_dict["speaker_ids"])
     attn_prior = to_gpu(batch_dict["attn_prior"])

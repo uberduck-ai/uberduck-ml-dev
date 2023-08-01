@@ -7,28 +7,28 @@ from torch.nn import functional as F
 from torch.nn import Conv1d, Conv2d
 from torch.nn.utils import weight_norm, spectral_norm
 
-from uberduck_ml_dev.models import common
-from uberduck_ml_dev.models.components.attribute_prediction_model import (
+from . import common
+from .components.attribute_prediction_model import (
     get_attribute_prediction_model,
     F0Decoder,
 )
-from uberduck_ml_dev.models.components.encoders.duration import (
+from .components.encoders.duration import (
     StochasticDurationPredictor,
     DurationPredictor,
 )
-from uberduck_ml_dev.models.components.encoders.resnet_speaker_encoder import (
+from .components.encoders.resnet_speaker_encoder import (
     get_pretrained_model,
 )
-from uberduck_ml_dev.utils.utils import (
+from ..utils.utils import (
     get_padding,
     rand_slice_segments,
     sequence_mask,
     generate_path,
 )
 
-from uberduck_ml_dev.vocoders.hifigan import Generator
-from uberduck_ml_dev import monotonic_align
-from uberduck_ml_dev.models.attentions import VITSEncoder
+from .hifigan import Generator
+from .. import monotonic_align
+from .components.attentions import VITSEncoder
 
 F0_MODEL_CONFIG = {
     "name": "dap",

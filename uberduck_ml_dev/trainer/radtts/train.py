@@ -8,7 +8,7 @@ from .load import prepare_dataloaders, warmstart
 from ...models.radtts import RADTTS
 from ...losses import RADTTSLoss, AttentionBinarizationLoss
 from ...optimizers.radam import RAdam
-from ...vocoders.hifigan import get_vocoder
+from ...models.hifigan import get_vocoder
 
 
 def train_func(config: dict):

@@ -103,6 +103,10 @@ def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
     return torch.log(torch.clamp(x, min=clip_val) * C)
 
 
+def spectral_normalize_torch(magnitudes):
+    return dynamic_range_compression_torch(magnitudes)
+
+
 def dynamic_range_decompression_torch(x, C=1):
     """
     PARAMS
@@ -110,10 +114,6 @@ def dynamic_range_decompression_torch(x, C=1):
     C: compression factor used to compress
     """
     return torch.exp(x) / C
-
-
-def spectral_normalize_torch(magnitudes):
-    return dynamic_range_compression_torch(magnitudes)
 
 
 def spectral_de_normalize_torch(magnitudes):
@@ -157,6 +157,7 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     # Padding
     y = torch.nn.functional.pad(
         y.unsqueeze(1),
+        # NOTE (Sam): combinining n_fft with hop_size is confusing.
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
         mode="reflect",
     )
@@ -175,7 +176,6 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
         onesided=True,
         return_complex=False,
     )
-
     # Linear-frequency Linear-amplitude spectrogram :: (B, Freq, Frame, RealComplex=2) -> (B, Freq, Frame)
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
@@ -200,6 +200,8 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
     return melspec
 
 
+# TODO (Sam): use this in the functional data processor
+# NOTE (Sam): be careful about normalization!  Sometimes (e.g. hifigan) there is a mel term in the loss that is scaled by the normalization.
 def mel_spectrogram_torch(
     y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False
 ):
@@ -217,3 +219,49 @@ def mel_spectrogram_torch(
     melspec = spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax)
 
     return melspec
+
+
+# NOTE (Sam): this has the type of normalization used in the DataMel class, which should be deprecated for the functional data processor.
+# stft = TacotronSTFT(
+#         filter_length=data_config["filter_length"],
+#         hop_length=data_config["hop_length"],
+#         win_length=data_config["win_length"],
+#         sampling_rate=data_config["sampling_rate"],
+#         n_mel_channels=data_config["n_mel_channels"],
+#         mel_fmin=data_config["mel_fmin"],
+#         mel_fmax=data_config["mel_fmax"],
+#     )
+
+# def mel_spectrogram_torch_datamel(audio, stft):
+#     # print(audio.shape, "audioshp")
+#     # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
+#     print(audio.shape, "audio shape")
+#     print(torch.max(torch.abs(audio), dim=1).values.shape, "qwqwq")
+#     # audio = np.einsum("b t, b -> b t", audio, (np.abs(audio).max(axis=1) * 2) ** (-1))
+#     audio = torch.einsum(
+#         "b t, b -> b t", audio, (torch.abs(audio).max(dim=1).values * 2) ** (-1)
+#     )
+
+#     print(audio.shape, "in here")
+#     audio_norm = torch.tensor(audio, dtype=torch.float32)
+#     # audio_norm = audio_norm.unsqueeze(0)
+#     audio_norm = torch.nn.functional.pad(
+#         audio_norm.unsqueeze(1),
+#         # NOTE (Sam): combinining n_fft (filter_length) with hop_size reeks of either a bug or sophisticated asympotitc analysis.
+#         # janky hardcoding of padding for now.
+#         (int((80 - 256) / 2), int((80 - 256) / 2)),
+#         mode="reflect",
+#     )
+#     audio_norm = audio_norm.squeeze(1)
+
+#     melspec = stft.mel_spectrogram(audio_norm)
+#     print(melspec.shape, "mps")
+#     melspec = torch.squeeze(melspec, 0)
+#     melspec = (melspec + 5.5) / 2
+#     return melspec
+
+
+def find_rel_paths(directory, filename):
+    for root, dirs, files in os.walk(directory):
+        if filename in files:
+            yield os.path.relpath(os.path.join(root, filename), directory)

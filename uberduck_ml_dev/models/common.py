@@ -1112,7 +1112,6 @@ def mel_spectrogram_torch(
             dtype=y.dtype, device=y.device
         )
 
-    print(y.shape)
     y = torch.nn.functional.pad(
         y,
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
@@ -2105,7 +2104,8 @@ class ConvLSTMLinear(nn.Module):
 
 
 # NOTE (Sam): ironically, this is from RADTTS
-# TODO (Sam): combine this and MelSTFT (the class actually from Tacotron)
+# TODO (Sam): combine this and MelSTFT (the class actually from Tacotron) as functional methods
+# NOTE (Sam): in contrast, the MelSTFT class also has griffin lim inverse transform
 class TacotronSTFT(torch.nn.Module):
     def __init__(
         self,
@@ -2168,6 +2168,7 @@ class TacotronSTFT(torch.nn.Module):
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
         melspec = self.mel_spectrogram(audio_norm)
+
         melspec = torch.squeeze(melspec, 0)
         # if self.do_mel_scaling:
         melspec = (melspec + 5.5) / 2

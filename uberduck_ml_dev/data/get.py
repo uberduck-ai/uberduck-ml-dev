@@ -5,8 +5,9 @@ from tqdm import tqdm
 import torch
 import os
 
-from uberduck_ml_dev.data.data import DataMel, DataPitch, DataEmbedding
-from uberduck_ml_dev.data.collate import CollateBlank
+from ..data.data import DataMel, DataPitch, DataEmbedding
+from ..data.collate import CollateBlank
+from ..data.processor import Processor
 
 
 def get_parallel_torch(data):
@@ -15,6 +16,30 @@ def get_parallel_torch(data):
     )
     for batch in data_loader:
         pass
+
+
+from typing import Callable, List
+
+
+def get(
+    function_: Callable,
+    loading_function: Callable,
+    saving_function: Callable,
+    paths: List[str],
+    target_paths: List[str],
+    recompute: bool = False,
+    function_kwargs: dict = None,
+):
+    data = Processor(
+        paths=paths,
+        target_paths=target_paths,
+        function_=function_,
+        loading_function=loading_function,
+        saving_function=saving_function,
+        recompute=recompute,
+        function_kwargs=function_kwargs,
+    )
+    get_parallel_torch(data)
 
 
 # TODO (Sam): use get_parallel_torch to reduce boilerplate.
@@ -61,12 +86,16 @@ def get_embeddings(
 
 
 # NOTE (Sam): pitch, pitchf == f0 coarse, f0bak in rvc parlance.
+# NOTE (Sam): sample_rate is also passed as part of data_config
+# TODO (Sam): decide on sample_rate v sampling_rate
+# NOTE (Sam): pyin (radtts) and parselmouth (rvc) methods seem to generate pitches of different lengths.
 def get_pitches(
     paths,
     data_config=None,
     target_folders=None,
     method="parselmouth",
     sample_rate=None,
+    recompute=False,
 ):
     data = DataPitch(
         audiopaths=paths,
@@ -74,6 +103,7 @@ def get_pitches(
         target_folders=target_folders,
         method=method,
         sample_rate=sample_rate,
+        recompute=recompute,
     )
     get_parallel_torch(data)
 
@@ -116,23 +146,21 @@ def get_hubert_embeddings(
     return hubert_abs_paths
 
 
-from uberduck_ml_dev.data.data import FunctionalDataProcessor
-
-
 def get(
-    function_,
-    loading_function,
+    processing_function,
     saving_function,
-    paths,
+    loading_function,
+    source_paths,
     target_paths,
     recompute,
 ):
-    data = FunctionalDataProcessor(
-        paths=paths,
-        target_paths=target_paths,
+    function_ = lambda source_path, target_path: saving_function(
+        processing_function(loading_function(source_path)), target_path
+    )
+    processor = Processor(
         function_=function_,
-        loading_function=loading_function,
-        saving_function=saving_function,
+        source_paths=source_paths,
+        target_paths=target_paths,
         recompute=recompute,
     )
-    get_parallel_torch(data)
+    get_parallel_torch(processor)
