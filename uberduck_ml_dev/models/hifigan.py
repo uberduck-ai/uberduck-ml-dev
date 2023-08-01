@@ -175,7 +175,6 @@ class Generator(torch.nn.Module):
             for j, (k, d) in enumerate(
                 zip(resblock_kernel_sizes, resblock_dilation_sizes)
             ):
-                # print("params", ch, k, d)
                 resblock_list.append(resblock(ch, k, d))
             self.resblocks.append(resblock_list)
 
@@ -312,7 +311,6 @@ class DiscriminatorP(torch.nn.Module):
         return x, fmap
 
 
-# NOTE (Sam): can also use the rvc version, which has 6 period discriminators and only one scale one.
 class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self):
         super(MultiPeriodDiscriminator, self).__init__()

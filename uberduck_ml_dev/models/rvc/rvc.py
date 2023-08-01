@@ -7,6 +7,7 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 import numpy as np
 
 from .commons import init_weights, get_padding
+from ...models.common import ResBlock1, ResBlock2
 from . import modules
 from . import attentions
 from . import commons
@@ -339,9 +340,6 @@ class SourceModuleHnNSF(torch.nn.Module):
         return sine_merge, None, None  # noise, uv
 
 
-from uberduck_ml_dev.models.common import ResBlock1, ResBlock2
-
-
 class GeneratorNSF(torch.nn.Module):
     def __init__(
         self,
@@ -538,7 +536,6 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         self.enc_q.remove_weight_norm()
 
     # TODO (Sam): combine forward and infer for jit compilation
-    # Although realistically this will probably happen in a new file.
     def forward(self, phone, phone_lengths, pitch, pitchf, y, y_lengths, ds):
         g = self.emb_g(ds).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths)
