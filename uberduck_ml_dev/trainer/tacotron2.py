@@ -156,7 +156,7 @@ class Tacotron2Trainer(TTSTrainer):
             )
 
         if self.global_step % self.steps_per_sample == 0:
-            mel_target, gate_target = y.subset(["mel_padded", "gate_target"]).values()
+            mel_target, gate_target = y.subset(["mel_padded", "gate_padded"]).values()
             alignment_metrics = get_alignment_metrics(y_pred["alignments"])
             alignment_diagonalness = alignment_metrics["diagonalness"]
             alignment_max = alignment_metrics["max"]
@@ -370,7 +370,7 @@ class Tacotron2Trainer(TTSTrainer):
             self.global_step,
             image=save_figure_to_numpy(
                 plot_gate_outputs(
-                    gate_targets=y["gate_target"][sample_idx].data.cpu(),
+                    gate_targets=y["gate_padded"][sample_idx].data.cpu(),
                     gate_outputs=y_pred["gate_predicted"][sample_idx].data.cpu(),
                 )
             ),
@@ -468,7 +468,7 @@ class Tacotron2Trainer(TTSTrainer):
                         "speaker_ids",
                         "gst",
                         "mel_padded",
-                        "output_lengths",
+                        "mel_lengths",
                         "audio_encodings",
                     ]
                 )
@@ -476,12 +476,12 @@ class Tacotron2Trainer(TTSTrainer):
                     input_text=model_input["text_int_padded"],
                     input_lengths=model_input["input_lengths"],
                     speaker_ids=model_input["speaker_ids"],
-                    embedded_gst=model_input["gst"],
+                    embedded_gst=model_input.get("gst", None),
                     targets=model_input["mel_padded"],
-                    audio_encoding=model_input["audio_encodings"],
-                    output_lengths=model_input["output_lengths"],
+                    audio_encoding=model_input.get("audio_encodings", None),
+                    output_lengths=model_input["mel_lengths"],
                 )
-                target = batch.subset(["gate_target", "mel_padded"])
+                target = batch.subset(["gate_padded", "mel_padded"])
                 mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
                     model_output=model_output, target=target
                 )
@@ -601,7 +601,7 @@ class Tacotron2Trainer(TTSTrainer):
                     output_lengths=model_input["output_lengths"],
                     audio_encoding=model_input["audio_encoding"],
                 )
-                target = batch.subset(["gate_target", "mel_padded"])
+                target = batch.subset(["gate_padded", "mel_padded"])
                 mel_loss, gate_loss, mel_loss_batch, gate_loss_batch = criterion(
                     model_output=model_output,
                     target=target,

@@ -19,7 +19,7 @@ class Tacotron2Loss(nn.Module):
 
     # NOTE (Sam): making function inputs explicit makes less sense in situations like this with obvious subcategories.
     def forward(self, model_output: Batch, target: Batch):
-        mel_target, gate_target = target["mel_padded"], target["gate_target"]
+        mel_target, gate_target = target["mel_padded"], target["gate_padded"]
         mel_target.requires_grad = False
         gate_target.requires_grad = False
         mel_out, mel_out_postnet, gate_out = (
