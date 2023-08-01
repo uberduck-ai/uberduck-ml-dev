@@ -18,14 +18,17 @@ def get_parallel_torch(data):
         pass
 
 
+from typing import Callable, List
+
+
 def get(
-    function_,
-    loading_function,
-    saving_function,
-    paths,
-    target_paths,
-    recompute,
-    function_kwargs,
+    function_: Callable,
+    loading_function: Callable,
+    saving_function: Callable,
+    paths: List[str],
+    target_paths: List[str],
+    recompute: bool = False,
+    function_kwargs: dict = None,
 ):
     data = Processor(
         paths=paths,
