@@ -157,7 +157,7 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     # Padding
     y = torch.nn.functional.pad(
         y.unsqueeze(1),
-        # NOTE (Sam): combinining n_fft (filter_length) with hop_size reeks of either a bug or sophisticated asympotitc analysis.
+        # NOTE (Sam): combinining n_fft with hop_size is confusing.
         (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
         mode="reflect",
     )
@@ -202,7 +202,6 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
 
 # TODO (Sam): use this in the functional data processor
 # NOTE (Sam): be careful about normalization!  Sometimes (e.g. hifigan) there is a mel term in the loss that is scaled by the normalization.
-# This can make a difference in
 def mel_spectrogram_torch(
     y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False
 ):
@@ -222,6 +221,7 @@ def mel_spectrogram_torch(
     return melspec
 
 
+# NOTE (Sam): this has the type of normalization used in the DataMel class, which should be deprecated for the functional data processor.
 # stft = TacotronSTFT(
 #         filter_length=data_config["filter_length"],
 #         hop_length=data_config["hop_length"],
@@ -232,8 +232,6 @@ def mel_spectrogram_torch(
 #         mel_fmax=data_config["mel_fmax"],
 #     )
 
-
-# NOTE (Sam): this has the type of normalization used in the DataMel class, which should be deprecated for the functional data processor.
 # def mel_spectrogram_torch_datamel(audio, stft):
 #     # print(audio.shape, "audioshp")
 #     # sub_path = audiopath.split("resampled_unnormalized.wav")[0]
