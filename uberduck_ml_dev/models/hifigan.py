@@ -36,7 +36,7 @@ from .common import ResBlock1, ResBlock2
 from .rvc.rvc import (
     SourceModuleHnNSF,
 )  # TODO (Sam): we should switch the direction of this import
-from .utils import load_pretrained
+from .utils import load_pretrained, filter_valid_args
 
 # NOTE(zach): This is config_v1 from https://github.com/jik876/hifi-gan.
 # TODO (Sam): try the config from https://dl.fbaipublicfiles.com/voicebox/paper.pdf
@@ -54,9 +54,10 @@ DEFAULTS = {
 def _load_uninitialized(device="cpu", config_overrides=None):
     dev = torch.device(device)
     config_dict = DEFAULTS
+
     if config_overrides is not None:
+        config_overrides = filter_valid_args(Generator.__init__, **config_overrides)
         config_dict.update(config_overrides)
-    print(config_dict)
     generator = Generator(**config_dict).to(dev)
     return generator
 
@@ -504,3 +505,142 @@ def apply_weight_norm(m):
 
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size * dilation - dilation) / 2)
+
+
+# TODO (Sam): this should be moved into Generator
+class GeneratorVITS(torch.nn.Module):
+    __constants__ = ["lrelu_slope", "num_kernels", "num_upsamples", "p_blur"]
+
+    def __init__(
+        self,
+        initial_channel,
+        resblock,
+        resblock_kernel_sizes,
+        resblock_dilation_sizes,
+        upsample_rates,
+        upsample_initial_channel,
+        upsample_kernel_sizes,
+        gin_channels=0,
+        gaussian_blur=dict(p_blurring=0),
+        weight_norm_pre_and_post=False,
+        use_f0=False,
+        use_nsf=False,
+        use_noise_convs=False,
+        use_conv_post_bias=False,
+        sampling_rate=None,
+    ):
+        super().__init__()
+        self.use_f0 = use_f0
+        self.use_nsf = use_nsf
+        if self.use_f0:
+            self.f0_upsamp = torch.nn.Upsample(scale_factor=np.prod(upsample_rates))
+        if self.use_nsf:
+            assert sampling_rate is not None
+            self.m_source = SourceModuleHnNSF(sampling_rate, harmonic_num=8)
+        self.num_kernels = len(resblock_kernel_sizes)
+        self.num_upsamples = len(upsample_rates)
+        conv_pre = Conv1d(initial_channel, upsample_initial_channel, 7, 1, padding=3)
+        if weight_norm_pre_and_post:
+            conv_pre = weight_norm(conv_pre)
+        self.conv_pre = conv_pre
+        self.p_blur = gaussian_blur["p_blurring"]
+        self.gaussian_blur_fn = None
+        if self.p_blur > 0.0:
+            raise Exception(
+                "Gaussian blur is not supported in this version of the code."
+            )
+            # self.gaussian_blur_fn = GaussianBlurAugmentation(h.gaussian_blur['kernel_size'], h.gaussian_blur['sigmas'], self.p_blur)
+        else:
+            self.gaussian_blur_fn = nn.Identity()
+        self.lrelu_slope = LRELU_SLOPE
+
+        resblock = ResBlock1 if resblock == "1" else ResBlock2
+
+        self.ups = nn.ModuleList()
+        if use_noise_convs:
+            self.noise_convs = nn.ModuleList()
+        for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
+            out_channels = upsample_initial_channel // (2 ** (i + 1))
+            self.ups.append(
+                weight_norm(
+                    ConvTranspose1d(
+                        upsample_initial_channel // (2**i),
+                        out_channels,
+                        k,
+                        u,
+                        padding=(k - u) // 2,
+                    )
+                )
+            )
+            if use_noise_convs:
+                if i + 1 < self.num_upsamples:
+                    stride_f0 = np.prod(upsample_rates[i + 1 :])
+                    self.noise_convs.append(
+                        Conv1d(
+                            1,
+                            out_channels,
+                            kernel_size=stride_f0 * 2,
+                            stride=stride_f0,
+                            padding=stride_f0 // 2,
+                        )
+                    )
+                else:
+                    self.noise_convs.append(Conv1d(1, out_channels, kernel_size=1))
+
+        self.resblocks = nn.ModuleList()
+        for i in range(len(self.ups)):
+            ch = upsample_initial_channel // (2 ** (i + 1))
+            for j, (k, d) in enumerate(
+                zip(resblock_kernel_sizes, resblock_dilation_sizes)
+            ):
+                self.resblocks.append(resblock(ch, k, d))
+
+        conv_post = Conv1d(ch, 1, 7, 1, padding=3, bias=use_conv_post_bias)
+        if weight_norm_pre_and_post:
+            conv_post = weight_norm(conv_post)
+        self.conv_post = conv_post
+        self.ups.apply(init_weights)
+        self.conv_post.apply(init_weights)
+        if gin_channels != 0:
+            self.cond = Conv1d(gin_channels, upsample_initial_channel, 1)
+
+    def forward(self, x, g=None, f0=None):
+        if f0 is not None:
+            assert self.use_f0
+            f0 = self.f0_upsamp(f0[:, None]).transpose(1, 2)
+            signal_source, noise_source, uv = self.m_source(f0)
+            signal_source = signal_source.transpose(1, 2)
+        if self.p_blur > 0.0:
+            raise Exception(
+                "Gaussian blur is not supported in this version of the code."
+            )
+            # x = self.gaussian_blur_fn(x)
+        x = self.conv_pre(x)
+        if g is not None:
+            x = x + self.cond(g)
+        for idx, upsample_layer in enumerate(self.ups):
+            x = F.leaky_relu(x, self.lrelu_slope)
+            x = upsample_layer(x)
+            if f0 is not None:
+                x_source = self.noise_convs[idx](signal_source)
+                x = x + x_source
+            xs = torch.zeros(x.shape, dtype=x.dtype, device=x.device)
+            for j in range(self.num_kernels):
+                resblock = self.resblocks[idx * self.num_kernels + j]
+                xs += resblock(x)
+            x = xs / self.num_kernels
+        x = F.leaky_relu(x)
+        x = self.conv_post(x)
+        x = torch.tanh(x)
+
+        return x
+
+    def remove_weight_norm(self):
+        print("Removing weight norm...")
+        for l in self.ups:
+            remove_weight_norm(l)
+        for group in self.resblocks:
+            for block in group:
+                block.remove_weight_norm()
+        remove_weight_norm(self.conv_pre)
+        remove_weight_norm(self.conv_post)

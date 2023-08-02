@@ -1,6 +1,7 @@
 import torch
 import pickle
 import os
+import inspect
 
 
 def load_checkpoint(filepath, device, pickle_module=pickle):
@@ -21,3 +22,8 @@ def load_pretrained(model, checkpoint_path, key_="generator"):
     # bio = BytesIO(response.content)
     loaded = torch.load(checkpoint_path)
     model.load_state_dict(loaded[key_])
+
+
+def filter_valid_args(func, **kwargs):
+    valid_keys = inspect.signature(func).parameters.keys()
+    return {key: value for key, value in kwargs.items() if key in valid_keys}
