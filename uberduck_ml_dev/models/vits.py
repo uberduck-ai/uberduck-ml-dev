@@ -723,12 +723,10 @@ class SynthesizerTrn(nn.Module):
         return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
     def infer_textless(self, c, f0, uv, g=None, noise_scale=0.35, predict_f0=False):
-        print("here here her \n\n\n\n")
         c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
         g = self.emb_g(g).transpose(1, 2)
         x_mask = torch.unsqueeze(sequence_mask(c_lengths, c.size(2)), 1).to(c.dtype)
         x = self.pre(c) * x_mask + self.emb_uv(uv.long()).transpose(1, 2)
-        print(f0.shape, "\n\n\n\n asdfasdfasdf")
         if predict_f0:
             lf0 = 2595.0 * torch.log10(1.0 + f0.unsqueeze(1) / 700.0) / 500
             norm_lf0 = normalize_f0(lf0, x_mask, uv, random_scale=False)
