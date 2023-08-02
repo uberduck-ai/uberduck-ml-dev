@@ -247,6 +247,7 @@ class SineGen(torch.nn.Module):
         """
         with torch.no_grad():
             f0 = f0[:, None].transpose(1, 2)
+
             f0_buf = torch.zeros(f0.shape[0], f0.shape[1], self.dim, device=f0.device)
             # fundamental component
             f0_buf[:, :, 0] = f0[:, :, 0]
