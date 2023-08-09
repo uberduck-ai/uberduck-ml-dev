@@ -21,27 +21,6 @@ def get_parallel_torch(data):
 from typing import Callable, List
 
 
-def get(
-    function_: Callable,
-    loading_function: Callable,
-    saving_function: Callable,
-    paths: List[str],
-    target_paths: List[str],
-    recompute: bool = False,
-    function_kwargs: dict = None,
-):
-    data = Processor(
-        paths=paths,
-        target_paths=target_paths,
-        function_=function_,
-        loading_function=loading_function,
-        saving_function=saving_function,
-        recompute=recompute,
-        function_kwargs=function_kwargs,
-    )
-    get_parallel_torch(data)
-
-
 # TODO (Sam): use get_parallel_torch to reduce boilerplate.
 # NOTE (Sam): assumes data is in a directory structure like:
 # /tmp/{uuid}/resampled_normalized.wav
