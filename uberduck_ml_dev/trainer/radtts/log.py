@@ -172,6 +172,6 @@ def get_log_audio(
                     sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
                 if oos_name is not None:
                     sample_tag = f"{sample_tag}_oos_{oos_name}"
-                audios[sample_tag] = audio
+                audios[sample_tag] = {"audio": torch.tensor(audio)}
 
     return images, audios

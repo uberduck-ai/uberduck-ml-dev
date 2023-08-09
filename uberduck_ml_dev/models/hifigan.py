@@ -64,18 +64,29 @@ def _load_uninitialized(device="cpu", config_overrides=None):
 
 # NOTE (Sam): this is the loading method used by radtts
 # TODO (Sam): combine loading methods
+# def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
+#     print("Getting vocoder")
+
+#     with open(hifi_gan_config_path) as f:
+#         hifigan_config = json.load(f)
+
+
+#     h = AttrDict(hifigan_config)
+#     hifigan_config["p_blur"] = 0.0
+#     model = Generator(**h)
+#     print("Loading pretrained model...")
+#     load_pretrained(model, hifi_gan_checkpoint_path)
+#     print("Got pretrained model...")
+#     model.eval()
+#     return model
 def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     print("Getting vocoder")
 
     with open(hifi_gan_config_path) as f:
-        hifigan_config = json.load(f)
-
-    h = AttrDict(hifigan_config)
-    hifigan_config["p_blur"] = 0.0
-    model = Generator(**h)
-    print("Loading pretrained model...")
-    load_pretrained(model, hifi_gan_checkpoint_path)
-    print("Got pretrained model...")
+        config_overrides = json.load(f)
+    model = _load_uninitialized(config_overrides=config_overrides)
+    state_dict = torch.load(hifi_gan_checkpoint_path)
+    model.load_state_dict(state_dict["generator"])
     model.eval()
     return model
 
