@@ -85,7 +85,7 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     with open(hifi_gan_config_path) as f:
         config_overrides = json.load(f)
     model = _load_uninitialized(config_overrides=config_overrides)
-    state_dict = torch.load(hifi_gan_checkpoint_path)
+    state_dict = torch.load(hifi_gan_checkpoint_path, map_location=torch.device("cpu"))
     model.load_state_dict(state_dict["generator"])
     model.eval()
     return model
@@ -113,6 +113,7 @@ class Generator(torch.nn.Module):
         sr=22050,
         is_half=False,
         gin_channels=0,
+        harmonic_num=0,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -131,7 +132,7 @@ class Generator(torch.nn.Module):
         if use_noise_convs:
             self.noise_convs = nn.ModuleList()
             self.m_source = SourceModuleHnNSF(
-                sampling_rate=sr, harmonic_num=0, is_half=is_half
+                sampling_rate=sr, harmonic_num=harmonic_num, is_half=is_half
             )
             self.upp = np.prod(upsample_rates)
 

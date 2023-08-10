@@ -724,6 +724,7 @@ class DataMel(Dataset):
         self.sampling_rate = data_config["sampling_rate"]
 
     # NOTE (Sam): we should already be normalized by the time we are computing mels but unfortunately thats not done yet here.
+    # TODO (Sam): make normalization explicit.
     def _get_data(self, audiopath: str, target_path: str):
         # if os.path.exists(target_path):
         #     return
