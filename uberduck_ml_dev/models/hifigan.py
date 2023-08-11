@@ -48,6 +48,7 @@ DEFAULTS = {
     "resblock_kernel_sizes": [3, 7, 11],
     "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
     "p_blur": 0.0,
+    "sr": 22050,
 }
 
 
