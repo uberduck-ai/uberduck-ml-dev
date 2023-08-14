@@ -406,13 +406,40 @@ class DataRADTTS(torch.utils.data.Dataset):
         dur_max=None,
         combine_speaker_and_emotion=False,
         is_zero_shot=True,
+        audio_suffix="audio_resampledT_normalized32768T.wav",
+        audio_embedding_suffix="coqui_resnet_512_emb.pt",
+        f0_suffix="f0.pt",
+        f0_type="pyin",
+        mel_suffix="spectrogram.pt",
         **kwargs,
     ):
+        self.audio_suffix = audio_suffix
+        self.audio_embedding_suffix = audio_embedding_suffix
+        self.f0_suffix = f0_suffix
+        print("here \n\n\n ", f0_suffix)
+        self.f0_type = f0_type
+        self.mel_suffix = mel_suffix
         self.combine_speaker_and_emotion = combine_speaker_and_emotion
         self.max_wav_value = max_wav_value
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.mel_fmin = mel_fmin
+        self.mel_fmax = mel_fmax
+        self.f0_min = f0_min
+        self.f0_max = f0_max
+        self.use_f0 = use_f0
+        self.use_log_f0 = use_log_f0
+        self.use_energy_avg = use_energy_avg
+        self.use_scaled_energy = use_scaled_energy
+        self.sampling_rate = sampling_rate
+        self.is_zero_shot = is_zero_shot
+        self.dur_min = dur_min
+        self.dur_max = dur_max
+
         self.audio_lmdb_dict = {}  # dictionary of lmdbs for audio data
-        self.data = self.load_data(datasets)
         self.distance_tx_unvoiced = False
+
+        self.data = self.load_data(datasets)
         if "distance_tx_unvoiced" in kwargs.keys():
             self.distance_tx_unvoiced = kwargs["distance_tx_unvoiced"]
         self.stft = TacotronSTFT(
@@ -428,18 +455,7 @@ class DataRADTTS(torch.utils.data.Dataset):
         self.do_mel_scaling = kwargs.get("do_mel_scaling", True)
         self.mel_noise_scale = kwargs.get("mel_noise_scale", 0.0)
         self.filter_length = filter_length
-        self.hop_length = hop_length
-        self.win_length = win_length
-        self.mel_fmin = mel_fmin
-        self.mel_fmax = mel_fmax
-        self.f0_min = f0_min
-        self.f0_max = f0_max
-        self.use_f0 = use_f0
-        self.use_log_f0 = use_log_f0
-        self.use_energy_avg = use_energy_avg
-        self.use_scaled_energy = use_scaled_energy
-        self.sampling_rate = sampling_rate
-        self.is_zero_shot = is_zero_shot
+
         self.tp = TextProcessing(
             symbol_set,
             cleaner_names,
@@ -453,8 +469,6 @@ class DataRADTTS(torch.utils.data.Dataset):
             add_bos_eos_to_text=add_bos_eos_to_text,
         )
 
-        self.dur_min = dur_min
-        self.dur_max = dur_max
         if speaker_ids is None or speaker_ids == "":
             self.speaker_ids = self.create_speaker_lookup_table(self.data)
         else:
@@ -648,15 +662,28 @@ class DataRADTTS(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         data = self.data[index]
+
         sub_path = data["audiopath"]
         text = data["text"]
-        audiopath = f"{sub_path}/audio_resampledT_normalized32768T.wav"
-        audio_emb_path = f"{sub_path}/coqui_resnet_512_emb.pt"
-        f0_path = f"{sub_path}/f0.pt"
-        mel_path = f"{sub_path}/spectrogram.pt"
+        audiopath = os.path.join(sub_path, self.audio_suffix)
+        audio_emb_path = os.path.join(sub_path, self.audio_embedding_suffix)
+        f0_path = os.path.join(sub_path, self.f0_suffix)
+        f0_type = self.f0_type
+
+        mel_path = os.path.join(sub_path, self.mel_suffix)
 
         speaker_id = data["speaker"]
-        f0, voiced_mask, p_voiced = torch.load(f0_path)
+
+        if f0_type == "pyin":
+            f0, voiced_mask, p_voiced = torch.load(f0_path)
+        # NOTE (Sam): Diffsinger use of Parselmouth appears to be potentially faster / more accurate.
+        if f0_type == "parselmouth":
+            f0 = torch.load(f0_path)
+            voiced_mask = f0 > 0.0
+            p_voiced = torch.ones_like(f0)
+            p_voiced[~voiced_mask] = 0.0
+
+        # NOTE (Sam): these modifications are used in the original pyin code.
         f0 = self.f0_normalize(f0)
         if self.distance_tx_unvoiced:
             mask = f0 <= 0.0
@@ -674,6 +701,8 @@ class DataRADTTS(torch.utils.data.Dataset):
 
         speaker_id = self.get_speaker_id(speaker_id)
         text_encoded = self.get_text(text)
+        print(type(text_encoded), "\n\n\n\n\n\n", "rtere")
+        print(type(mel), "\n\n\n\n\n\n", "hererere")
         attn_prior = self.get_attention_prior(text_encoded.shape[0], mel.shape[1])
 
         if not self.use_attn_prior_masking:

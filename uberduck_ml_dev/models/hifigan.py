@@ -87,7 +87,8 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
         config_overrides = json.load(f)
     model = _load_uninitialized(config_overrides=config_overrides)
     state_dict = torch.load(hifi_gan_checkpoint_path, map_location=torch.device("cpu"))
-    model.load_state_dict(state_dict["generator"])
+    # model.load_state_dict(state_dict["generator"])
+    model.load_state_dict(state_dict["state_dict"]["model_gen"])  # For Diffsinger
     model.eval()
     return model
 

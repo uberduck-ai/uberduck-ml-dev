@@ -163,7 +163,12 @@ def get_log_audio(
                 #     continue
                 mels = model_output["mel"]
                 if hasattr(vocoder, "forward"):
-                    audio = vocoder(mels.cpu()).float()[0]
+                    if hasattr(vocoder, "m_source"):
+                        audio = vocoder(
+                            mels.cpu(), f0=f0[0:1, : durations.sum()]
+                        ).float()[0]
+                    else:
+                        audio = vocoder(mels.cpu()).float()[0]
                 audio = audio[0].detach().cpu().numpy()
                 audio = audio / np.abs(audio).max()
                 if attribute_sigma < 0:
