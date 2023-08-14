@@ -416,7 +416,6 @@ class DataRADTTS(torch.utils.data.Dataset):
         self.audio_suffix = audio_suffix
         self.audio_embedding_suffix = audio_embedding_suffix
         self.f0_suffix = f0_suffix
-        print("here \n\n\n ", f0_suffix)
         self.f0_type = f0_type
         self.mel_suffix = mel_suffix
         self.combine_speaker_and_emotion = combine_speaker_and_emotion
