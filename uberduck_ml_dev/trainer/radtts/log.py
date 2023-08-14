@@ -38,7 +38,6 @@ def get_log_audio(
     attn_prior = to_gpu(batch_dict["attn_prior"])
     f0 = to_gpu(batch_dict["f0"])
     voiced_mask = to_gpu(batch_dict["voiced_mask"])
-    p_voiced = to_gpu(batch_dict["p_voiced"])
     text = to_gpu(batch_dict["text"])
     in_lens = to_gpu(batch_dict["input_lengths"])
     out_lens = to_gpu(batch_dict["output_lengths"])
@@ -57,7 +56,6 @@ def get_log_audio(
         f0=f0,
         energy_avg=energy_avg,
         voiced_mask=voiced_mask,
-        p_voiced=p_voiced,
         audio_embedding=audio_embedding,
     )
 
@@ -101,13 +99,12 @@ def get_log_audio(
             # this causes issues to the length_regulator, which expects floor < durations.
             # Just keep binarize_attention = True in inference and don't think about it that hard.
             durations = (durations + 0.5).floor().int()
-            # NOTE (Sam): should we load vocoder to CPU to avoid taking up valuable GPU vRAM?
+
             for attribute_sigma in attribute_sigmas:
                 if audio_embedding is not None:
                     audio_embedding_argument = audio_embedding[0:1]
                 else:
                     audio_embedding_argument = None
-                # try:
                 if attribute_sigma > 0.0:
                     if hasattr(model, "infer"):
                         model_output = model.infer(
@@ -158,17 +155,17 @@ def get_log_audio(
                             voiced_mask=voiced_mask[0:1, : durations.sum()],
                             audio_embedding=audio_embedding_argument,
                         )
-                # except:
-                #     print("Instability or issue occured during inference, skipping sample generation for TB logger")
-                #     continue
                 mels = model_output["mel"]
-                if hasattr(vocoder, "forward"):
-                    if hasattr(vocoder, "m_source"):
-                        audio = vocoder(
-                            mels.cpu(), f0=f0[0:1, : durations.sum()]
-                        ).float()[0]
-                    else:
-                        audio = vocoder(mels.cpu()).float()[0]
+                # NOTE (Sam): run vocoder on CPU to avoid taking up valuable GPU vRAM.
+                mels = mels.cpu()
+                f0 = f0.cpu()
+                durations = durations.cpu()
+                if hasattr(vocoder, "m_source"):
+                    audio = vocoder(mels.cpu(), f0=f0[0:1, : durations.sum()]).float()[
+                        0
+                    ]
+                else:
+                    audio = vocoder(mels.cpu()).float()[0]
                 audio = audio[0].detach().cpu().numpy()
                 audio = audio / np.abs(audio).max()
                 if attribute_sigma < 0:

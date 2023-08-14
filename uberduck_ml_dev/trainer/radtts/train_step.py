@@ -47,7 +47,6 @@ def _train_step(
         attn_prior = to_gpu(batch_dict["attn_prior"])
         f0 = to_gpu(batch_dict["f0"])
         voiced_mask = to_gpu(batch_dict["voiced_mask"])
-        p_voiced = to_gpu(batch_dict["p_voiced"])
         text = to_gpu(batch_dict["text"])
         in_lens = to_gpu(batch_dict["input_lengths"])
         out_lens = to_gpu(batch_dict["output_lengths"])
@@ -65,7 +64,6 @@ def _train_step(
             f0=f0,
             energy_avg=energy_avg,
             voiced_mask=voiced_mask,
-            p_voiced=p_voiced,
             audio_embedding=audio_embedding,
         )
 
