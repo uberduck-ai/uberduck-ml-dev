@@ -669,7 +669,6 @@ class DataRADTTS(torch.utils.data.Dataset):
         audio_emb_path = os.path.join(sub_path, self.audio_embedding_suffix)
         f0_path = os.path.join(sub_path, self.f0_suffix)
         f0_type = self.f0_type
-
         mel_path = os.path.join(sub_path, self.mel_suffix)
 
         speaker_id = data["speaker"]
@@ -701,8 +700,6 @@ class DataRADTTS(torch.utils.data.Dataset):
 
         speaker_id = self.get_speaker_id(speaker_id)
         text_encoded = self.get_text(text)
-        print(type(text_encoded), "\n\n\n\n\n\n", "rtere")
-        print(type(mel), "\n\n\n\n\n\n", "hererere")
         attn_prior = self.get_attention_prior(text_encoded.shape[0], mel.shape[1])
 
         if not self.use_attn_prior_masking:

@@ -558,7 +558,6 @@ class RADTTS(torch.nn.Module):
             else:
                 attn = attn_soft
 
-            # print(text_enc.type(),attn.type(), 'report card')
             context = torch.bmm(text_enc, attn.squeeze(1).transpose(1, 2))
 
         f0_bias = 0
