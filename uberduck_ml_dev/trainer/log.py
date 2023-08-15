@@ -4,7 +4,7 @@ from ray.air import session
 
 
 @torch.no_grad()
-def log(metrics=None, audios=None, images=None):
+def log(metrics=None, audios=None, images=None, sample_rate=22050):
     if session.get_world_rank() != 0:
         return
     audios = audios or {}
@@ -15,7 +15,7 @@ def log(metrics=None, audios=None, images=None):
 
     for k, v in audios.items():
         wandb_metrics[k] = wandb.Audio(
-            v["audio"].cpu(), sample_rate=22050, caption=v.get("caption")
+            v["audio"].cpu(), sample_rate=sample_rate, caption=v.get("caption")
         )
 
     for k, v in images.items():

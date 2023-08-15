@@ -87,8 +87,10 @@ def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
         config_overrides = json.load(f)
     model = _load_uninitialized(config_overrides=config_overrides)
     state_dict = torch.load(hifi_gan_checkpoint_path, map_location=torch.device("cpu"))
-    # model.load_state_dict(state_dict["generator"])
-    model.load_state_dict(state_dict["state_dict"]["model_gen"])  # For Diffsinger
+    if "generator" in state_dict:
+        model.load_state_dict(state_dict["generator"])
+    else:
+        model.load_state_dict(state_dict["state_dict"]["model_gen"])  # For Diffsinger
     model.eval()
     return model
 
@@ -122,6 +124,7 @@ class Generator(torch.nn.Module):
         self.num_upsamples = len(upsample_rates)
         self.conv_post_bias = conv_post_bias
         self.use_noise_convs = use_noise_convs
+        self.sr = sr
         # TODO (Sam): detect this automatically
         if weight_norm_conv:
             self.conv_pre = weight_norm(

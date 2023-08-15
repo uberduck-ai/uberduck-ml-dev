@@ -140,7 +140,12 @@ def _train_step(
         #         audio_embedding_oos=audio_embedding_oos,
         #     )
         #     audios.update(audios_oos)
-        log(metrics, audios)
+        log(
+            metrics,
+            audios,
+            sample_rate=getattr(vocoder, "sr", 22050),
+            images=images,
+        )
         model.train()
     else:
         log(metrics)
