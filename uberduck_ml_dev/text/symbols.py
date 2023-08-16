@@ -199,56 +199,6 @@ IPA_SYMBOLS = "ipa"
 NVIDIA_TACO2_SYMBOLS = "nvidia_taco2"
 GRAD_TTS_SYMBOLS = "gradtts"
 
-SYMBOL_SETS = {
-    DEFAULT_SYMBOLS: symbols,
-    IPA_SYMBOLS: symbols_with_ipa,
-    NVIDIA_TACO2_SYMBOLS: symbols_nvidia_taco2,
-    GRAD_TTS_SYMBOLS: grad_tts_symbols,
-    PORTUGUESE_SYMBOLS: symbols_portuguese,
-    POLISH_SYMBOLS: symbols_polish,
-    DUTCH_SYMBOLS: symbols_dutch,
-    SPANISH_SYMBOLS: symbols_spanish,
-    NORWEGIAN_SYMBOLS: symbols_norwegian,
-    TURKISH_SYMBOLS: symbols_turkish,
-    RUSSIAN_SYMBOLS: symbols_russian,
-    UKRAINIAN_SYMBOLS: symbols_ukrainian,
-}
-
-
-import re
-
-symbol_to_id = {
-    DEFAULT_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
-    IPA_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[IPA_SYMBOLS])},
-    NVIDIA_TACO2_SYMBOLS: {
-        s: i for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
-    },
-    GRAD_TTS_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
-    PORTUGUESE_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[PORTUGUESE_SYMBOLS])},
-    POLISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
-    DUTCH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
-    SPANISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
-    NORWEGIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
-    TURKISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[TURKISH_SYMBOLS])},
-    RUSSIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
-    UKRAINIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
-}
-id_to_symbol = {
-    DEFAULT_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
-    IPA_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[IPA_SYMBOLS])},
-    NVIDIA_TACO2_SYMBOLS: {
-        i: s for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
-    },
-    GRAD_TTS_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
-    PORTUGUESE_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[PORTUGUESE_SYMBOLS])},
-    POLISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
-    DUTCH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
-    SPANISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
-    NORWEGIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
-    TURKISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[TURKISH_SYMBOLS])},
-    RUSSIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
-    UKRAINIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
-}
 
 curly_re = re.compile(r"(.*?)\{(.+?)\}(.*)")
 words_re = re.compile(
@@ -413,3 +363,53 @@ def get_symbols(symbol_set):
         raise Exception("{} symbol set does not exist".format(symbol_set))
 
     return symbols
+
+
+SYMBOL_SETS = {
+    DEFAULT_SYMBOLS: symbols,
+    IPA_SYMBOLS: symbols_with_ipa,
+    NVIDIA_TACO2_SYMBOLS: symbols_nvidia_taco2,
+    GRAD_TTS_SYMBOLS: grad_tts_symbols,
+    PORTUGUESE_SYMBOLS: symbols_portuguese,
+    POLISH_SYMBOLS: symbols_polish,
+    DUTCH_SYMBOLS: symbols_dutch,
+    SPANISH_SYMBOLS: symbols_spanish,
+    NORWEGIAN_SYMBOLS: symbols_norwegian,
+    TURKISH_SYMBOLS: symbols_turkish,
+    RUSSIAN_SYMBOLS: symbols_russian,
+    UKRAINIAN_SYMBOLS: symbols_ukrainian,
+    "radtts": get_symbols("radtts"),
+}
+
+symbol_to_id = {
+    DEFAULT_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
+    IPA_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[IPA_SYMBOLS])},
+    NVIDIA_TACO2_SYMBOLS: {
+        s: i for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
+    },
+    GRAD_TTS_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
+    PORTUGUESE_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[PORTUGUESE_SYMBOLS])},
+    POLISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
+    DUTCH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
+    SPANISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
+    NORWEGIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
+    TURKISH_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[TURKISH_SYMBOLS])},
+    RUSSIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
+    UKRAINIAN_SYMBOLS: {s: i for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
+}
+id_to_symbol = {
+    DEFAULT_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DEFAULT_SYMBOLS])},
+    IPA_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[IPA_SYMBOLS])},
+    NVIDIA_TACO2_SYMBOLS: {
+        i: s for i, s in enumerate(SYMBOL_SETS[NVIDIA_TACO2_SYMBOLS])
+    },
+    GRAD_TTS_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[GRAD_TTS_SYMBOLS])},
+    PORTUGUESE_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[PORTUGUESE_SYMBOLS])},
+    POLISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[POLISH_SYMBOLS])},
+    DUTCH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[DUTCH_SYMBOLS])},
+    SPANISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[SPANISH_SYMBOLS])},
+    NORWEGIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[NORWEGIAN_SYMBOLS])},
+    TURKISH_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[TURKISH_SYMBOLS])},
+    RUSSIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[RUSSIAN_SYMBOLS])},
+    UKRAINIAN_SYMBOLS: {i: s for i, s in enumerate(SYMBOL_SETS[UKRAINIAN_SYMBOLS])},
+}
