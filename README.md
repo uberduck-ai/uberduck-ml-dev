@@ -61,8 +61,9 @@ python setup.py develop # Install the library
 
 ## 🚩 Testing
 
-In an environment or image with uberduck-ml-dev installed in the uberduck-ml-dev root folder, run 
+In an environment or image with uberduck-ml-dev installed, run 
 
 ```bash
+cd uberduck-ml-dev
 python -m pytest
 ```
