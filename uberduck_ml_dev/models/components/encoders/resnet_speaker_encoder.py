@@ -1,3 +1,5 @@
+# NOTE (Sam): this is the only component in this repository under copyleft license (Coqui / Mozilla).
+
 from io import BytesIO
 import os
 import requests
