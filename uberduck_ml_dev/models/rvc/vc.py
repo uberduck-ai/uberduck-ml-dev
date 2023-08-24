@@ -81,6 +81,7 @@ class VC(object):
         index,
         big_npy,
         index_rate,
+        rvc_version="v1",
     ):  # ,file_index,file_big_npy
         feats = torch.from_numpy(audio0)
         if self.is_half:
@@ -93,15 +94,20 @@ class VC(object):
         feats = feats.view(1, -1)
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
 
+        output_layer = 9 if rvc_version == "v1" else 12
+
         inputs = {
             "source": feats.to(self.device),
             "padding_mask": padding_mask,
-            "output_layer": 9,  # layer 9
+            "output_layer": output_layer,
         }
         t0 = ttime()
         with torch.no_grad():
             logits = model.extract_features(**inputs)
-            feats = model.final_proj(logits[0])
+            if rvc_version == "v1":
+                feats = model.final_proj(logits[0])
+            else:
+                feats = logits[0]
 
         if (
             isinstance(index, type(None)) == False
