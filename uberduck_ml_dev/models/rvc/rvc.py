@@ -24,6 +24,7 @@ class TextEncoder256(nn.Module):
         kernel_size,
         p_dropout,
         f0=True,
+        n_emb_input=256,
     ):
         super().__init__()
         self.out_channels = out_channels
@@ -33,7 +34,7 @@ class TextEncoder256(nn.Module):
         self.n_layers = n_layers
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
-        self.emb_phone = nn.Linear(256, hidden_channels)
+        self.emb_phone = nn.Linear(n_emb_input, hidden_channels)
         self.lrelu = nn.LeakyReLU(0.1, inplace=True)
         if f0 == True:
             self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
@@ -71,6 +72,7 @@ class TextEncoder256Sim(nn.Module):
         kernel_size,
         p_dropout,
         f0=True,
+        n_emb_input=256,
     ):
         super().__init__()
         self.out_channels = out_channels
@@ -80,7 +82,7 @@ class TextEncoder256Sim(nn.Module):
         self.n_layers = n_layers
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
-        self.emb_phone = nn.Linear(256, hidden_channels)
+        self.emb_phone = nn.Linear(n_emb_input, hidden_channels)
         self.lrelu = nn.LeakyReLU(0.1, inplace=True)
         if f0 == True:
             self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
@@ -503,6 +505,7 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
             n_layers,
             kernel_size,
             p_dropout,
+            n_emb_input=kwargs.get("n_emb_input", 256),
         )
         self.dec = GeneratorNSF(
             inter_channels,
