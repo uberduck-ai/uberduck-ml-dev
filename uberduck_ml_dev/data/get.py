@@ -81,7 +81,7 @@ def get_pitches(
         data_config=data_config,
         target_folders=target_folders,
         method=method,
-        sample_rate=sample_rate,
+        sample_rate=data_config["sampling_rate"],
         recompute=recompute,
     )
     get_parallel_torch(data)

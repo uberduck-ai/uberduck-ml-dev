@@ -830,10 +830,12 @@ def get_f0_pvoiced(
     f0_max=300,
 ):
     # NOTE (Sam): this normalization is fragile: have to remember to pass ints normalized to MAX_WAV_VALUE / 2
-    MAX_WAV_VALUE = 32768.0
-    audio_norm = audio / MAX_WAV_VALUE
+    # MAX_WAV_VALUE = 32768.0
+    # audio_norm = audio / MAX_WAV_VALUE
+    # print(audio_norm.max())
+    # NOTE (Sam): how did this ever work?
     f0, voiced_mask, p_voiced = pyin(
-        y=audio_norm,
+        y=audio,
         fmin=f0_min,
         fmax=f0_max,
         sr=sampling_rate,
@@ -957,13 +959,14 @@ class DataPitch:
         # NOTE (Sam): the logic here is convoluted and still won't catch issues with recomputation of f0 using different parameters
         # TODO (Sam): add hashing of cached files.
         if recompute or not os.path.exists(f"{target_folder}/f0.pt"):
-            if sample_rate is not None:
-                data, rate = librosa.load(
-                    audiopath, sr=sample_rate
-                )  # undoes normalization
-                data = (data * MAX_WAV_VALUE) / (np.abs(data).max() * 2)
-            else:
-                rate, data = read(audiopath)
+            # NOTE (Sam): librosa load breaks on int16 normalization and should be replaced with scipy / float normalize / librosa.resample
+            # if sample_rate is not None:
+            #     data, rate = librosa.load(
+            #         audiopath, sr=sample_rate
+            #     )  # undoes normalization
+            #     data = (data * MAX_WAV_VALUE) / (np.abs(data).max() * 2)
+            # else:
+            rate, data = read(audiopath)
             if self.method == "radtts":
                 pitch = get_f0_pvoiced(
                     data,
