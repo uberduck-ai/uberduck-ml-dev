@@ -98,16 +98,11 @@ def get_hubert_embeddings(
 
 
 def get(
-    processing_function,
-    saving_function,
-    loading_function,
+    function_,
     source_paths,
     target_paths,
     recompute,
 ):
-    function_ = lambda source_path, target_path: saving_function(
-        processing_function(loading_function(source_path)), target_path
-    )
     processor = Processor(
         function_=function_,
         source_paths=source_paths,
