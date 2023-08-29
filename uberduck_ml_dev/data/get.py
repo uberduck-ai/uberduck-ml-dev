@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torch
 import os
 
-from ..data.data import DataMel, DataPitch, DataEmbedding
+from ..data.data import DataMel, DataPitch
 from ..data.collate import CollateBlank
 from ..data.processor import Processor
 
@@ -16,9 +16,6 @@ def get_parallel_torch(data):
     )
     for batch in data_loader:
         pass
-
-
-from typing import Callable, List
 
 
 # TODO (Sam): use get_parallel_torch to reduce boilerplate.
