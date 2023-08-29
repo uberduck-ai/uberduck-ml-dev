@@ -13,12 +13,8 @@ from collections import Counter
 import os
 
 import librosa
-import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image, ImageOps
 from pydub.utils import mediainfo_json
-import seaborn as sns
-from wordcloud import WordCloud, STOPWORDS
 from wordfreq import word_frequency
 
 from ..text.utils import text_to_sequence
@@ -34,33 +30,6 @@ def word_frequencies(text: str, language: str = "en") -> List[float]:
     for word in text.split():
         freqs.append(word_frequency(word, language))
     return freqs
-
-
-def create_wordcloud(text: str, output_file: str):
-    """
-    Creates and saves a wordcloud in the shape of a duck to the designated output file.
-    """
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-
-    mask = np.array(
-        ImageOps.invert(
-            Image.open(os.path.join(dir_path, "../assets/duck.png")).convert("RGB")
-        )
-    )
-    wc = WordCloud(
-        background_color="white",
-        max_words=3000,
-        mask=mask,
-        contour_width=7,
-        contour_color="steelblue",
-    )
-    frequency_dict = dict(Counter(text.lower().split()).most_common())
-    for k in STOPWORDS:
-        if k in frequency_dict.keys():
-            frequency_dict.pop(k)
-
-    wc.generate_from_frequencies(frequency_dict)
-    wc.to_file(output_file)
 
 
 def count_frequency(arr: List[Any]) -> Dict[Any, int]:
