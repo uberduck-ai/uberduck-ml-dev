@@ -39,31 +39,6 @@ def get_mels(paths, data_config, target_paths):
         pass  # computes in loader.
 
 
-def get_embeddings(
-    paths,
-    data_config,
-    resnet_se_model_path,
-    resnet_se_config_path,
-    subpath_truncation=41,
-):
-    data = DataEmbedding(
-        audiopaths=paths,
-        resnet_se_model_path=resnet_se_model_path,
-        resnet_se_config_path=resnet_se_config_path,
-        subpath_truncation=subpath_truncation,
-    )
-
-    collate_fn = CollateBlank()
-
-    data_loader = DataLoader(
-        data,
-        batch_size=32,
-        collate_fn=collate_fn,
-    )
-    for batch in data_loader:
-        pass  # computes in loader.
-
-
 # NOTE (Sam): pitch, pitchf == f0 coarse, f0bak in rvc parlance.
 # NOTE (Sam): sample_rate is also passed as part of data_config
 # TODO (Sam): decide on sample_rate v sampling_rate
