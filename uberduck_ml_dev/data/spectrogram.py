@@ -3,6 +3,11 @@ from librosa.filters import mel as librosa_mel_fn
 
 from .utils import spectral_normalize_torch
 
+# NOTE (Sam): needed for importable lambdas.
+# TODO (Sam): remove redundancy from elsewhere in repo.
+hann_window = {}
+mel_basis = {}
+
 
 # TODO (Sam): combine with identically-named function is models.common
 def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False):
@@ -109,3 +114,25 @@ def mel_spectrogram_torch(
     melspec = spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax)
 
     return melspec
+
+
+from ..data.data import HIFIGAN_DEFAULTS as DEFAULTS
+from scipy.io.wavfile import read
+import librosa
+
+mel_spec = lambda x: mel_spectrogram_torch(
+    x,
+    DEFAULTS["n_fft"],
+    DEFAULTS["num_mels"],
+    DEFAULTS["sampling_rate"],
+    #     100,
+    #     24000,#DEFAULTS["sampling_rate"],
+    DEFAULTS["hop_size"],
+    DEFAULTS["win_size"],
+    DEFAULTS["fmin"],
+    None,
+    False,  # center
+)
+
+load_audio = lambda source_path: torch.Tensor(read(source_path)[1]).unsqueeze(0)
+save_torch = lambda data, target_path: torch.save(data[0], target_path)

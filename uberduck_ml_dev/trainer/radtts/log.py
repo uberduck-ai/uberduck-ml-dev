@@ -23,11 +23,10 @@ def get_log_audio(
     f0,
     energy_avg,
     voiced_mask,
-    vocoder,  # NOTE (Sam): should this be moved on and off gpu?
+    vocoder,
     audio_embedding_oos=None,
     oos_name=None,
 ):
-    # print( audio_embedding_oos, oos_name, bool(audio_embedding_oos is None), bool(oos_name is None))
     assert bool(audio_embedding_oos is None) == bool(
         oos_name is None
     ), "must provide both or neither of audio_embedding_oos and oos_name"
@@ -38,14 +37,13 @@ def get_log_audio(
     attn_prior = to_gpu(batch_dict["attn_prior"])
     f0 = to_gpu(batch_dict["f0"])
     voiced_mask = to_gpu(batch_dict["voiced_mask"])
-    p_voiced = to_gpu(batch_dict["p_voiced"])
     text = to_gpu(batch_dict["text"])
     in_lens = to_gpu(batch_dict["input_lengths"])
     out_lens = to_gpu(batch_dict["output_lengths"])
     energy_avg = to_gpu(batch_dict["energy_avg"])
     audio_embedding = to_gpu(batch_dict["audio_embedding"])
 
-    # NOTE (Sam): I don't think we can reuse the previous outputs since binarize_attention must be true
+    # NOTE (Sam): we can't always reuse the train_step outputs since binarize_attention must be true.
     outputs = model(
         mel,
         speaker_ids,
@@ -57,7 +55,6 @@ def get_log_audio(
         f0=f0,
         energy_avg=energy_avg,
         voiced_mask=voiced_mask,
-        p_voiced=p_voiced,
         audio_embedding=audio_embedding,
     )
 
@@ -92,86 +89,87 @@ def get_log_audio(
                     attribute_sigmas.extend([1.0])
                 else:
                     attribute_sigmas.extend([0.1, 0.5, 0.8, 1.0])
-        if len(attribute_sigmas) > 0:
-            if audio_embedding_oos is not None:
-                audio_embedding = audio_embedding_oos.unsqueeze(0)
-            durations = attn_used[0, 0].sum(0, keepdim=True)
-            # NOTE (Sam): this is causing problems when durations are > x.5 and binarize_attention is false.
-            #  In that case, durations + 0.5 . floor > durations
-            # this causes issues to the length_regulator, which expects floor < durations.
-            # Just keep binarize_attention = True in inference and don't think about it that hard.
-            durations = (durations + 0.5).floor().int()
-            # NOTE (Sam): should we load vocoder to CPU to avoid taking up valuable GPU vRAM?
-            for attribute_sigma in attribute_sigmas:
-                if audio_embedding is not None:
-                    audio_embedding_argument = audio_embedding[0:1]
+
+        if audio_embedding_oos is not None:
+            audio_embedding = audio_embedding_oos.unsqueeze(0)
+        durations = attn_used[0, 0].sum(0, keepdim=True)
+        # NOTE (Sam): this is causing problems when durations are > x.5 and binarize_attention is false.
+        # In that case, (durations + 0.5).floor() > durations
+        # causes issues to the length_regulator, which expects floor < durations.
+        durations = (durations + 0.5).floor().int()
+        for attribute_sigma in attribute_sigmas:
+            if audio_embedding is not None:
+                audio_embedding_argument = audio_embedding[0:1]
+            else:
+                audio_embedding_argument = None
+            if attribute_sigma > 0.0:
+                if hasattr(model, "infer"):
+                    model_output = model.infer(
+                        speaker_ids[0:1],
+                        text[0:1],
+                        0.8,
+                        dur=durations,
+                        f0=None,
+                        energy_avg=None,
+                        voiced_mask=None,
+                        sigma_f0=attribute_sigma,
+                        sigma_energy=attribute_sigma,
+                        audio_embedding=audio_embedding_argument,
+                    )
                 else:
-                    audio_embedding_argument = None
-                # try:
-                if attribute_sigma > 0.0:
-                    if hasattr(model, "infer"):
-                        model_output = model.infer(
-                            speaker_ids[0:1],
-                            text[0:1],
-                            0.8,
-                            dur=durations,
-                            f0=None,
-                            energy_avg=None,
-                            voiced_mask=None,
-                            sigma_f0=attribute_sigma,
-                            sigma_energy=attribute_sigma,
-                            audio_embedding=audio_embedding_argument,
-                        )
-                    else:
-                        model_output = model.module.infer(
-                            speaker_ids[0:1],
-                            text[0:1],
-                            0.8,
-                            dur=durations,
-                            f0=None,
-                            energy_avg=None,
-                            voiced_mask=None,
-                            sigma_f0=attribute_sigma,
-                            sigma_energy=attribute_sigma,
-                            audio_embedding=audio_embedding_argument,
-                        )
+                    model_output = model.module.infer(
+                        speaker_ids[0:1],
+                        text[0:1],
+                        0.8,
+                        dur=durations,
+                        f0=None,
+                        energy_avg=None,
+                        voiced_mask=None,
+                        sigma_f0=attribute_sigma,
+                        sigma_energy=attribute_sigma,
+                        audio_embedding=audio_embedding_argument,
+                    )
+            else:
+                if hasattr(model, "infer"):
+                    model_output = model.infer(
+                        speaker_ids[0:1],
+                        text[0:1],
+                        0.8,
+                        dur=durations,
+                        f0=f0[0:1, : durations.sum()],
+                        energy_avg=energy_avg[0:1, : durations.sum()],
+                        voiced_mask=voiced_mask[0:1, : durations.sum()],
+                        audio_embedding=audio_embedding_argument,
+                    )
                 else:
-                    if hasattr(model, "infer"):
-                        model_output = model.infer(
-                            speaker_ids[0:1],
-                            text[0:1],
-                            0.8,
-                            dur=durations,
-                            f0=f0[0:1, : durations.sum()],
-                            energy_avg=energy_avg[0:1, : durations.sum()],
-                            voiced_mask=voiced_mask[0:1, : durations.sum()],
-                            audio_embedding=audio_embedding_argument,
-                        )
-                    else:
-                        model_output = model.module.infer(
-                            speaker_ids[0:1],
-                            text[0:1],
-                            0.8,
-                            dur=durations,
-                            f0=f0[0:1, : durations.sum()],
-                            energy_avg=energy_avg[0:1, : durations.sum()],
-                            voiced_mask=voiced_mask[0:1, : durations.sum()],
-                            audio_embedding=audio_embedding_argument,
-                        )
-                # except:
-                #     print("Instability or issue occured during inference, skipping sample generation for TB logger")
-                #     continue
-                mels = model_output["mel"]
-                if hasattr(vocoder, "forward"):
-                    audio = vocoder(mels.cpu()).float()[0]
-                audio = audio[0].detach().cpu().numpy()
-                audio = audio / np.abs(audio).max()
-                if attribute_sigma < 0:
-                    sample_tag = "decoder_sample_gt_attributes"
-                else:
-                    sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
-                if oos_name is not None:
-                    sample_tag = f"{sample_tag}_oos_{oos_name}"
-                audios[sample_tag] = audio
+                    model_output = model.module.infer(
+                        speaker_ids[0:1],
+                        text[0:1],
+                        0.8,
+                        dur=durations,
+                        f0=f0[0:1, : durations.sum()],
+                        energy_avg=energy_avg[0:1, : durations.sum()],
+                        voiced_mask=voiced_mask[0:1, : durations.sum()],
+                        audio_embedding=audio_embedding_argument,
+                    )
+            mels = model_output["mel"]
+            # NOTE (Sam): run vocoder on CPU to avoid taking up valuable GPU vRAM.
+            mels = mels.cpu()
+            f0 = f0.cpu()
+            durations = durations.cpu()
+            if hasattr(vocoder, "m_source"):
+                # NOTE (Sam): due to duration manipulation mentioned above, we need to use mels.size(2) rather than durations.sum().
+                audio = vocoder(mels.cpu(), f0=f0[0:1, : mels.size(2)]).float()[0]
+            else:
+                audio = vocoder(mels.cpu()).float()[0]
+            audio = audio[0].detach().cpu().numpy()
+            audio = audio / np.abs(audio).max()
+            if attribute_sigma < 0:
+                sample_tag = "decoder_sample_gt_attributes"
+            else:
+                sample_tag = f"sample_attribute_sigma_{attribute_sigma}"
+            if oos_name is not None:
+                sample_tag = f"{sample_tag}_oos_{oos_name}"
+            audios[sample_tag] = {"audio": torch.tensor(audio)}
 
     return images, audios

@@ -48,6 +48,7 @@ DEFAULTS = {
     "resblock_kernel_sizes": [3, 7, 11],
     "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
     "p_blur": 0.0,
+    "sr": 22050,
 }
 
 
@@ -63,19 +64,18 @@ def _load_uninitialized(device="cpu", config_overrides=None):
 
 
 # NOTE (Sam): this is the loading method used by radtts
-# TODO (Sam): combine loading methods
+# TODO (Sam): combine loading method
 def get_vocoder(hifi_gan_config_path, hifi_gan_checkpoint_path):
     print("Getting vocoder")
 
     with open(hifi_gan_config_path) as f:
-        hifigan_config = json.load(f)
-
-    h = AttrDict(hifigan_config)
-    hifigan_config["p_blur"] = 0.0
-    model = Generator(**h)
-    print("Loading pretrained model...")
-    load_pretrained(model, hifi_gan_checkpoint_path)
-    print("Got pretrained model...")
+        config_overrides = json.load(f)
+    model = _load_uninitialized(config_overrides=config_overrides)
+    state_dict = torch.load(hifi_gan_checkpoint_path, map_location=torch.device("cpu"))
+    if "generator" in state_dict:
+        model.load_state_dict(state_dict["generator"])
+    else:
+        model.load_state_dict(state_dict["state_dict"]["model_gen"])  # For Diffsinger
     model.eval()
     return model
 
@@ -102,12 +102,14 @@ class Generator(torch.nn.Module):
         sr=22050,
         is_half=False,
         gin_channels=0,
+        harmonic_num=0,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
         self.conv_post_bias = conv_post_bias
         self.use_noise_convs = use_noise_convs
+        self.sr = sr
         # TODO (Sam): detect this automatically
         if weight_norm_conv:
             self.conv_pre = weight_norm(
@@ -120,7 +122,7 @@ class Generator(torch.nn.Module):
         if use_noise_convs:
             self.noise_convs = nn.ModuleList()
             self.m_source = SourceModuleHnNSF(
-                sampling_rate=sr, harmonic_num=0, is_half=is_half
+                sampling_rate=sr, harmonic_num=harmonic_num, is_half=is_half
             )
             self.upp = np.prod(upsample_rates)
 

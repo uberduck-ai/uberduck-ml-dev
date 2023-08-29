@@ -135,11 +135,13 @@ class RADTTS(torch.nn.Module):
         use_first_order_features=False,
         unvoiced_bias_activation="",
         ap_pred_log_f0=False,
+        is_cuda=torch.cuda.is_available(),
         **kwargs
     ):
         super(RADTTS, self).__init__()
         assert n_early_size % 2 == 0
         self.do_mel_descaling = kwargs.get("do_mel_descaling", True)
+        self.is_cuda = is_cuda
         self.n_mel_channels = n_mel_channels
         self.n_f0_dims = n_f0_dims  # >= 1 to trains with f0
         self.n_energy_avg_dims = n_energy_avg_dims  # >= 1 trains with energy
@@ -500,7 +502,6 @@ class RADTTS(torch.nn.Module):
         f0=None,
         energy_avg=None,
         voiced_mask=None,
-        p_voiced=None,
         audio_embedding=None,
     ):
         # NOTE (Sam): hacky solution until check speaker_ids isn't being used as a positional argument.
@@ -513,6 +514,12 @@ class RADTTS(torch.nn.Module):
 
         if audio_embedding is not None:
             speaker_vecs = audio_embedding
+
+        # NOTE (Sam): pyin gives a explicit voiced_mask.
+        # For other pitch computation methods like parselmouth, we compute it.
+        # NOTE (Sam): parselmouth pitches look better than pyin.
+        if voiced_mask is None:
+            voiced_mask = f0.bool().int()
 
         text_enc, text_embeddings = self.encode_text(text, in_lens)
         #  NOTE (Sam): text_enc = text_enc.double() was necessary for inference without dataloader - no clue why.
@@ -551,7 +558,6 @@ class RADTTS(torch.nn.Module):
             else:
                 attn = attn_soft
 
-            # print(text_enc.type(),attn.type(), 'report card')
             context = torch.bmm(text_enc, attn.squeeze(1).transpose(1, 2))
 
         f0_bias = 0
@@ -721,6 +727,9 @@ class RADTTS(torch.nn.Module):
         audio_embedding=None,
         text_lengths=None,
     ):
+        # NOTE (Sam): I don't think we want this here since there's already some complex logic on it.
+        # if voiced_mask is None:
+        #     voiced_mask = f0.bool().int()
         batch_size = text.shape[0]
         n_tokens = text.shape[1]
         if audio_embedding is not None:
@@ -742,8 +751,8 @@ class RADTTS(torch.nn.Module):
 
         txt_enc, txt_emb = self.encode_text(text, None)
         if dur is None:
-            # TODO (Sam): replace non-controllable is_available with controllable global setting. This is useful for debugging.
-            if torch.cuda.is_available():
+            # NOTE (Sam): non-controllable is_available blocks debugging on gpu.
+            if self.is_cuda:
                 z_dur = torch.cuda.FloatTensor(batch_size, 1, n_tokens)
             else:
                 z_dur = torch.FloatTensor(batch_size, 1, n_tokens)
@@ -802,7 +811,7 @@ class RADTTS(torch.nn.Module):
 
             if f0 is None:
                 n_f0_feature_channels = 2 if self.use_first_order_features else 1
-                if torch.cuda.is_available():
+                if self.is_cuda:
                     z_f0 = (
                         torch.cuda.FloatTensor(
                             batch_size, n_f0_feature_channels, max_n_frames
@@ -834,7 +843,7 @@ class RADTTS(torch.nn.Module):
 
             if energy_avg is None:
                 n_energy_feature_channels = 2 if self.use_first_order_features else 1
-                if torch.cuda.is_available():
+                if self.is_cuda:
                     z_energy_avg = (
                         torch.cuda.FloatTensor(
                             batch_size, n_energy_feature_channels, max_n_frames
@@ -885,7 +894,7 @@ class RADTTS(torch.nn.Module):
                 txt_enc_time_expanded, spk_vec, out_lens, None, None
             )
 
-        if torch.cuda.is_available():
+        if self.is_cuda:
             residual = torch.cuda.FloatTensor(
                 batch_size, 80 * self.n_group_size, max_n_frames // self.n_group_size
             )
