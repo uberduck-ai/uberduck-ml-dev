@@ -119,6 +119,8 @@ class Generator(torch.nn.Module):
             self.conv_pre = Conv1d(
                 initial_channel, upsample_initial_channel, 7, 1, padding=3
             )
+
+        print(use_noise_convs, "asdfasdfasdf")
         if use_noise_convs:
             self.noise_convs = nn.ModuleList()
             self.m_source = SourceModuleHnNSF(

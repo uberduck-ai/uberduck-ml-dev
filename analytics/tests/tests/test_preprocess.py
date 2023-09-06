@@ -12,7 +12,7 @@ class TestGetMels:
         spectrogram_path_list,
         target_spectrogram_path_list,
     ):
-        get_mels(resampled_normalized_path_list, data_config, spectrogram_path_list)
+        get(resampled_normalized_path_list, spectrogram_path_list)
         for sp, tsp in zip(
             resampled_normalized_path_list,
             spectrogram_path_list,
@@ -24,4 +24,3 @@ class TestGetMels:
     def test_compute_mels_diffsinger(self, resampled_normalized_path_list,
         spectrogram_path_list,
         target_spectrogram_path_list):
-        
