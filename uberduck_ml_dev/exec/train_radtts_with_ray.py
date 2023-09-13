@@ -1,5 +1,6 @@
 import sys
 import json
+import os
 
 from ray.air.config import ScalingConfig, RunConfig
 from ray.train.torch import TorchTrainer
@@ -16,6 +17,7 @@ if __name__ == "__main__":
         with open(args.config) as f:
             config = json.load(f)
 
+    os.makedirs(config["train_config"]["output_dir"], exist_ok=True)
     trainer = TorchTrainer(
         train_loop_per_worker=train_func,
         train_loop_config=config,
