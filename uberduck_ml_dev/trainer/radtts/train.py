@@ -14,6 +14,7 @@ from ...models.hifigan import get_vocoder
 
 def get_config(
     filename="",
+    full=False,
     output_directory="",
     learning_rate=1e-4,
     log_attribute_samples=False,
@@ -30,6 +31,7 @@ def get_config(
     filelist_path="",
     heteronyms_path="",
     phoneme_dict_path="",
+    is_zero_shot=True,
 ):
     train_config = dict(
         log_attribute_samples=log_attribute_samples,
@@ -42,13 +44,14 @@ def get_config(
         warmstart_checkpoint_path=warmstart_checkpoint_path,
         vocoder_config_path=vocoder_config_path,
         vocoder_checkpoint_path=vocoder_checkpoint_path,
+        unfreeze_modules=unfreeze_modules,
     )
 
     data_config = dict(
         num_workers=num_workers,
-        unfreeze_modules=unfreeze_modules,
         heteronyms_path=heteronyms_path,
         phoneme_dict_path=phoneme_dict_path,
+        is_zero_shot=is_zero_shot,
         training_files={
             "dataset_1": {
                 "basedir": "",
@@ -67,9 +70,26 @@ def get_config(
         },
     )
     model_config = dict(include_modules=include_modules)
-    output = dict(
-        train_config=train_config, data_config=data_config, model_config=model_config
-    )
+    from uberduck_ml_dev.trainer.radtts.train import DEFAULTS as TRAIN_CONFIG
+    from uberduck_ml_dev.data.data import RADTTS_DEFAULTS as DATA_CONFIG
+    from uberduck_ml_dev.models.radtts import DEFAULTS as MODEL_CONFIG
+
+    if full:
+        output = dict(
+            train_config=TRAIN_CONFIG,
+            data_config=DATA_CONFIG,
+            model_config=MODEL_CONFIG,
+        )
+        output["train_config"].update(train_config)
+        output["data_config"].update(data_config)
+        output["model_config"].update(model_config)
+
+    else:
+        output = dict(
+            train_config=train_config,
+            data_config=data_config,
+            model_config=model_config,
+        )
 
     with open(filename, "w") as f:
         json.dump(output, f)
@@ -164,18 +184,18 @@ DEFAULTS = {
     "learning_rate": 1e-4,
     "weight_decay": 1e-6,
     "sigma": 1.0,
-    "iters_per_checkpoint": 50000,
+    "iters_per_checkpoint": 10000,
     "batch_size": 32,
     "seed": 1234,
     "checkpoint_path": "",
     "ignore_layers": [],
     "ignore_layers_warmstart": [],
-    "steps_per_sample": 10000,
+    "steps_per_sample": 500,
     "include_layers": [],
     "vocoder_config_path": "hifigan_22khz_config.json",
     "vocoder_checkpoint_path": "hifigan_libritts100360_generator0p5.pt",
     "log_attribute_samples": False,
-    "log_decoder_samples": False,
+    "log_decoder_samples": True,
     "warmstart_checkpoint_path": "",  # NOTE (Sam): this also "loads_checkpoint" (i.e. no optimizer state initialization).
     "use_amp": True,
     "grad_clip_val": 1.0,
@@ -188,8 +208,8 @@ DEFAULTS = {
         "energy_loss_weight": 1.0,
         "vpred_loss_weight": 1.0,
     },
-    "binarization_start_iter": 18000,
-    "kl_loss_start_iter": 40000,
+    "binarization_start_iter": 3000,
+    "kl_loss_start_iter": 10000,
     "unfreeze_modules": "all",
     "n_gpus": 1,
 }
