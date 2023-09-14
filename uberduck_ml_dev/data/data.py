@@ -1002,6 +1002,7 @@ RADTTS_DEFAULTS = {
     "f0_min": 80.0,
     "f0_max": 640.0,
     "max_wav_value": 32768.0,
+    "is_zero_shot": False,
     "use_f0": True,
     "use_log_f0": 0,
     "use_energy_avg": True,
@@ -1025,6 +1026,11 @@ RADTTS_DEFAULTS = {
     "distance_tx_unvoiced": False,
     "mel_noise_scale": 0.0,
     "num_workers": 4,
+    "audio_embedding_suffix": "coqui_resnet_512_emb.pt",
+    "audio_suffix": "audio_resampled_normalized.wav",
+    "mel_suffix": "spectrogram.pt",
+    "f0_suffix": "f0.pt",
+    "f0_type": "pyin",
 }
 
 

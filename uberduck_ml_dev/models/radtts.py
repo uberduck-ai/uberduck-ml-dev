@@ -1123,4 +1123,5 @@ DEFAULTS = {
             },
         },
     },
+    "do_mel_descaling": True,  # TODO (Sam): move to data config
 }
