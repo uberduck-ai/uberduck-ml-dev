@@ -1,5 +1,5 @@
 # Deprecation note
-This repo is still used in `uberduck`, but we are moving away from making changes to this repository, and will eventually incorporate its code inside uberduck without having to import `uberduck_ml_dev` from this repository. 
+We are moving away from maintaining this repository. 
 
 # 🦆 ~~Uberduck Synthetic Speech~~
 ![](https://img.shields.io/github/forks/uberduck-ai/uberduck-ml-dev)
