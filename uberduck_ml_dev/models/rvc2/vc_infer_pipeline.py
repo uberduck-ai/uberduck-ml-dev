@@ -226,7 +226,7 @@ class VC(object):
                 f0 = f0[1:]  # Get rid of first frame.
             elif method == "rmvpe":
                 if hasattr(self, "model_rmvpe") == False:
-                    from rmvpe import RMVPE
+                    from .rmvpe import RMVPE
 
                     print("loading rmvpe model")
                     self.model_rmvpe = RMVPE(
