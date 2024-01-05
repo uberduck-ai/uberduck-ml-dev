@@ -7,7 +7,7 @@ from torch.nn import functional as F
 
 from . import commons
 from . import modules
-from . import LayerNorm
+from .modules import LayerNorm
 
 
 class Encoder(nn.Module):
