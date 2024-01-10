@@ -15,6 +15,14 @@ bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
 input_audio_path2wav = {}
 
+class VCConfig:
+    def __init__(self, device="cpu"):
+        self.x_pad = 1
+        self.x_query = 6
+        self.x_center = 38
+        self.x_max = 41
+        self.is_half = False
+        self.device = device
 
 @lru_cache
 def cache_harvest_f0(input_audio_path, fs, f0max, f0min, frame_period):
