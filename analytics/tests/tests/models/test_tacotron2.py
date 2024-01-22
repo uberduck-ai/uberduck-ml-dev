@@ -2,7 +2,7 @@ import json
 
 import torch
 from einops import rearrange
-import torch
+
 import numpy as np
 
 from uberduck_ml_dev.text.utils import prepare_input_sequence
@@ -17,7 +17,7 @@ from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 class TestTacotron2Model:
     def test_tacotron2_model(self):
         config = TACOTRON2_TRAINER_DEFAULTS.values()
-        with open("analytics/tests/fixtures/ljtest/taco2_lj2lj.json") as f:
+        with open('analytics/tests/fixtures/ljtest/taco2_lj2lj.json', encoding='utf-8') as f:
             config.update(json.load(f))
         hparams = HParams(**config)
 
