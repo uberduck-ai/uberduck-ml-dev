@@ -19,7 +19,7 @@ from uberduck_ml_dev.vendor.tfcompat.hparam import HParams
 # NOTE (Sam): move to Tacotron2 model and remove from Uberduck repo.
 def _load_tacotron_uninitialized(overrides=None):
     overrides = overrides or {}
-    defaults = dict(**TACOTRON2_DEFAULTS.values())
+    defaults = {**TACOTRON2_DEFAULTS.values()}
     defaults.update(overrides)
     hparams = HParams(**defaults)
     return Tacotron2(hparams)
@@ -75,7 +75,7 @@ def sample_inference_tf_spectrogram():
 def lj_trainer(lj_speech_tacotron2_file):
     # NOTE (Sam): It may be nicer to specify trainer here and test-specific parameters (e.g. data) in test itself.
     config = TACOTRON2_TRAINER_DEFAULTS.values()
-    params = dict(
+    params = {
         warm_start_name=lj_speech_tacotron2_file.name,
         training_audiopaths_and_text=os.path.join(
             os.path.dirname(__file__), "fixtures/ljtest/list_small.txt"
@@ -93,7 +93,7 @@ def lj_trainer(lj_speech_tacotron2_file):
         # NOTE (Sam): this effects the reduction in loss in the gradient descent,
         # so we need a separate test of validation and logging code.
         is_validate=False,
-    )
+    }
     config.update(params)
     hparams = HParams(**config)
 
