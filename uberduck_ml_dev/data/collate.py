@@ -42,7 +42,7 @@ class Collate:
         output = Batch()
 
         if return_audio:
-            max_target_len = max([x["audio"].size(0) for x in batch])
+            max_target_len = max(x['audio'].size(0) for x in batch)
             audio_padded = torch.FloatTensor(len(batch), max_target_len)
             audio_padded.zero_()
             audio_lengths = torch.LongTensor(len(batch))
@@ -66,7 +66,7 @@ class Collate:
 
         if return_mels:
             n_mel_channels = batch[0]["mel"].size(0)
-            max_target_len = max([x["mel"].size(1) for x in batch])
+            max_target_len = max(x['mel'].size(1) for x in batch)
             mel_padded = torch.FloatTensor(len(batch), n_mel_channels, max_target_len)
             mel_padded.zero_()
             mel_lengths = torch.LongTensor(len(batch))
@@ -90,7 +90,7 @@ class Collate:
             output["speaker_ids"] = speaker_ids
 
         if return_f0s:
-            max_target_len = max([x["f0"].size(0) for x in batch])
+            max_target_len = max(x['f0'].size(0) for x in batch)
             f0_padded = torch.FloatTensor(len(batch), 1, max_target_len)
             f0_padded.zero_()
             for i, sample in enumerate(batch):
@@ -142,7 +142,7 @@ class DataCollateRADTTS:
 
         # Right zero-pad mel-spec
         num_mel_channels = batch[0]["mel"].size(0)
-        max_target_len = max([x["mel"].size(1) for x in batch])
+        max_target_len = max(x['mel'].size(1) for x in batch)
 
         # include mel padded, gate padded and speaker ids
         mel_padded = torch.FloatTensor(len(batch), num_mel_channels, max_target_len)
@@ -272,8 +272,8 @@ class TextAudioCollateMultiNSFsid:
             torch.LongTensor([x[0].size(1) for x in batch]), dim=0, descending=True
         )
 
-        max_spec_len = max([x[0].size(1) for x in batch])
-        max_wave_len = max([x[1].size(1) for x in batch])
+        max_spec_len = max(x[0].size(1) for x in batch)
+        max_wave_len = max(x[1].size(1) for x in batch)
         spec_lengths = torch.LongTensor(len(batch))
         wave_lengths = torch.LongTensor(len(batch))
         spec_padded = torch.FloatTensor(len(batch), batch[0][0].size(0), max_spec_len)
@@ -281,7 +281,7 @@ class TextAudioCollateMultiNSFsid:
         spec_padded.zero_()
         wave_padded.zero_()
 
-        max_phone_len = max([x[2].size(0) for x in batch])
+        max_phone_len = max(x[2].size(0) for x in batch)
         phone_lengths = torch.LongTensor(len(batch))
         phone_padded = torch.FloatTensor(
             len(batch), max_phone_len, batch[0][2].shape[1]

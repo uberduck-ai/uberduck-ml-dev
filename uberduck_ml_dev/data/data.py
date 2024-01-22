@@ -16,29 +16,18 @@ import librosa
 from librosa import pyin
 import parselmouth
 
-from ..models.common import MelSTFT
+from ..models.common import FILTER_LENGTH, HOP_LENGTH, MelSTFT, N_MEL_CHANNELS, SAMPLING_RATE, TacotronSTFT, WIN_LENGTH
 from ..utils.utils import (
     load_filepaths_and_text,
     intersperse,
 )
-from .utils import (
-    oversample,
-    _orig_to_dense_speaker_id,
-    beta_binomial_prior_distribution,
-)
+from .utils import _orig_to_dense_speaker_id, beta_binomial_prior_distribution, oversample, spectrogram_torch
 from ..text.utils import text_to_sequence
 from ..text.text_processing import TextProcessing
-from ..models.common import (
-    FILTER_LENGTH,
-    HOP_LENGTH,
-    WIN_LENGTH,
-    SAMPLING_RATE,
-    N_MEL_CHANNELS,
-    TacotronSTFT,
-)
+
 from ..text.symbols import NVIDIA_TACO2_SYMBOLS
 from ..trainer.rvc.utils import load_wav_to_torch
-from .utils import spectrogram_torch
+
 
 
 from ..models.tacotron2 import MAX_WAV_VALUE
@@ -185,7 +174,7 @@ class Data(Dataset):
     # NOTE (Sam): this is the RADTTS version - more recent than mellotron from the same author.
     # NOTE (Sam): in contrast to get_gst, the computation here is kept in this file rather than a functional argument.
     def _get_f0(self, audiopath, audio):
-        filename = "_".join(audiopath.split("/")).split(".wav")[0]
+        filename = '_'.join(audiopath.split('/')).split('.wav', maxsplit=1)[0]
         f0_path = os.path.join(self.f0_cache_path, filename)
         f0_path += "_f0_sr{}_fl{}_hl{}_f0min{}_f0max{}_log{}.pt".format(
             self.sampling_rate,
@@ -337,10 +326,7 @@ class Data(Dataset):
 
     def sample_test_batch(self, size):
         idx = np.random.choice(range(len(self)), size=size, replace=False)
-        test_batch = []
-        for index in idx:
-            test_batch.append(self.__getitem__(index))
-        return test_batch
+        return [self.__getitem__(index) for index in idx]
 
     def get_f0_pvoiced(
         self,
@@ -505,6 +491,8 @@ class DataRADTTS(torch.utils.data.Dataset):
 
     def load_data(self, datasets, split="|"):
         dataset = []
+
+        duration = -1
         for dset_name, dset_dict in datasets.items():
             folder_path = dset_dict["basedir"]
             audiodir = dset_dict["audiodir"]
@@ -521,9 +509,11 @@ class DataRADTTS(torch.utils.data.Dataset):
             with open(filelist_path, encoding="utf-8") as f:
                 data = [line.strip().split(split) for line in f]
 
+
+            
             for d in data:
                 # NOTE (Sam): BEWARE! change/comment depending on filelist.
-                duration = -1
+                
                 dataset.append(
                     {
                         "audiopath": os.path.join(wav_folder_prefix, d[0]),
@@ -776,9 +766,7 @@ class DataMel(Dataset):
         return None
 
     def __len__(self):
-        nfiles = len(self.audiopaths)
-
-        return nfiles
+        return len(self.audiopaths)
 
 
 def get_f0_pvoiced(
@@ -968,9 +956,7 @@ class DataPitch:
         return None
 
     def __len__(self):
-        nfiles = len(self.audiopaths)
-
-        return nfiles
+        return len(self.audiopaths)
 
 
 RADTTS_DEFAULTS = {
@@ -1073,8 +1059,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         self.lengths = lengths
 
     def get_sid(self, sid):
-        sid = torch.LongTensor([int(sid)])
-        return sid
+        return torch.LongTensor([int(sid)])
 
     def get_audio_text_pair(self, audiopath_and_text):
         file = audiopath_and_text[0]
@@ -1194,9 +1179,11 @@ class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
                 self.boundaries.pop(i + 1)
 
         num_samples_per_bucket = []
+
+        total_batch_size = self.num_replicas * self.batch_size
         for i in range(len(buckets)):
             len_bucket = len(buckets[i])
-            total_batch_size = self.num_replicas * self.batch_size
+            
             rem = (
                 total_batch_size - (len_bucket % total_batch_size)
             ) % total_batch_size
@@ -1256,16 +1243,15 @@ class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
         if hi is None:
             hi = len(self.boundaries) - 1
 
-        if hi > lo:
-            mid = (hi + lo) // 2
-            if self.boundaries[mid] < x and x <= self.boundaries[mid + 1]:
-                return mid
-            elif x <= self.boundaries[mid]:
-                return self._bisect(x, lo, mid)
-            else:
-                return self._bisect(x, mid + 1, hi)
-        else:
+        if hi <= lo:
             return -1
+
+        mid = (hi + lo) // 2
+        if self.boundaries[mid] < x and x <= self.boundaries[mid + 1]:
+            return mid
+        if x <= self.boundaries[mid]:
+            return self._bisect(x, lo, mid)
+        return self._bisect(x, mid + 1, hi)
 
     def __len__(self):
         return self.num_samples // self.batch_size

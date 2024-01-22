@@ -11,12 +11,12 @@ class TestTrainer:
     def test_trainer_base(self):
         config = TRAINER_DEFAULTS.values()
 
-        params = dict(
+        params = {
             checkpoint_name="test",
             checkpoint_path="test_checkpoint",
             cudnn_enabled=True,
             log_dir="this/is/a/test",
-        )
+        }
         config.update(params)
         hparams = HParams(**config)
         trainer = TTSTrainer(hparams)
