@@ -100,3 +100,45 @@ def lj_trainer(lj_speech_tacotron2_file):
     trainer = Tacotron2Trainer(hparams, rank=0, world_size=1)
 
     return trainer
+
+
+from scipy.io.wavfile import read
+
+
+@pytest.fixture()
+def raw_audio_files(raw_audio_file_paths):
+    output = [read(raw_audio_file_path) for raw_audio_file_path in raw_audio_file_paths]
+    return output
+
+
+@pytest.fixture()
+def resampled_normalized_audio_files(resampled_normalized_audio_file_paths):
+    output = [
+        read(resampled_normalized_audio_file_path)
+        for resampled_normalized_audio_file_path in resampled_normalized_audio_file_paths
+    ]
+    return output
+
+
+@pytest.fixture()
+def radtts_spectrograms(radtts_spectrogram_paths):
+    output = [
+        torch.load(radtts_spectrogram_path)
+        for radtts_spectrogram_path in radtts_spectrogram_paths
+    ]
+    return output
+
+
+@pytest.fixture()
+def pyin_f0s(pyin_f0_paths):
+    output = [torch.load(pyin_f0_path) for pyin_f0_path in pyin_f0_paths]
+    return output
+
+
+@pytest.fixture()
+def audio_embeddings(audio_embeddings_paths):
+    output = [
+        torch.load(audio_embedding_path)
+        for audio_embedding_path in audio_embeddings_paths
+    ]
+    return output

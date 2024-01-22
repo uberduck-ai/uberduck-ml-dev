@@ -20,7 +20,7 @@ class Processor:
 
     def _get_data(self, source_path, target_path):
         # NOTE (Sam): we need caching to debug training issues in dev and for speed!
-        # NOTE (Sam): won't catch issues with recomputation using different parameters but name name
+        # NOTE (Sam): won't catch issues with recomputation using different parameters but ssame name
         # TODO (Sam): add hashing
         if self.recompute or not os.path.exists(target_path):
             self.function_(source_path, target_path)

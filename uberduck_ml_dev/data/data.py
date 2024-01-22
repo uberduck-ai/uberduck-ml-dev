@@ -926,7 +926,10 @@ class DataPitch:
             #     )  # undoes normalization
             #     data = (data * MAX_WAV_VALUE) / (np.abs(data).max() * 2)
             # else:
+
             rate, data = read(audiopath)
+            if data.dtype == np.int16:
+                data = data / np.abs(data.max())
             if self.method == "radtts":
                 pitch = get_f0_pvoiced(
                     data,
