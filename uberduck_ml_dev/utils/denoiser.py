@@ -22,6 +22,7 @@ audio_denoised = audio_denoised * normalize
 import sys
 import torch
 from ..models.common import STFT
+from ..vocoders.istftnet import iSTFTNetGenerator, TorchSTFT
 
 
 class Denoiser(torch.nn.Module):
@@ -46,11 +47,21 @@ class Denoiser(torch.nn.Module):
             raise Exception("Mode {} if not supported".format(mode))
 
         with torch.no_grad():
-            bias_audio = (
-                hifigan.vocoder.forward(mel_input.to(hifigan.device))
-                .view(1, -1)
-                .float()
-            )
+            if isinstance(hifigan, iSTFTNetGenerator):
+                self.stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16, device="cpu").to("cpu")
+                spec, phase = hifigan.vocoder(mel_input.to(hifigan.device))
+                y_g_hat = self.stft.inverse(spec.cpu(), phase.cpu())
+                bias_audio = (
+                    y_g_hat
+                    .view(1, -1)
+                    .float()
+                )
+            else:
+                bias_audio = (
+                    hifigan.vocoder.forward(mel_input.to(hifigan.device))
+                    .view(1, -1)
+                    .float()
+                )
             bias_spec, _ = self.stft.transform(bias_audio.cpu())
 
         self.register_buffer("bias_spec", bias_spec[:, :, 0][:, :, None])
